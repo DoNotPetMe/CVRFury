@@ -51,7 +51,7 @@ namespace CVRFury.Builder
                 var idx = layers.Length - 1;
                 layers[idx].defaultWeight = dst.layers.Length == 1 ? 1f : srcLayer.defaultWeight;
                 layers[idx].blendingMode = srcLayer.blendingMode;
-                layers[idx].ikPass = srcLayer.ikPass;
+                layers[idx].iKPass = srcLayer.iKPass;
                 layers[idx].avatarMask = srcLayer.avatarMask;
                 dst.layers = layers;
 
