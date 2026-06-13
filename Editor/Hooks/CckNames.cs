@@ -9,6 +9,11 @@ namespace CVRFury.Builder
     /// If a future CCK release renames a member, update the single constant here; CVRFury
     /// surfaces a clear diagnostic and skips the affected feature rather than corrupting
     /// an upload.
+    ///
+    /// Authoritative reference for these names/behaviours: the official ChilloutVR CCK docs
+    /// at https://docs.chilloutvr.net/cck/ (the CVRAvatar component + Advanced Avatar Settings
+    /// pages). When the docs and a real CCK install disagree, the install wins — verify with
+    /// Tools ▸ CVRFury ▸ Diagnose CCK Integration, which reads the actual loaded assemblies.
     /// </summary>
     internal static class CckNames
     {

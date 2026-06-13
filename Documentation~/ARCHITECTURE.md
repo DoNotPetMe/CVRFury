@@ -82,3 +82,13 @@ CVRFury's toggle therefore does two things at once: it builds its own animator
 **layer** (so it can animate anything, not just a GameObject's active state), and
 it registers a matching synced **AAS entry** with the same `machineName` so the
 control appears in the in-game radial/menu and syncs to other players.
+
+## References
+
+- **Official CCK documentation:** https://docs.chilloutvr.net/cck/ — the
+  authoritative source for the CVRAvatar component, Advanced Avatar Settings, and
+  the build/upload pipeline. All reflection names in `Editor/Hooks/CckNames.cs`
+  should track these docs. (Note: the docs site blocks automated scrapers, so the
+  names are also cross-checked against a real CCK install via *Tools ▸ CVRFury ▸
+  Diagnose CCK Integration* — when in doubt, the install wins.)
+- VRChat-side names (for the converter) live in `Editor/Convert/VrcNames.cs`.
