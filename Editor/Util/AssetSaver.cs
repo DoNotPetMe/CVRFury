@@ -27,6 +27,18 @@ namespace CVRFury.Builder
             return new AssetSaver(unique);
         }
 
+        /// <summary>A persistent output folder for conversion results (kept, not wiped like build
+        /// temp). Lives under "Assets/CVRFury Converted/&lt;avatar&gt;".</summary>
+        public static AssetSaver CreatePersistent(string avatarName)
+        {
+            const string root = "Assets/CVRFury Converted";
+            EnsureFolder(root);
+            var unique = AssetDatabase.GenerateUniqueAssetPath($"{root}/{MakeSafe(avatarName)}");
+            Directory.CreateDirectory(unique);
+            AssetDatabase.Refresh();
+            return new AssetSaver(unique);
+        }
+
         /// <summary>Persist a generated object and return it. Safe to call on an object that is
         /// already an asset (no-op in that case).</summary>
         public T Save<T>(T obj, string name) where T : Object

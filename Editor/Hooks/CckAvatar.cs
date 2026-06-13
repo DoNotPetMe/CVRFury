@@ -31,6 +31,43 @@ namespace CVRFury.Builder
             return comp != null ? new CckAvatar(comp) : null;
         }
 
+        /// <summary>Find the CVRAvatar, adding one if the object doesn't have it yet. Returns null
+        /// only if the CCK isn't installed. Used by the VRChat converter.</summary>
+        public static CckAvatar EnsureOn(GameObject root)
+        {
+            var existing = FindOn(root);
+            if (existing != null) return existing;
+
+            var type = Reflect.FindType(CckNames.AvatarType);
+            if (type == null) return null;
+            var comp = root.AddComponent(type);
+            return comp != null ? new CckAvatar(comp) : null;
+        }
+
+        /// <summary>Ensure Advanced Avatar Settings are enabled and have a live container + list, so
+        /// converters can append entries even on a freshly-added CVRAvatar.</summary>
+        public void EnsureAdvancedSettingsContainer()
+        {
+            EnableAdvancedSettings();
+
+            var aas = AdvancedSettings;
+            if (aas == null)
+            {
+                aas = Reflect.New(Reflect.FindType(CckNames.AdvancedSettingsType));
+                if (aas != null) Reflect.SetField(Component, CckNames.Avatar_AdvancedSettings, aas);
+            }
+            if (aas == null) return;
+
+            if (Reflect.GetField(aas, CckNames.AdvancedSettings_List) == null)
+            {
+                var entryType = Reflect.FindType(CckNames.SettingsEntryType);
+                if (entryType == null) return;
+                var listType = typeof(System.Collections.Generic.List<>).MakeGenericType(entryType);
+                var newList = Reflect.New(listType);
+                if (newList != null) Reflect.SetField(aas, CckNames.AdvancedSettings_List, newList);
+            }
+        }
+
         // ------------------------------------------------------------------ animators
 
         public AnimatorOverrideController Overrides

@@ -90,10 +90,29 @@ VRChat avatars are covered in components that don't exist in a CVR project
 Unity shows each as a broken **"The associated script can not be loaded"**
 component. They're inert, block clean prefab edits, and must never ship.
 
-CVRFury cleans them up:
+### Full conversion — *Tools ▸ CVRFury ▸ VRChat → ChilloutVR Converter*
 
-- **Automatically at build** — broken components are stripped during the bake.
-  Toggle via *Tools ▸ CVRFury ▸ Auto-Clean Missing Scripts on Build* (on by default).
+For a complete port, open the converter window, select your avatar, tick the
+steps you want, and hit **Convert**. The VRChat SDK must be imported so CVRFury
+can read the avatar (convert, then remove the SDK). Steps:
+
+| Step | Default | Does |
+|------|---------|------|
+| Avatar basics | on | Viewpoint, viseme face mesh, blink, eye movement → CVRAvatar |
+| PhysBones → DynamicBones | off | VRCPhysBone(+colliders) → DynamicBone(+colliders), approximate physics |
+| Expressions → AAS | off | Expression menu (toggles/radials/puppets/submenus) + parameters → Advanced Avatar Settings |
+| Merge playable layers | off | FX/Gesture/Action controllers → the CVR animator |
+| Strip VRChat + broken | on | Removes `VRC.*` and missing-script components when done |
+
+> Work on a **copy** — conversion edits the avatar in place (with undo) and
+> deletes the VRChat components. Generated controllers go to `Assets/CVRFury Converted/`.
+
+### Just clean broken components
+
+If you only need the broken `(Script)` components gone:
+
+- **Automatically at build** — stripped during the bake. Toggle via *Tools ▸
+  CVRFury ▸ Auto-Clean Missing Scripts on Build* (on by default).
 - **On demand** — *Tools ▸ CVRFury ▸ Clean Missing Scripts on Selected*. It's
   **prefab-aware**: if the selection is a prefab it offers to fix the prefab
   **asset** permanently (recommended) instead of just patching the scene instance,

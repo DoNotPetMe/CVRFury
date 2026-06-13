@@ -4,6 +4,40 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-06-13
+
+The big one: a VRChat → ChilloutVR conversion engine.
+
+### Added
+- **VRChat → ChilloutVR Converter** (*Tools ▸ CVRFury ▸ VRChat → ChilloutVR
+  Converter*) — a toggle-driven window that turns a VRChat avatar into a
+  CVR-ready one. Reads the VRChat avatar purely by reflection (no compile-time
+  VRChat SDK dependency; the SDK must be present at convert time so its types
+  load — the standard "convert then remove the SDK" workflow). Modular,
+  per-step, each independently toggleable:
+  - **Avatar basics** (default on) — VRCAvatarDescriptor viewpoint, viseme face
+    mesh + lipsync, blink, and eye movement → CVRAvatar.
+  - **PhysBones → DynamicBones** (opt-in) — VRCPhysBone/VRCPhysBoneCollider →
+    DynamicBone/DynamicBoneCollider, colliders re-linked. Physics values are
+    approximate (different models) and may need tuning.
+  - **Expressions → AAS** (opt-in) — VRCExpressionsMenu controls (toggle, radial,
+    puppet, nested submenus) + VRCExpressionParameters → ChilloutVR Advanced
+    Avatar Settings.
+  - **Merge playable layers** (opt-in) — FX/Gesture/Action animator controllers
+    merged into the CVR animator (reusing the parameter-remapping merger);
+    GestureLeft/GestureRight names carry across.
+  - **Strip VRChat + broken components** (default on) — removes all `VRC.*`
+    components and missing scripts once data has been converted.
+- "Enable all automatic" button for one-click aggressive conversion.
+- Centralised VRChat/DynamicBone reflection names in `VrcNames.cs` (fail-soft,
+  like `CckNames`).
+
+### Notes
+- Conversion edits the avatar in place (with undo) and writes generated
+  controllers to `Assets/CVRFury Converted/`. Work on a copy.
+- This complements (does not replace) external converters; it focuses on a
+  built-in, non-destructive-feeling, toggle-driven path inside CVRFury.
+
 ## [0.4.0] - 2026-06-13
 
 VRChat-import quality-of-life and CCK integration verification.

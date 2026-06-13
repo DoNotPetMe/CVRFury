@@ -39,7 +39,8 @@ honest about what exists and what's next.
 | SPS (penetration system) | ⬜ | large; CVR has no DPS/SPS equivalent — would be net-new |
 | Direct Tree / OSC / Advanced | ⬜ | |
 | Remove/strip missing (broken) scripts | ✅ | auto at build + prefab-aware manual tool — key for VRChat imports |
-| Remove/strip known components, fix bad bindings | 🟡 | missing-script removal done; typed VRChat→CVR component mapping still planned |
+| VRChat → CVR converter (descriptor/menu/params/physbones/layers) | ✅ | toggle-driven window; reflection-based; physics values approximate |
+| Typed component mapping fidelity | 🟡 | converter exists; PhysBone physics + puppet→joystick mapping need refinement |
 | World-constraint, Boundingbox fix, Toggle-folder | ⬜ | |
 
 ## CVR-specific quirks still to wire up
