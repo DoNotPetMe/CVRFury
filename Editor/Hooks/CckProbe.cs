@@ -132,5 +132,81 @@ namespace CVRFury.Builder
                    name.StartsWith("Mono.") || name.StartsWith("nunit") || name.StartsWith("Newtonsoft") ||
                    name.StartsWith("com.donotpetme.cvrfury");
         }
+
+        private const BindingFlags AnyMember =
+            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static |
+            BindingFlags.FlattenHierarchy;
+
+        /// <summary>
+        /// Statically check every CCK type / field / enum member CVRFury writes to during a bake, so
+        /// the full reflection contract can be verified without doing an upload. Returns a human
+        /// report for the diagnostic command.
+        /// </summary>
+        public static string ValidateDataModel()
+        {
+            var sb = new System.Text.StringBuilder();
+
+            void Type(string label, string name)
+            {
+                var t = Reflect.FindType(name);
+                sb.AppendLine($"  [{(t != null ? "OK" : "MISSING")}] {label}  ({name})");
+            }
+
+            void Fields(string label, string typeName, params string[] fields)
+            {
+                var t = Reflect.FindType(typeName);
+                if (t == null)
+                {
+                    sb.AppendLine($"  [MISSING] {label} type not found ({typeName}) — fields unchecked");
+                    return;
+                }
+                sb.AppendLine($"  {label} ({t.Name}) fields:");
+                foreach (var f in fields)
+                {
+                    var ok = t.GetField(f, AnyMember) != null || t.GetProperty(f, AnyMember) != null;
+                    sb.AppendLine($"     [{(ok ? "OK" : "MISSING")}] {f}");
+                }
+            }
+
+            void EnumMembers(string label, string enumTypeName, params string[] members)
+            {
+                var t = Reflect.FindType(enumTypeName);
+                if (t == null || !t.IsEnum)
+                {
+                    sb.AppendLine($"  [MISSING] {label} enum not found ({enumTypeName})");
+                    return;
+                }
+                var names = new HashSet<string>(Enum.GetNames(t));
+                sb.AppendLine($"  {label} ({t.Name}) members:");
+                foreach (var m in members)
+                    sb.AppendLine($"     [{(names.Contains(m) ? "OK" : "MISSING")}] {m}");
+            }
+
+            sb.AppendLine("--- Data model contract ---");
+            Fields("CVRAvatar", CckNames.AvatarType,
+                CckNames.Avatar_OverridesField, CckNames.Avatar_BaseControllerField,
+                CckNames.Avatar_AdvancedSettings, CckNames.Avatar_UsesAdvancedSettings,
+                CckNames.Avatar_ViewPosition, CckNames.Avatar_VoicePosition, CckNames.Avatar_FaceMesh,
+                CckNames.Avatar_UseBlinkBlendshapes, CckNames.Avatar_UseVisemeLipsync,
+                CckNames.Avatar_UseEyeMovement);
+
+            Fields("AdvancedAvatarSettings", CckNames.AdvancedSettingsType,
+                CckNames.AdvancedSettings_List, CckNames.AdvancedSettings_BaseController);
+
+            Fields("SettingsEntry", CckNames.SettingsEntryType,
+                CckNames.Entry_Name, CckNames.Entry_MachineName, CckNames.Entry_Type,
+                CckNames.Entry_Setting, CckNames.Entry_UsedType, CckNames.Entry_IsLocal);
+
+            EnumMembers("SettingsType", CckNames.SettingsTypeEnum,
+                CckNames.SettingsType_GameObjectToggle, CckNames.SettingsType_GameObjectDropdown,
+                CckNames.SettingsType_Slider, CckNames.SettingsType_MaterialColor);
+
+            Type("Toggle setting class", CckNames.SettingToggleType);
+            Type("Slider setting class", CckNames.SettingSliderType);
+            Type("Dropdown setting class", CckNames.SettingDropdownType);
+            Type("Dropdown option class", CckNames.DropdownOptionType);
+
+            return sb.ToString();
+        }
     }
 }
