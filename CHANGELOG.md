@@ -4,6 +4,30 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-06-13
+
+Feature expansion toward VRCFury parity.
+
+### Added
+- **Modes** — exclusive multi-state control baked as a synced AAS dropdown plus an
+  animator layer with mutually-exclusive states (outfit/hair/weapon variants).
+  Clips are built with union binding coverage so switching modes fully resets.
+- **Slider** — continuous radial/puppet control baked as a synced AAS slider plus
+  a 1D blend-tree animator layer interpolating a 0% and 100% state.
+- **Avatar Settings** helper — sets the CVRAvatar viewpoint / voice position, face
+  mesh, and the viseme / blink / eye-movement toggles from a prefab.
+- **Blendshape Link "keep live"** — now actually implemented: animated source
+  blendshape curves (from toggles/modes/sliders) are mirrored onto linked meshes,
+  not just copied once statically.
+- **Prop / spawnable pipeline** — hooks `CCK_BuildUtility.PrePropBundleEvent`;
+  applies structural features (Object State) and strips CVRFury components.
+- **Synced-parameter budget check** — warns when an avatar accumulates an unusually
+  large number of synced Advanced Avatar Settings.
+
+### Reflection layer
+- Added AAS dropdown option types/fields and CVRAvatar viseme/blink/eye/viewpoint
+  field names to `CckNames.cs`.
+
 ## [0.1.0] - 2026-06-13
 
 Initial public foundation.

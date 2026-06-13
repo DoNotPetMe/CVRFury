@@ -14,6 +14,9 @@ namespace CVRFury.Components
     {
         public override string FeatureTitle => "Blendshape Link";
 
+        // Run after toggles/modes/sliders so "keep live" can mirror their generated curves.
+        public override int BuildPriority => 50;
+
         [Tooltip("Mesh whose blendshape values are the source of truth (usually the body).")]
         public SkinnedMeshRenderer sourceMesh;
 

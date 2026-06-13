@@ -58,12 +58,47 @@ namespace CVRFury.Builder
             }
 
             FinalizeAnimators(ctx);
+            CheckParameterBudget(ctx);
             StripComponents(avatarRoot);
             assets.Flush();
 
             ctx.Log.Info("CVRFury bake complete.");
             BuildLogWindow.Publish(ctx.Log);
             return true;
+        }
+
+        /// <summary>
+        /// Lightweight pass for props/spawnables, which have no CVRAvatar. Only structural features
+        /// that don't touch Advanced Avatar Settings are applied (currently Object State); CVRFury
+        /// components are always stripped so nothing editor-only ships.
+        /// </summary>
+        public static bool RunProps(GameObject propRoot)
+        {
+            var features = propRoot.GetComponentsInChildren<CVRFuryComponent>(true);
+            if (features.Length == 0) return false;
+
+            foreach (var f in features.OfType<CVRFuryObjectState>())
+            {
+                try { new ObjectStateBuilder().Apply(null, f); }
+                catch (System.Exception e) { Debug.LogError($"[CVRFury] Prop Object State failed: {e.Message}"); }
+            }
+
+            StripComponents(propRoot);
+            return true;
+        }
+
+        /// <summary>ChilloutVR syncs a limited budget of bits across all players. Warn loudly if a
+        /// build registers an unusually large number of synced settings.</summary>
+        private static void CheckParameterBudget(BuildContext ctx)
+        {
+            var list = ctx.Avatar?.SettingsList;
+            if (list == null) return;
+            const int SoftLimit = 64;
+            if (list.Count > SoftLimit)
+                ctx.Log.Warning($"This avatar now has {list.Count} synced Advanced Avatar Settings. " +
+                                $"That is a lot — check your synced-bit budget in the CVRAvatar inspector.");
+            else
+                ctx.Log.Info($"Synced Advanced Avatar Settings on this avatar: {list.Count}.");
         }
 
         private static List<CVRFuryComponent> CollectFeatures(GameObject root)

@@ -13,9 +13,10 @@ honest about what exists and what's next.
 - ✅ Non-destructive bake (clone controllers, temp assets, strip components)
 - ✅ Auto-discovered feature/builder registry
 - ✅ Test-bake (clone) menu command + build-log window
+- ✅ Synced-parameter budget warning
+- 🟡 Prop / spawnable pipeline via `PrePropBundleEvent` (structural features only)
 - 🟡 **Validate** that the pre-bundle event operates on a build copy across CCK
   versions; if not, move the bake onto an explicit clone (see ARCHITECTURE.md)
-- ⬜ Prop / spawnable pipeline via `PrePropBundleEvent`
 - ⬜ EditMode tests for clip/animator/merge utilities (need CCK stubs in CI)
 
 ## Features vs. VRCFury
@@ -26,11 +27,10 @@ honest about what exists and what's next.
 | Armature Link | 🟡 | reparent + merge-bones modes; needs humanoid edge-case hardening |
 | Blendshape Link | 🟡 | bakes values; "keep live" animator-driven mirroring planned |
 | Object State / Apply During Upload | ✅ | activate / deactivate / delete |
-| Modes / multi-state (dropdown) | ⬜ | maps to AAS `GameObjectDropdown` |
-| Puppet / radial slider | 🟡 | `AddSlider` exists; dedicated component + blendtree builder planned |
+| Modes / multi-state (dropdown) | ✅ | exclusive states, union coverage, AAS `GameObjectDropdown` |
+| Puppet / radial slider | ✅ | 1D blend-tree layer + synced AAS slider |
 | Gestures | ⬜ | needs CVR gesture/animator-parameter mapping |
-| Visemes / Blink helper | ⬜ | wrap `CVRAvatar` viseme/blink fields |
-| Eye-look helper | ⬜ | wrap `CVRAvatar` eye-movement fields |
+| Visemes / Blink / Eye helper | 🟡 | `CVRFuryAvatarSettings` sets the CVRAvatar fields (verify member names) |
 | SPS (penetration system) | ⬜ | large; CVR has no DPS/SPS equivalent — would be net-new |
 | Direct Tree / OSC / Advanced | ⬜ | |
 | Remove/strip components, fix bad bindings | ⬜ | "automatic fixes" suite |

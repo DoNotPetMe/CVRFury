@@ -50,12 +50,22 @@ namespace CVRFury.Builder
                 return;
             }
 
-            UnityAction<GameObject> listener = OnPreAvatarBundle;
-            if (Reflect.AddUnityEventListener(preAvatar, listener))
+            UnityAction<GameObject> avatarListener = OnPreAvatarBundle;
+            if (Reflect.AddUnityEventListener(preAvatar, avatarListener))
             {
                 _subscribed = true;
                 if (CVRFurySettings.VerboseLogging)
                     Debug.Log("[CVRFury] Hooked CCK avatar build pipeline (PreAvatarBundleEvent).");
+            }
+
+            // Props/spawnables: best-effort. We can't write Advanced Avatar Settings here (props
+            // aren't avatars), but structural features like Object State still apply, and we strip
+            // CVRFury components so nothing editor-only ships.
+            var preProp = Reflect.GetStaticField(buildUtility, CckNames.PrePropBundleEvent);
+            if (preProp != null)
+            {
+                UnityAction<GameObject> propListener = OnPrePropBundle;
+                Reflect.AddUnityEventListener(preProp, propListener);
             }
         }
 
@@ -77,6 +87,19 @@ namespace CVRFury.Builder
                 Debug.LogError(
                     $"[CVRFury] Build failed for '{avatarRoot.name}'. The avatar was uploaded " +
                     $"WITHOUT CVRFury changes. Details:\n{e}");
+            }
+        }
+
+        private static void OnPrePropBundle(GameObject propRoot)
+        {
+            if (propRoot == null) return;
+            try
+            {
+                CVRFuryBuilder.RunProps(propRoot);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[CVRFury] Prop build failed for '{propRoot.name}':\n{e}");
             }
         }
     }

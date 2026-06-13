@@ -99,6 +99,41 @@ namespace CVRFury.Builder
                 setting => Reflect.SetField(setting, CckNames.Setting_DefaultFloat, defaultValue));
         }
 
+        /// <summary>Register a synced dropdown (exclusive multi-option) menu control.</summary>
+        public bool AddDropdown(string displayName, string machineName, string[] optionNames,
+                                int defaultIndex, bool isLocal)
+        {
+            return AddEntry(
+                displayName, machineName, isLocal,
+                CckNames.SettingsType_GameObjectDropdown, CckNames.SettingDropdownType,
+                setting =>
+                {
+                    Reflect.SetField(setting, CckNames.Setting_DefaultInt, defaultIndex);
+
+                    var optionType = Reflect.FindType(CckNames.DropdownOptionType);
+                    var list = Reflect.AsList(Reflect.GetField(setting, CckNames.Setting_DropdownOptions));
+                    if (optionType != null && list != null)
+                    {
+                        foreach (var name in optionNames)
+                        {
+                            var opt = Reflect.New(optionType);
+                            if (opt == null) continue;
+                            Reflect.SetField(opt, CckNames.DropdownOption_Name, name);
+                            list.Add(opt);
+                        }
+                    }
+                });
+        }
+
+        // ------------------------------------------------------------------ spatial / face
+
+        public void SetViewPosition(Vector3 v) => Reflect.SetField(Component, CckNames.Avatar_ViewPosition, v);
+        public void SetVoicePosition(Vector3 v) => Reflect.SetField(Component, CckNames.Avatar_VoicePosition, v);
+        public void SetFaceMesh(SkinnedMeshRenderer m) => Reflect.SetField(Component, CckNames.Avatar_FaceMesh, m);
+        public void SetUseBlink(bool b) => Reflect.SetField(Component, CckNames.Avatar_UseBlinkBlendshapes, b);
+        public void SetUseVisemes(bool b) => Reflect.SetField(Component, CckNames.Avatar_UseVisemeLipsync, b);
+        public void SetUseEyeMovement(bool b) => Reflect.SetField(Component, CckNames.Avatar_UseEyeMovement, b);
+
         private bool AddEntry(string displayName, string machineName, bool isLocal,
                               string settingsTypeEnumMember, string settingClassName,
                               Action<object> configureSetting)

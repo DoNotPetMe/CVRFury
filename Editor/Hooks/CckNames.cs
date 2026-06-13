@@ -60,6 +60,20 @@ namespace CVRFury.Builder
 
         public const string Setting_DefaultBool = "defaultValue";   // toggle (bool)
         public const string Setting_DefaultFloat = "defaultValue";  // slider (float)
+        public const string Setting_DefaultInt = "defaultValue";    // dropdown (int)
         public const string Setting_UseAnimationClip = "useAnimationClip";
+
+        // Dropdown options. Each option is a CVRAdvancedSettingsDropDownOption with a display name.
+        public const string Setting_DropdownOptions = "options";
+        public const string DropdownOptionType = "ABI.CCK.Scripts.CVRAdvancesAvatarSettingGameObjectDropdownOption";
+        public const string DropdownOption_Name = "name";
+
+        // --- Viseme / blink / eye / spatial fields on CVRAvatar ---
+        public const string Avatar_ViewPosition = "viewPosition";   // Vector3
+        public const string Avatar_VoicePosition = "voicePosition"; // Vector3
+        public const string Avatar_FaceMesh = "bodyMesh";           // SkinnedMeshRenderer used for visemes/blink
+        public const string Avatar_UseBlinkBlendshapes = "useBlinkBlendshapes"; // bool
+        public const string Avatar_UseVisemeLipsync = "useVisemeLipsync";       // bool
+        public const string Avatar_UseEyeMovement = "useEyeMovement";           // bool
     }
 }

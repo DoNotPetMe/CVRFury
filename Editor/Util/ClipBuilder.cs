@@ -77,6 +77,26 @@ namespace CVRFury.Builder
             }
         }
 
+        /// <summary>
+        /// Build a clip for one option of an exclusive control (a mode, or a slider endpoint).
+        /// Every binding touched by <i>any</i> option (<paramref name="allActions"/>) is first set
+        /// to its resting value, then this option's actions are layered on top. That union coverage
+        /// is what makes modes/sliders mutually exclusive — switching away from an option restores
+        /// whatever it had changed, rather than leaving it stuck on.
+        /// </summary>
+        public static AnimationClip BuildExclusive(Transform avatarRoot, FuryState option,
+                                                   System.Collections.Generic.IEnumerable<FuryAction> allActions,
+                                                   string name)
+        {
+            var clip = new AnimationClip { name = name };
+            foreach (var a in allActions)
+                ApplyResting(avatarRoot, clip, a);
+            if (option != null && !option.IsEmpty)
+                foreach (var a in option.actions)
+                    Apply(avatarRoot, clip, a);
+            return clip;
+        }
+
         private static void Apply(Transform root, AnimationClip clip, FuryAction a)
         {
             switch (a.type)

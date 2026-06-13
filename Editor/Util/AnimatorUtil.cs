@@ -71,6 +71,78 @@ namespace CVRFury.Builder
             toOff.AddCondition(AnimatorConditionMode.Less, 0.5f, param);
         }
 
+        /// <summary>
+        /// Add an exclusive multi-state layer driven by a float parameter whose value selects the
+        /// active state (0, 1, 2 …). Each state is reached from Any State when the parameter is
+        /// within ±0.5 of its index. This is the animator side of a Modes / Dropdown control.
+        /// </summary>
+        public static void AddModesLayer(AnimatorController c, string layerName, string param,
+                                         AnimationClip[] clips, float transitionSeconds, int defaultIndex)
+        {
+            EnsureFloatParam(c, param, defaultIndex);
+
+            var name = UniqueLayerName(c, layerName);
+            c.AddLayer(name);
+            var layers = c.layers;
+            var idx = layers.Length - 1;
+            layers[idx].defaultWeight = 1f;
+            c.layers = layers;
+
+            var sm = c.layers[idx].stateMachine;
+            for (var i = 0; i < clips.Length; i++)
+            {
+                var state = sm.AddState($"Mode {i}");
+                state.motion = clips[i];
+                state.writeDefaultValues = false;
+                if (i == Mathf.Clamp(defaultIndex, 0, clips.Length - 1)) sm.defaultState = state;
+
+                var t = sm.AddAnyStateTransition(state);
+                ConfigureTransition(t, transitionSeconds);
+                t.canTransitionToSelf = false;
+                // Window [i-0.5, i+0.5); omit the unbounded side at the ends.
+                if (i > 0) t.AddCondition(AnimatorConditionMode.Greater, i - 0.5f, param);
+                if (i < clips.Length - 1) t.AddCondition(AnimatorConditionMode.Less, i + 0.5f, param);
+            }
+        }
+
+        /// <summary>
+        /// Add an always-active single-state layer holding a 1D blend tree, blending from
+        /// <paramref name="zeroClip"/> at 0 to <paramref name="oneClip"/> at 1 across the float
+        /// <paramref name="param"/>. This is the animator side of a radial / puppet slider.
+        /// </summary>
+        public static void AddBlendTreeLayer(AnimatorController c, string layerName, string param,
+                                             AnimationClip zeroClip, AnimationClip oneClip,
+                                             float defaultValue, AssetSaver assets)
+        {
+            EnsureFloatParam(c, param, defaultValue);
+
+            var name = UniqueLayerName(c, layerName);
+            c.AddLayer(name);
+            var layers = c.layers;
+            var idx = layers.Length - 1;
+            layers[idx].defaultWeight = 1f;
+            c.layers = layers;
+
+            var sm = c.layers[idx].stateMachine;
+            var tree = new BlendTree
+            {
+                name = layerName,
+                blendType = BlendTreeType.Simple1D,
+                blendParameter = param,
+                useAutomaticThresholds = false,
+                minThreshold = 0f,
+                maxThreshold = 1f,
+            };
+            assets.AddSubAsset(tree, c);
+            tree.AddChild(zeroClip, 0f);
+            tree.AddChild(oneClip, 1f);
+
+            var state = sm.AddState(layerName);
+            state.motion = tree;
+            state.writeDefaultValues = false;
+            sm.defaultState = state;
+        }
+
         private static void ConfigureTransition(AnimatorStateTransition t, float seconds)
         {
             t.hasExitTime = false;
