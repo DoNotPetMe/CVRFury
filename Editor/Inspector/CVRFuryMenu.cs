@@ -38,6 +38,41 @@ namespace CVRFury.Builder
             Selection.activeGameObject = clone;
         }
 
+        [MenuItem("Tools/CVRFury/Diagnose CCK Integration", false, 50)]
+        private static void DiagnoseCck()
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("=== CVRFury ▸ CCK Integration Diagnosis ===");
+
+            var avatarType = Reflect.FindType(CckNames.AvatarType);
+            sb.AppendLine($"CVRAvatar type ('{CckNames.AvatarType}'): {(avatarType != null ? "FOUND (" + avatarType.FullName + ")" : "NOT FOUND")}");
+
+            var buildType = Reflect.FindType(CckNames.BuildUtilityType);
+            sb.AppendLine($"Build utility ('{CckNames.BuildUtilityType}'): {(buildType != null ? "FOUND" : "NOT FOUND — will broad-scan")}");
+
+            sb.AppendLine();
+            sb.AppendLine("Pre-bundle events discovered (static UnityEvent<GameObject> on CCK types):");
+            var events = CckProbe.Discover(broadScan: true);
+            if (events.Count == 0)
+            {
+                sb.AppendLine("  (none) — CVRFury cannot hook this CCK version automatically.");
+                sb.AppendLine("  Please share this output so the hook names can be updated.");
+            }
+            else
+            {
+                foreach (var e in events)
+                {
+                    var role = e.IsAvatar ? "AVATAR" : e.IsProp ? "PROP" : "unclassified";
+                    sb.AppendLine($"  [{role}] {e.TypeName}.{e.MemberName}  (instance: {(e.EventInstance != null ? "ok" : "null")})");
+                }
+            }
+
+            sb.AppendLine();
+            sb.AppendLine("If an event is mis-classified or missing, paste this to the CVRFury maintainer.");
+            Debug.Log(sb.ToString());
+            EditorUtility.DisplayDialog("CVRFury", "CCK diagnosis written to the Console.", "OK");
+        }
+
         [MenuItem("Tools/CVRFury/Verbose Logging", false, 100)]
         private static void ToggleVerbose() => CVRFurySettings.VerboseLogging = !CVRFurySettings.VerboseLogging;
 

@@ -33,39 +33,48 @@ namespace CVRFury.Builder
         {
             if (_subscribed) return;
 
-            var buildUtility = Reflect.FindType(CckNames.BuildUtilityType);
-            if (buildUtility == null)
-            {
-                // CCK not installed (yet). Stay quiet — CVRFury is harmless without it, and
-                // the user may import the CCK later, triggering another domain reload.
+            // Is the CCK even present? If not, stay silent — CVRFury is harmless without it and the
+            // user may import the CCK later, triggering another domain reload.
+            if (Reflect.FindType(CckNames.AvatarType) == null &&
+                Reflect.FindType(CckNames.BuildUtilityType) == null)
                 return;
-            }
 
-            var preAvatar = Reflect.GetStaticField(buildUtility, CckNames.PreAvatarBundleEvent);
-            if (preAvatar == null)
-            {
-                Debug.LogWarning(
-                    "[CVRFury] Found the CCK but not its PreAvatarBundleEvent. CVRFury features " +
-                    "will NOT be applied on upload. Update Editor/Hooks/CckNames.cs for your CCK version.");
-                return;
-            }
+            // Discover the pre-bundle events by reflection rather than trusting one hard-coded name,
+            // because CVR has moved/renamed these across CCK generations.
+            var events = CckProbe.Discover();
 
+            var hookedAvatar = false;
+            var hookedProp = false;
             UnityAction<GameObject> avatarListener = OnPreAvatarBundle;
-            if (Reflect.AddUnityEventListener(preAvatar, avatarListener))
+            UnityAction<GameObject> propListener = OnPrePropBundle;
+
+            foreach (var e in events)
+            {
+                if (e.EventInstance == null) continue;
+                if (e.IsAvatar && Reflect.AddUnityEventListener(e.EventInstance, avatarListener))
+                {
+                    hookedAvatar = true;
+                    if (CVRFurySettings.VerboseLogging)
+                        Debug.Log($"[CVRFury] Hooked avatar build event {e.TypeName}.{e.MemberName}");
+                }
+                else if (e.IsProp && Reflect.AddUnityEventListener(e.EventInstance, propListener))
+                {
+                    hookedProp = true;
+                    if (CVRFurySettings.VerboseLogging)
+                        Debug.Log($"[CVRFury] Hooked prop build event {e.TypeName}.{e.MemberName}");
+                }
+            }
+
+            if (hookedAvatar || hookedProp)
             {
                 _subscribed = true;
-                if (CVRFurySettings.VerboseLogging)
-                    Debug.Log("[CVRFury] Hooked CCK avatar build pipeline (PreAvatarBundleEvent).");
             }
-
-            // Props/spawnables: best-effort. We can't write Advanced Avatar Settings here (props
-            // aren't avatars), but structural features like Object State still apply, and we strip
-            // CVRFury components so nothing editor-only ships.
-            var preProp = Reflect.GetStaticField(buildUtility, CckNames.PrePropBundleEvent);
-            if (preProp != null)
+            else
             {
-                UnityAction<GameObject> propListener = OnPrePropBundle;
-                Reflect.AddUnityEventListener(preProp, propListener);
+                Debug.LogWarning(
+                    "[CVRFury] The CCK is present but no avatar build event could be hooked, so CVRFury " +
+                    "features will NOT be applied on upload. Run Tools ▸ CVRFury ▸ Diagnose CCK " +
+                    "Integration and share the output so the hook can be updated for your CCK version.");
             }
         }
 
