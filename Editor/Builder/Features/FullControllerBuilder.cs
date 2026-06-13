@@ -1,6 +1,7 @@
 using System.Linq;
 using CVRFury.Components;
 using UnityEditor.Animations;
+using UnityEngine;
 
 namespace CVRFury.Builder
 {
