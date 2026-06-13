@@ -93,8 +93,17 @@ component. They're inert, block clean prefab edits, and must never ship.
 ### Full conversion — *Tools ▸ CVRFury ▸ VRChat → ChilloutVR Converter*
 
 For a complete port, open the converter window, select your avatar, tick the
-steps you want, and hit **Convert**. The VRChat SDK must be imported so CVRFury
-can read the avatar (convert, then remove the SDK). Steps:
+steps you want, and hit **Convert**.
+
+**Both SDKs must be present and compiling in the same project** when you convert,
+because CVRFury reads the VRChat components (their scripts must be loaded) and
+writes the CVR equivalents. Either import the VRChat Avatars SDK alongside the
+CCK, or add the CCK to your existing VRChat project (often easier — the avatar
+already works there). Then convert, remove the VRChat SDK, and upload with the
+CCK. **Gotcha:** the CCK and VRChat SDK target different Unity versions; if they
+don't both compile cleanly their types won't load and conversion can't run — in
+that case use the clean-only path above and rebuild the menu with CVRFury
+components by hand. Steps:
 
 | Step | Default | Does |
 |------|---------|------|

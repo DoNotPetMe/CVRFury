@@ -25,8 +25,13 @@ namespace CVRFury.Builder.Convert
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("VRChat → ChilloutVR Converter", EditorStyles.boldLabel);
             EditorGUILayout.HelpBox(
-                "Converts a VRChat avatar to a ChilloutVR-ready one. The VRChat SDK must be imported " +
-                "so the avatar's data can be read. Convert, review, then remove the VRChat SDK.",
+                "Converts a VRChat avatar to a ChilloutVR-ready one.\n\n" +
+                "Both SDKs must be present and compiling in THIS project at once: import the VRChat " +
+                "Avatars SDK alongside the CCK (or add the CCK to your VRChat project). CVRFury reads " +
+                "the VRChat components and writes the CVR equivalents, then you remove the VRChat SDK " +
+                "and upload.\n\n" +
+                "Gotcha: the CCK and VRChat SDK target different Unity versions — if they don't both " +
+                "compile cleanly, their types won't load and conversion can't run.",
                 MessageType.Info);
 
             var sdkPresent = Reflect.FindType(VrcNames.AvatarDescriptorType) != null;
