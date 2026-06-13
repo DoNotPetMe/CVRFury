@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using UnityEditor.Animations;
 using UnityEngine;
 
@@ -21,8 +20,7 @@ namespace CVRFury.Builder
 
         public AnimatorController Controller { get; private set; }
 
-        private readonly HashSet<string> _usedParamNames = new HashSet<string>();
-        private int _counter;
+        private readonly ParamNameAllocator _params = new ParamNameAllocator();
 
         public BuildContext(GameObject root, CckAvatar avatar, AssetSaver assets, BuildTrigger trigger)
         {
@@ -54,27 +52,6 @@ namespace CVRFury.Builder
 
         /// <summary>Reserve a unique, sanitised synced-parameter machine name. If
         /// <paramref name="desired"/> is blank, one is generated.</summary>
-        public string AllocateParam(string desired)
-        {
-            var baseName = Sanitize(desired);
-            if (string.IsNullOrEmpty(baseName))
-                baseName = $"CVRFury_{_counter++}";
-
-            var name = baseName;
-            var i = 1;
-            while (!_usedParamNames.Add(name))
-                name = $"{baseName}_{i++}";
-            return name;
-        }
-
-        private static string Sanitize(string s)
-        {
-            if (string.IsNullOrEmpty(s)) return s;
-            var chars = s.ToCharArray();
-            for (var i = 0; i < chars.Length; i++)
-                if (!char.IsLetterOrDigit(chars[i]) && chars[i] != '_')
-                    chars[i] = '_';
-            return new string(chars);
-        }
+        public string AllocateParam(string desired) => _params.Allocate(desired);
     }
 }

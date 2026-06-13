@@ -38,6 +38,8 @@ on the avatar GameObject right before it is bundled for upload. See
 | **CVRFury Full Controller** | Merge a prebuilt Animator Controller (and its parameters / menu entries) into the avatar. The backbone for shippable prefabs. |
 | **CVRFury Armature Link** | Attach a prop's armature to the avatar skeleton by bone name — reparent the prop skeleton or merge its skinned meshes onto the avatar's bones. |
 | **CVRFury Blendshape Link** | Copy blendshape values from a source mesh (e.g. the body) onto clothing/accessory meshes — statically and live (mirrors animated curves). |
+| **CVRFury Gesture** | Play an animation while a hand holds a gesture (fist, open, point, victory, …), driven by ChilloutVR's gesture parameters. |
+| **CVRFury Parameters** | Declare animator parameters (Float/Int/Bool), optionally exposed in the menu — for prefab/controller interop. |
 | **CVRFury Avatar Settings** | Set the CVRAvatar viewpoint / voice position, face mesh, and viseme / blink / eye-movement toggles from a prefab. |
 | **CVRFury Object State** | Force objects active/inactive or delete them at build (e.g. strip editor-only helpers). |
 

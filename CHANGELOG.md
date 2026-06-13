@@ -4,6 +4,27 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-06-13
+
+More features, hardening, and the first tests.
+
+### Added
+- **Gesture** — play an animation while a hand holds a specific gesture (fist,
+  open hand, point, victory, …), reading ChilloutVR's `GestureLeft`/`GestureRight`
+  parameters. Builds an animator layer keyed on the gesture value.
+- **Parameters** — declare animator parameters (Float/Int/Bool), optionally
+  exposed in the in-game menu as a toggle or slider. Lets prefabs declare the
+  synced parameters a companion Full Controller expects.
+- **Automatic Fixes** pass — prunes Advanced Avatar Settings entries that have no
+  parameter name and warns about duplicate synced parameter names (which would
+  collide in-game). Never renames, to avoid breaking the animator↔menu link.
+- **EditMode test suite** — `ParamNameAllocator` (uniqueness/sanitisation) and
+  `HierarchyUtil.GetPath` are covered by NUnit tests in a dedicated test assembly.
+
+### Changed
+- Extracted synced-parameter name allocation into a pure, unit-tested
+  `ParamNameAllocator`. `InternalsVisibleTo` exposes internals to the test assembly.
+
 ## [0.2.0] - 2026-06-13
 
 Feature expansion toward VRCFury parity.

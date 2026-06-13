@@ -35,6 +35,17 @@ namespace CVRFury.Builder
         /// synced float that is 0 or 1). <paramref name="transitionSeconds"/> &gt; 0 produces a
         /// smooth blend; 0 is an instant cut.
         /// </summary>
+        public static void EnsureIntParam(AnimatorController c, string name, int def = 0)
+        {
+            if (c.parameters.Any(p => p.name == name)) return;
+            c.AddParameter(new AnimatorControllerParameter
+            {
+                name = name,
+                type = AnimatorControllerParameterType.Int,
+                defaultInt = def,
+            });
+        }
+
         public static void AddToggleLayer(AnimatorController c, string layerName, string param,
                                           AnimationClip offClip, AnimationClip onClip,
                                           float transitionSeconds, bool defaultOn)
@@ -69,6 +80,47 @@ namespace CVRFury.Builder
             var toOff = on.AddTransition(off);
             ConfigureTransition(toOff, transitionSeconds);
             toOff.AddCondition(AnimatorConditionMode.Less, 0.5f, param);
+        }
+
+        /// <summary>
+        /// Add a layer that activates while a (platform-driven) float parameter equals a specific
+        /// discrete value — used for hand gestures. The On state is entered when the parameter is
+        /// within ±0.5 of <paramref name="value"/> and exited otherwise.
+        /// </summary>
+        public static void AddGestureLayer(AnimatorController c, string layerName, string param,
+                                           int value, AnimationClip offClip, AnimationClip onClip,
+                                           float transitionSeconds)
+        {
+            EnsureFloatParam(c, param, 0f);
+
+            var name = UniqueLayerName(c, layerName);
+            c.AddLayer(name);
+            var layers = c.layers;
+            var idx = layers.Length - 1;
+            layers[idx].defaultWeight = 1f;
+            c.layers = layers;
+
+            var sm = c.layers[idx].stateMachine;
+            var off = sm.AddState("Off");
+            off.motion = offClip;
+            off.writeDefaultValues = false;
+            var on = sm.AddState("On");
+            on.motion = onClip;
+            on.writeDefaultValues = false;
+            sm.defaultState = off;
+
+            var toOn = off.AddTransition(on);
+            ConfigureTransition(toOn, transitionSeconds);
+            toOn.AddCondition(AnimatorConditionMode.Greater, value - 0.5f, param);
+            toOn.AddCondition(AnimatorConditionMode.Less, value + 0.5f, param);
+
+            // Two exit transitions cover "below the window" OR "above the window".
+            var toOffLow = on.AddTransition(off);
+            ConfigureTransition(toOffLow, transitionSeconds);
+            toOffLow.AddCondition(AnimatorConditionMode.Less, value - 0.5f, param);
+            var toOffHigh = on.AddTransition(off);
+            ConfigureTransition(toOffHigh, transitionSeconds);
+            toOffHigh.AddCondition(AnimatorConditionMode.Greater, value + 0.5f, param);
         }
 
         /// <summary>

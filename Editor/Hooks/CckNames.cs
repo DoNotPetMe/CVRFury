@@ -68,6 +68,12 @@ namespace CVRFury.Builder
         public const string DropdownOptionType = "ABI.CCK.Scripts.CVRAdvancesAvatarSettingGameObjectDropdownOption";
         public const string DropdownOption_Name = "name";
 
+        // --- Built-in gesture parameters driven by the platform ---
+        // ChilloutVR feeds hand gestures into the animator through these float parameters,
+        // mirroring VRChat's GestureLeft / GestureRight convention (0 = neutral … 7 = thumbs up).
+        public const string GestureLeftParam = "GestureLeft";
+        public const string GestureRightParam = "GestureRight";
+
         // --- Viseme / blink / eye / spatial fields on CVRAvatar ---
         public const string Avatar_ViewPosition = "viewPosition";   // Vector3
         public const string Avatar_VoicePosition = "voicePosition"; // Vector3

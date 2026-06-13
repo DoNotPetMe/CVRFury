@@ -58,6 +58,7 @@ namespace CVRFury.Builder
             }
 
             FinalizeAnimators(ctx);
+            AutomaticFixes.Run(ctx);
             CheckParameterBudget(ctx);
             StripComponents(avatarRoot);
             assets.Flush();

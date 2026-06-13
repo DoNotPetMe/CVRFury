@@ -14,10 +14,12 @@ honest about what exists and what's next.
 - ✅ Auto-discovered feature/builder registry
 - ✅ Test-bake (clone) menu command + build-log window
 - ✅ Synced-parameter budget warning
+- ✅ Automatic-fixes pass (prune broken AAS entries, warn on duplicate params)
+- 🟡 EditMode tests — pure utilities (`ParamNameAllocator`, `HierarchyUtil`) covered;
+  clip/animator/merge tests still need CCK stubs in CI
 - 🟡 Prop / spawnable pipeline via `PrePropBundleEvent` (structural features only)
 - 🟡 **Validate** that the pre-bundle event operates on a build copy across CCK
   versions; if not, move the bake onto an explicit clone (see ARCHITECTURE.md)
-- ⬜ EditMode tests for clip/animator/merge utilities (need CCK stubs in CI)
 
 ## Features vs. VRCFury
 | VRCFury feature | CVRFury status | Notes |
@@ -29,8 +31,11 @@ honest about what exists and what's next.
 | Object State / Apply During Upload | ✅ | activate / deactivate / delete |
 | Modes / multi-state (dropdown) | ✅ | exclusive states, union coverage, AAS `GameObjectDropdown` |
 | Puppet / radial slider | ✅ | 1D blend-tree layer + synced AAS slider |
-| Gestures | ⬜ | needs CVR gesture/animator-parameter mapping |
+| Gestures | ✅ | `CVRFuryGesture` keys a layer on GestureLeft/GestureRight |
 | Visemes / Blink / Eye helper | 🟡 | `CVRFuryAvatarSettings` sets the CVRAvatar fields (verify member names) |
+| Parameters declaration | ✅ | `CVRFuryParameters` declares params + optional menu exposure |
+| Exclusive toggle tags | ⬜ | CVR has no animator parameter drivers; use **Modes** for true exclusivity |
+| Automatic fixes (dedupe / prune) | 🟡 | broken-entry prune + duplicate-param warning done; more to come |
 | SPS (penetration system) | ⬜ | large; CVR has no DPS/SPS equivalent — would be net-new |
 | Direct Tree / OSC / Advanced | ⬜ | |
 | Remove/strip components, fix bad bindings | ⬜ | "automatic fixes" suite |
