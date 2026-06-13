@@ -38,7 +38,8 @@ honest about what exists and what's next.
 | Automatic fixes (dedupe / prune) | 🟡 | broken-entry prune + duplicate-param warning done; more to come |
 | SPS (penetration system) | ⬜ | large; CVR has no DPS/SPS equivalent — would be net-new |
 | Direct Tree / OSC / Advanced | ⬜ | |
-| Remove/strip components, fix bad bindings | ⬜ | "automatic fixes" suite |
+| Remove/strip missing (broken) scripts | ✅ | auto at build + prefab-aware manual tool — key for VRChat imports |
+| Remove/strip known components, fix bad bindings | 🟡 | missing-script removal done; typed VRChat→CVR component mapping still planned |
 | World-constraint, Boundingbox fix, Toggle-folder | ⬜ | |
 
 ## CVR-specific quirks still to wire up

@@ -83,6 +83,26 @@ Clone/copy this repository into your project's `Packages/` folder, or into
 
 ---
 
+## Bringing a VRChat avatar into ChilloutVR
+
+VRChat avatars are covered in components that don't exist in a CVR project
+(`VRCAvatarDescriptor`, PhysBones, contacts, VRCFury, …). With no script to load,
+Unity shows each as a broken **"The associated script can not be loaded"**
+component. They're inert, block clean prefab edits, and must never ship.
+
+CVRFury cleans them up:
+
+- **Automatically at build** — broken components are stripped during the bake.
+  Toggle via *Tools ▸ CVRFury ▸ Auto-Clean Missing Scripts on Build* (on by default).
+- **On demand** — *Tools ▸ CVRFury ▸ Clean Missing Scripts on Selected*. It's
+  **prefab-aware**: if the selection is a prefab it offers to fix the prefab
+  **asset** permanently (recommended) instead of just patching the scene instance,
+  and supports undo for plain scene objects.
+
+> Tip: run *Tools ▸ CVRFury ▸ Diagnose CCK Integration* once after installing to
+> confirm CVRFury has hooked your CCK version and that every Advanced Avatar
+> Settings field it writes is present.
+
 ## How non-destruction works
 
 CVRFury never edits your source assets:

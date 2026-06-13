@@ -38,6 +38,80 @@ namespace CVRFury.Builder
             Selection.activeGameObject = clone;
         }
 
+        [MenuItem("Tools/CVRFury/Clean Missing Scripts on Selected", true)]
+        private static bool ValidateCleanMissing() => Selection.activeGameObject != null;
+
+        /// <summary>
+        /// One-click removal of broken/missing-script components — the components a VRChat avatar
+        /// brings into CVR that show as "The associated script can not be loaded". Prefab-aware: it
+        /// offers to fix the prefab asset permanently rather than just patching the instance.
+        /// </summary>
+        [MenuItem("Tools/CVRFury/Clean Missing Scripts on Selected", false, 20)]
+        private static void CleanMissingScripts()
+        {
+            var go = Selection.activeGameObject;
+            if (go == null) return;
+
+            var found = MissingScriptCleaner.CountInHierarchy(go);
+            if (found == 0)
+            {
+                EditorUtility.DisplayDialog("CVRFury", $"No missing scripts found on '{go.name}'.", "OK");
+                return;
+            }
+
+            // If this is a prefab, the permanent fix is to clean the asset itself.
+            var assetPath = ResolvePrefabAssetPath(go);
+            if (!string.IsNullOrEmpty(assetPath))
+            {
+                var cleanAsset = EditorUtility.DisplayDialogComplex("CVRFury",
+                    $"Found {found} missing-script component(s). '{go.name}' is a prefab.\n\n" +
+                    "Clean the prefab ASSET (permanent, recommended) or just this scene instance?",
+                    "Clean Prefab Asset", "Cancel", "Clean Instance Only");
+
+                if (cleanAsset == 1) return; // Cancel
+
+                if (cleanAsset == 0)
+                {
+                    var root = PrefabUtility.LoadPrefabContents(assetPath);
+                    var removedAsset = MissingScriptCleaner.RemoveInHierarchy(root);
+                    PrefabUtility.SaveAsPrefabAsset(root, assetPath);
+                    PrefabUtility.UnloadPrefabContents(root);
+                    AssetDatabase.SaveAssets();
+                    EditorUtility.DisplayDialog("CVRFury",
+                        $"Removed {removedAsset} missing-script component(s) from the prefab asset.", "OK");
+                    return;
+                }
+            }
+
+            // Plain scene object, or "instance only" choice.
+            Undo.RegisterFullObjectHierarchyUndo(go, "CVRFury Clean Missing Scripts");
+            var removed = MissingScriptCleaner.RemoveInHierarchy(go);
+            EditorUtility.SetDirty(go);
+            EditorUtility.DisplayDialog("CVRFury",
+                $"Removed {removed} missing-script component(s) from '{go.name}'.", "OK");
+        }
+
+        private static string ResolvePrefabAssetPath(GameObject go)
+        {
+            if (PrefabUtility.IsPartOfPrefabAsset(go))
+                return AssetDatabase.GetAssetPath(go);
+            if (PrefabUtility.IsPartOfPrefabInstance(go))
+                return PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(go);
+            return null;
+        }
+
+        [MenuItem("Tools/CVRFury/Auto-Clean Missing Scripts on Build", false, 101)]
+        private static void ToggleAutoClean() =>
+            CVRFurySettings.CleanMissingScriptsOnBuild = !CVRFurySettings.CleanMissingScriptsOnBuild;
+
+        [MenuItem("Tools/CVRFury/Auto-Clean Missing Scripts on Build", true)]
+        private static bool ToggleAutoCleanValidate()
+        {
+            Menu.SetChecked("Tools/CVRFury/Auto-Clean Missing Scripts on Build",
+                CVRFurySettings.CleanMissingScriptsOnBuild);
+            return true;
+        }
+
         [MenuItem("Tools/CVRFury/Diagnose CCK Integration", false, 50)]
         private static void DiagnoseCck()
         {

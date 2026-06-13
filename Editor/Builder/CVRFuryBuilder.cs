@@ -35,6 +35,15 @@ namespace CVRFury.Builder
 
             ctx.Log.Info($"Baking {features.Count} feature(s) on '{avatarRoot.name}'.");
 
+            // Strip inert/broken VRChat-and-friends components before anything else, so the upload
+            // is clean and later steps see a tidy hierarchy.
+            if (CVRFurySettings.CleanMissingScriptsOnBuild)
+            {
+                var removed = MissingScriptCleaner.RemoveInHierarchy(avatarRoot);
+                if (removed > 0)
+                    ctx.Log.Info($"Removed {removed} broken/missing-script component(s).");
+            }
+
             foreach (var feature in features)
             {
                 var builder = FeatureBuilderRegistry.For(feature);
@@ -77,6 +86,9 @@ namespace CVRFury.Builder
         {
             var features = propRoot.GetComponentsInChildren<CVRFuryComponent>(true);
             if (features.Length == 0) return false;
+
+            if (CVRFurySettings.CleanMissingScriptsOnBuild)
+                MissingScriptCleaner.RemoveInHierarchy(propRoot);
 
             foreach (var f in features.OfType<CVRFuryObjectState>())
             {

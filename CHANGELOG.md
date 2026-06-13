@@ -4,6 +4,32 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-06-13
+
+VRChat-import quality-of-life and CCK integration verification.
+
+### Added
+- **Missing-script cleaner** — the headline pain of importing a VRChat avatar into
+  CVR is the swarm of broken "The associated script can not be loaded" components
+  (VRCAvatarDescriptor, PhysBones, contacts, VRCFury, …) that have no script in a
+  CVR project. CVRFury now:
+  - strips them automatically during the bake (toggle: *Tools ▸ CVRFury ▸
+    Auto-Clean Missing Scripts on Build*, on by default), and
+  - offers a one-click, **prefab-aware** *Tools ▸ CVRFury ▸ Clean Missing Scripts
+    on Selected* that fixes the prefab **asset** permanently (or just the instance),
+    with undo for plain scene objects.
+- **CCK integration diagnostic** (*Tools ▸ CVRFury ▸ Diagnose CCK Integration*):
+  self-discovers the CCK pre-bundle events and statically validates the entire AAS
+  reflection contract (CVRAvatar fields, settings entry/enum, typed setting classes)
+  so version mismatches surface instantly without an upload.
+- **Self-discovering build hook** — finds the CCK's avatar/prop bundle events by
+  reflection instead of a single hard-coded name, resilient to CCK renames.
+
+### Verified
+- Confirmed against a live CCK install: `ABI.CCK.Components.CVRAvatar` and
+  `ABI.CCK.Scripts.Editor.CCK_BuildUtility.Pre{Avatar,Prop}BundleEvent` resolve and
+  are hooked correctly.
+
 ## [0.3.0] - 2026-06-13
 
 More features, hardening, and the first tests.
