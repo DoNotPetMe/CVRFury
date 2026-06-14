@@ -1,6 +1,8 @@
 using System;
 using System.Collections;
+using UnityEditor;
 using UnityEditor.Animations;
+using UnityEditor.SceneManagement;
 using UnityEngine;
 
 namespace CVRFury.Builder
@@ -100,6 +102,20 @@ namespace CVRFury.Builder
                 var aas = AdvancedSettings;
                 if (aas != null) Reflect.SetField(aas, CckNames.AdvancedSettings_BaseController, value);
             }
+        }
+
+        /// <summary>Force Unity to serialize the changes CVRFury made to the CVRAvatar by reflection.
+        /// The AAS list, animators and overrides are mutated directly on the live component (not through
+        /// a SerializedObject), so Unity only persists them — to the scene file and to the upload clone —
+        /// once the object is marked dirty. Without this the entries can read back correctly in-memory
+        /// yet show as an empty list after a domain reload, and toggles upload as if unconfigured.</summary>
+        public void Persist()
+        {
+            EditorUtility.SetDirty(Component);
+            if (PrefabUtility.IsPartOfPrefabInstance(Component))
+                PrefabUtility.RecordPrefabInstancePropertyModifications(Component);
+            if (!Application.isPlaying && Root.scene.IsValid())
+                EditorSceneManager.MarkSceneDirty(Root.scene);
         }
 
         // ------------------------------------------------------------------ AAS entries

@@ -12,13 +12,19 @@ namespace CVRFury.Builder.Convert
     /// Runs ChilloutVR's own Advanced Avatar Settings generation automatically — the equivalent of
     /// clicking "Create Controller" + "Attach Created Override to Avatar" in the CVRAvatar inspector.
     ///
-    /// CVR doesn't run the Base Controller directly; it generates a fresh AnimatorController by
-    /// calling each AAS entry's <c>SetupAnimator()</c> (which builds that entry's layer, parameter and
-    /// states from its clips/targets) on top of a CLEAN base, then attaches it. Crucially that base
-    /// must be clean: <c>SetupAnimator</c> calls <c>AddParameter</c> for each entry, so if the base
-    /// already contains the parameter (as our merged VRChat FX controller did) generation throws and
-    /// nothing is produced — which is why converted toggles did nothing. We therefore generate onto a
-    /// copy of CVR's default locomotion controller and assign the result to the avatar's Animator.
+    /// CVR doesn't run the Base Controller directly; it generates a fresh AnimatorController by calling
+    /// each AAS entry's <c>SetupAnimator()</c> (which builds that entry's layer, parameter and states
+    /// from its clips/targets) on top of the Base Controller, then attaches the result as the avatar's
+    /// override controller.
+    ///
+    /// We generate onto a COPY of the merged CVR controller — the same controller the Base Controller
+    /// points at — which already carries locomotion plus every merged FX toggle layer. <c>SetupAnimator</c>
+    /// calls <c>AddParameter</c> per entry, so any parameter the base already declares is dropped first so
+    /// it doesn't throw. Crucially we then attach the GENERATED controller to the avatar's
+    /// <c>overrides</c>: earlier versions generated the controller but left the avatar pointing at the raw
+    /// merged controller, so the generated layers were orphaned (toggles did nothing) and the merged
+    /// controller's gesture/blend-tree validation errors were uploaded. Attaching the generated controller
+    /// is exactly what worked when "Create Controller" + "Attach" were clicked by hand.
     /// </summary>
     internal sealed class AasControllerGenerator : IConverter
     {
@@ -36,24 +42,28 @@ namespace CVRFury.Builder.Convert
                 return;
             }
 
-            // Clean base — locomotion only. SetupAnimator adds each entry's parameter, so the base
-            // must NOT already contain them (the merged FX controller did, which broke generation).
-            var loco = ctx.FindCvrLocomotion();
-            var genPath = ctx.Assets.NewPath(ctx.AvatarRoot.name + " AAS", "controller");
-            AnimatorController gen;
-            if (loco != null && AssetDatabase.CopyAsset(AssetDatabase.GetAssetPath(loco), genPath))
-                gen = AssetDatabase.LoadAssetAtPath<AnimatorController>(genPath);
-            else
-                gen = AnimatorController.CreateAnimatorControllerAtPath(genPath);
+            // Base = the merged CVR controller (locomotion + every merged FX toggle layer). This is the
+            // controller the avatar's Base Controller already points at, and the one "Create Controller"
+            // extends. We generate onto a COPY so the documented base stays untouched.
+            var baseController = ctx.Controller ?? ctx.FindCvrLocomotion();
+            if (baseController == null)
+            {
+                ctx.Log.Warning("AAS generation skipped: no base controller (merge step produced nothing " +
+                                "and no CVR locomotion controller was found).");
+                return;
+            }
 
+            var genPath = ctx.Assets.NewPath(ctx.AvatarRoot.name + " AAS", "controller");
+            AnimatorController gen = null;
+            if (AssetDatabase.CopyAsset(AssetDatabase.GetAssetPath(baseController), genPath))
+                gen = AssetDatabase.LoadAssetAtPath<AnimatorController>(genPath);
             if (gen == null)
             {
-                ctx.Log.Warning("AAS generation failed: couldn't create the generated controller asset.");
+                ctx.Log.Warning("AAS generation failed: couldn't copy the base controller to the generated path.");
                 return;
             }
 
             var folder = Path.GetDirectoryName(genPath)?.Replace('\\', '/');
-            var existingParams = new System.Collections.Generic.HashSet<string>(gen.parameters.Select(p => p.name));
 
             int ok = 0, failed = 0, i = 0;
             foreach (var entry in entries)
@@ -64,11 +74,12 @@ namespace CVRFury.Builder.Convert
                 var setting = Reflect.GetProperty(entry, CckNames.Entry_Setting);
                 if (string.IsNullOrEmpty(machineName) || setting == null) { failed++; continue; }
 
-                // Defensive: if the clean base somehow already declares this parameter, drop it so
-                // SetupAnimator's AddParameter doesn't throw.
-                if (existingParams.Contains(machineName))
+                // SetupAnimator calls AddParameter, which throws if the base already declares the
+                // parameter (the merged controller does, for every menu param). Drop it first; the
+                // entry re-adds it with the correct synced type, and the existing layer — which
+                // references the parameter by name — keeps working.
+                if (gen.parameters.Any(p => p.name == machineName))
                     gen.parameters = gen.parameters.Where(p => p.name != machineName).ToArray();
-                existingParams.Add(machineName);
 
                 // SetupAnimator(ref AnimatorController controller, string machineName, string folderPath, string fileName)
                 var fileName = Sanitize(machineName) + "_" + i;
@@ -81,34 +92,36 @@ namespace CVRFury.Builder.Convert
                 else failed++;
             }
 
-            EditorUtility.SetDirty(gen);
-            AssetDatabase.SaveAssets();
-
-            // VRChat's gesture params (Int, Equals conditions) clash with CVR's Float gesture params
-            // once both are present; make any Equals/NotEqual-gated parameter Int so the controller
-            // validates cleanly.
+            // Don't break the hand-pose blend trees: a parameter used as a blend-tree parameter (e.g.
+            // GestureLeft/GestureRight) must stay Float, so only Equals/NotEqual-gated params that are
+            // NOT blend parameters are retyped to Int.
             SyncBitOptimizer.HarmonizeConditionParamTypes(gen, ctx.Log);
             EditorUtility.SetDirty(gen);
             AssetDatabase.SaveAssets();
 
-            // Attach: clean base stays as the documented input, the generated controller is what runs.
-            Reflect.SetField(aas, CckNames.AdvancedSettings_BaseController, loco);
+            // Attach — the generated controller is what the avatar actually runs.
+            Reflect.SetField(aas, CckNames.AdvancedSettings_BaseController, baseController);
             Reflect.SetField(aas, CckNames.AdvancedSettings_Animator, gen);
 
             var aoc = new AnimatorOverrideController(gen) { name = gen.name + " (Override)" };
             AssetDatabase.AddObjectToAsset(aoc, gen);
             Reflect.SetField(aas, CckNames.AdvancedSettings_Overrides, aoc);
 
+            // "Attach Created Override to Avatar": the avatar's override controller IS the generated one.
+            ctx.Cvr.Overrides = aoc;
+
             var animator = ctx.AvatarRoot.GetComponent<Animator>();
             if (animator != null) animator.runtimeAnimatorController = gen;
 
-            EditorUtility.SetDirty(ctx.Cvr.Component);
+            ctx.AasControllerAttached = true;
+            ctx.Cvr.Persist();
+            EditorUtility.SetDirty(gen);
             AssetDatabase.SaveAssets();
 
             ctx.Log.Info($"Generated AAS controller '{gen.name}': {ok} entr(y/ies) built, {failed} skipped " +
-                         (loco != null ? "(seeded from CVR locomotion). " : "(no locomotion base found). ") +
-                         "Attached as the avatar's animator + override — toggles should now drive in-game " +
-                         "without clicking Create Controller manually.");
+                         "(seeded from the merged CVR controller). Attached as the avatar's animator + " +
+                         "override — this is the automatic equivalent of clicking Create Controller + Attach, " +
+                         "so toggles drive in-game without doing it by hand.");
         }
 
         /// <summary>Make a machine name safe for an asset file name (CVR machine names contain

@@ -4,6 +4,34 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.2] - 2026-06-14
+
+**The generated controller is now actually the one the avatar runs — toggles drive in-game.**
+0.9.0/0.9.1 generated a working AAS controller, but the orchestrator then *overwrote* the avatar's
+override controller with the raw merged FX controller right afterwards. So the generated controller
+was orphaned (every toggle dead) and the merged controller — with its incompatible VRChat gesture
+blend trees — was the thing uploaded and validated, producing the `GestureLeft/GestureRight ... is
+not float type` errors. Clicking **Create Controller + Attach** by hand worked precisely because it
+re-did the wiring CVRFury was clobbering. This release makes CVRFury do that wiring itself and keep it.
+
+### Fixed
+- **Toggles did nothing in-game / generated controller was orphaned.** `AasControllerGenerator` now
+  generates onto a copy of the **merged** CVR controller (the same controller the Base Controller
+  points at — locomotion plus every merged FX toggle layer) instead of a bare locomotion base, and
+  **attaches the generated controller to the avatar's `overrides`** (the "Attach Created Override to
+  Avatar" step). The orchestrator no longer overwrites that wiring with the raw merged controller; it
+  only falls back to wiring the merged controller when AAS generation didn't run.
+- **`GestureLeft`/`GestureRight` "is not float type" blend-tree error (regression from 0.9.1).** The
+  0.9.1 harmoniser retyped every `Equals`/`NotEqual`-gated parameter to **Int**, but the gesture
+  parameters are *also* used as **Float blend-tree parameters** (hand-pose blends), which Unity then
+  rejected. The harmoniser now leaves any parameter used as a blend-tree input as **Float** and only
+  retypes Equals/NotEqual params that are never used in a blend tree.
+- **AAS list showed "List is Empty" and the CCK inspector threw `ArgumentOutOfRangeException` at
+  `AAS_SettingsList.cs:143`.** CVRFury appends entries by reflection (out of band of the inspector's
+  cached `SerializedObject`/ReorderableList), leaving the open inspector stale. The conversion now
+  explicitly persists the component (`SetDirty` + prefab-modification record + mark-scene-dirty) and
+  deselects/reselects the avatar so the inspector rebuilds against the populated list.
+
 ## [0.9.1] - 2026-06-14
 
 ### Fixed

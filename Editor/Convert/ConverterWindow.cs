@@ -115,6 +115,18 @@ namespace CVRFury.Builder.Convert
             var log = VRChatConverter.Convert(target, _options);
             EditorUtility.SetDirty(target);
 
+            // The CCK CVRAvatar inspector caches a ReorderableList bound to the AAS settings. Because
+            // CVRFury appends entries by reflection (out of band of that SerializedObject), the open
+            // inspector is left stale — it shows "List is Empty" and can throw an index-out-of-range in
+            // AAS_SettingsList.OnDrawElementAAS. Deselect and reselect so Unity rebuilds the inspector
+            // against the now-populated list.
+            var toReselect = target;
+            Selection.activeObject = null;
+            EditorApplication.delayCall += () =>
+            {
+                if (toReselect != null) Selection.activeObject = toReselect;
+            };
+
             EditorUtility.DisplayDialog("CVRFury",
                 log.HasErrors
                     ? "Conversion finished with errors — see the CVRFury Build Log window."

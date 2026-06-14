@@ -22,6 +22,12 @@ namespace CVRFury.Builder.Convert
         /// <summary>Working CVR animator controller, lazily created when a step needs one.</summary>
         public AnimatorController Controller;
 
+        /// <summary>Set once the AAS controller-generation step has run and wired the avatar's
+        /// animator/overrides itself. When true, the orchestrator must NOT overwrite that wiring with
+        /// the raw merged controller (doing so orphans the generated controller and re-introduces the
+        /// merged controller's gesture/blend-tree validation errors).</summary>
+        public bool AasControllerAttached;
+
         /// <summary>Maps a converted VRChat PhysBone collider to its new DynamicBoneCollider, so
         /// bones can re-reference the right collider in a second pass.</summary>
         public readonly Dictionary<Object, Object> ColliderMap = new Dictionary<Object, Object>();

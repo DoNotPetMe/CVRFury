@@ -66,8 +66,13 @@ namespace CVRFury.Builder.Convert
                 }
             }
 
-            // Wire the merged controller onto the CVR avatar.
-            if (ctx.Controller != null)
+            // Wire the merged controller onto the CVR avatar — but ONLY as a fallback. When the AAS
+            // controller-generation step ran it already extended this controller per Advanced Avatar
+            // Setting and attached the GENERATED controller (the working "Create Controller + Attach"
+            // result). Overwriting the avatar's overrides here would orphan that generated controller —
+            // toggles would stop driving and the raw merged controller's gesture/blend-tree validation
+            // errors would be uploaded — so we skip it whenever generation succeeded.
+            if (ctx.Controller != null && !ctx.AasControllerAttached)
             {
                 ctx.Cvr.BaseController = ctx.Controller;
                 var overrides = new AnimatorOverrideController(ctx.Controller)
@@ -76,6 +81,7 @@ namespace CVRFury.Builder.Convert
                 };
                 ctx.Assets.Save(overrides, overrides.name);
                 ctx.Cvr.Overrides = overrides;
+                ctx.Cvr.Persist();
             }
 
             Finish(ctx);

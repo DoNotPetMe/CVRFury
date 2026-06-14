@@ -33,12 +33,15 @@ namespace CVRFury.Builder
         private const int BoolBits = 1, IntBits = 8, FloatBits = 32; // CVR per-type synced-bit cost (approx)
 
         /// <summary>
-        /// Make every parameter's type compatible with how its transition conditions use it. VRChat
-        /// declares GestureLeft/GestureRight (and others) as Int and gates on Equals/NotEqual, but
-        /// ChilloutVR's base declares the gesture params as Float — so after the merge those Int-style
-        /// conditions are invalid ("parameter not compatible with condition type"), spamming the
-        /// console and breaking those layers. A parameter used with Equals/NotEqual anywhere must be
-        /// Int; one used only with Greater/Less can stay Float. Retype to satisfy that.
+        /// Make a parameter's type compatible with how its transition conditions use it — WITHOUT
+        /// breaking blend trees. VRChat declares GestureLeft/GestureRight (and others) as Int and gates
+        /// on Equals/NotEqual, but ChilloutVR uses the gesture params as Float blend-tree parameters
+        /// (hand-pose blends). A parameter used with Equals/NotEqual "wants" Int, but a parameter used
+        /// as a blend-tree blendParameter/blendParameterY/directBlendParameter MUST be Float — Unity
+        /// rejects an Int blend parameter ("uses parameter X which is not float type"). When a parameter
+        /// is BOTH (the gesture params are), the blend-tree requirement wins: we leave it Float and leave
+        /// its Equals/NotEqual conditions as-is. Only Equals/NotEqual params that are never used as a
+        /// blend parameter are retyped to Int.
         /// </summary>
         public static void HarmonizeConditionParamTypes(AnimatorController controller, BuildLog log)
         {
@@ -49,20 +52,46 @@ namespace CVRFury.Builder
                 CollectEqualsParams(layer.stateMachine, needsInt);
             if (needsInt.Count == 0) return;
 
+            // Parameters used as blend-tree inputs must remain Float, even if also Equals-gated.
+            var blendParams = new HashSet<string>();
+            foreach (var layer in controller.layers)
+                CollectBlendParams(layer.stateMachine, blendParams);
+
             var ps = controller.parameters;
-            var changed = 0;
+            int changed = 0, keptFloat = 0;
             foreach (var p in ps)
-                if (needsInt.Contains(p.name) && p.type != AnimatorControllerParameterType.Int)
+            {
+                if (!needsInt.Contains(p.name)) continue;
+                if (blendParams.Contains(p.name)) { keptFloat++; continue; } // float blend param — leave it
+                if (p.type != AnimatorControllerParameterType.Int)
                 {
                     p.type = AnimatorControllerParameterType.Int;
                     changed++;
                 }
-            if (changed > 0)
-            {
-                controller.parameters = ps;
-                log.Info($"Harmonised {changed} parameter type(s) to Int to match Equals/NotEqual conditions " +
-                         "(e.g. GestureLeft/GestureRight) — clears 'parameter not compatible with condition type'.");
             }
+            if (changed > 0) controller.parameters = ps;
+            if (changed > 0 || keptFloat > 0)
+                log.Info($"Harmonised parameter types for conditions: {changed} retyped to Int to match " +
+                         $"Equals/NotEqual; {keptFloat} left Float because they drive a blend tree " +
+                         "(e.g. GestureLeft/GestureRight) — retyping those would break the blend tree.");
+        }
+
+        private static void CollectBlendParams(AnimatorStateMachine sm, HashSet<string> into)
+        {
+            void Walk(Motion m)
+            {
+                if (!(m is BlendTree tree)) return;
+                if (!string.IsNullOrEmpty(tree.blendParameter)) into.Add(tree.blendParameter);
+                if (!string.IsNullOrEmpty(tree.blendParameterY)) into.Add(tree.blendParameterY);
+                foreach (var ch in tree.children)
+                {
+                    if (tree.blendType == BlendTreeType.Direct && !string.IsNullOrEmpty(ch.directBlendParameter))
+                        into.Add(ch.directBlendParameter);
+                    Walk(ch.motion);
+                }
+            }
+            foreach (var cs in sm.states) Walk(cs.state.motion);
+            foreach (var child in sm.stateMachines) CollectBlendParams(child.stateMachine, into);
         }
 
         private static void CollectEqualsParams(AnimatorStateMachine sm, HashSet<string> needsInt)
