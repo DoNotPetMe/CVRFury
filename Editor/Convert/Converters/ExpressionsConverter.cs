@@ -50,8 +50,12 @@ namespace CVRFury.Builder.Convert
             // toggles down to Bool — the native, zero-latency CVR equivalent of VRCFury's parameter
             // compressor. Genuinely-continuous floats (radials/blend trees) are reported, not touched.
             if (ctx.Controller != null)
+            {
                 SyncBitOptimizer.Run(ctx.Controller, n => n[0] != '#' && !CoreParams.Contains(n),
                                      _toggleParams, ctx.Assets, ctx.Log);
+                // Clear the VRChat Int-gesture vs CVR Float-gesture condition-type errors.
+                SyncBitOptimizer.HarmonizeConditionParamTypes(ctx.Controller, ctx.Log);
+            }
         }
 
         /// <summary>Pre-walk the menu to learn which parameters are reachable from a control, so the

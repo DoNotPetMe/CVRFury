@@ -84,6 +84,13 @@ namespace CVRFury.Builder.Convert
             EditorUtility.SetDirty(gen);
             AssetDatabase.SaveAssets();
 
+            // VRChat's gesture params (Int, Equals conditions) clash with CVR's Float gesture params
+            // once both are present; make any Equals/NotEqual-gated parameter Int so the controller
+            // validates cleanly.
+            SyncBitOptimizer.HarmonizeConditionParamTypes(gen, ctx.Log);
+            EditorUtility.SetDirty(gen);
+            AssetDatabase.SaveAssets();
+
             // Attach: clean base stays as the documented input, the generated controller is what runs.
             Reflect.SetField(aas, CckNames.AdvancedSettings_BaseController, loco);
             Reflect.SetField(aas, CckNames.AdvancedSettings_Animator, gen);

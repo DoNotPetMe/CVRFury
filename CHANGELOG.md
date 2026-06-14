@@ -4,6 +4,16 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.1] - 2026-06-14
+
+### Fixed
+- **`GestureLeft`/`GestureRight` "parameter not compatible with condition type" error spam.**
+  VRChat declares the gesture parameters as **Int** and gates on `Equals`/`NotEqual`; ChilloutVR's
+  base declares them **Float**, so after the merge those conditions were invalid and the console
+  filled with errors (and the gesture layers broke). A new pass harmonises any parameter used with
+  an `Equals`/`NotEqual` condition to **Int**, on both the merged controller and the generated AAS
+  controller, so they validate cleanly.
+
 ## [0.9.0] - 2026-06-14
 
 **Toggles are now generated and attached automatically — the real fix.** The CCK

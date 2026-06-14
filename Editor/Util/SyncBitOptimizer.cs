@@ -32,6 +32,58 @@ namespace CVRFury.Builder
     {
         private const int BoolBits = 1, IntBits = 8, FloatBits = 32; // CVR per-type synced-bit cost (approx)
 
+        /// <summary>
+        /// Make every parameter's type compatible with how its transition conditions use it. VRChat
+        /// declares GestureLeft/GestureRight (and others) as Int and gates on Equals/NotEqual, but
+        /// ChilloutVR's base declares the gesture params as Float — so after the merge those Int-style
+        /// conditions are invalid ("parameter not compatible with condition type"), spamming the
+        /// console and breaking those layers. A parameter used with Equals/NotEqual anywhere must be
+        /// Int; one used only with Greater/Less can stay Float. Retype to satisfy that.
+        /// </summary>
+        public static void HarmonizeConditionParamTypes(AnimatorController controller, BuildLog log)
+        {
+            if (controller == null) return;
+
+            var needsInt = new HashSet<string>();
+            foreach (var layer in controller.layers)
+                CollectEqualsParams(layer.stateMachine, needsInt);
+            if (needsInt.Count == 0) return;
+
+            var ps = controller.parameters;
+            var changed = 0;
+            foreach (var p in ps)
+                if (needsInt.Contains(p.name) && p.type != AnimatorControllerParameterType.Int)
+                {
+                    p.type = AnimatorControllerParameterType.Int;
+                    changed++;
+                }
+            if (changed > 0)
+            {
+                controller.parameters = ps;
+                log.Info($"Harmonised {changed} parameter type(s) to Int to match Equals/NotEqual conditions " +
+                         "(e.g. GestureLeft/GestureRight) — clears 'parameter not compatible with condition type'.");
+            }
+        }
+
+        private static void CollectEqualsParams(AnimatorStateMachine sm, HashSet<string> needsInt)
+        {
+            void Scan(System.Collections.Generic.IEnumerable<AnimatorTransitionBase> ts)
+            {
+                foreach (var t in ts)
+                    foreach (var c in t.conditions)
+                        if (c.mode == AnimatorConditionMode.Equals || c.mode == AnimatorConditionMode.NotEqual)
+                            if (!string.IsNullOrEmpty(c.parameter)) needsInt.Add(c.parameter);
+            }
+            Scan(sm.anyStateTransitions);
+            Scan(sm.entryTransitions);
+            foreach (var cs in sm.states) Scan(cs.state.transitions);
+            foreach (var child in sm.stateMachines)
+            {
+                Scan(sm.GetStateMachineTransitions(child.stateMachine));
+                CollectEqualsParams(child.stateMachine, needsInt);
+            }
+        }
+
         public static void Run(AnimatorController controller, Predicate<string> canTouch,
                                HashSet<string> binaryToggleParams, AssetSaver assets, BuildLog log)
         {
