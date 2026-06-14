@@ -60,6 +60,14 @@ namespace CVRFury.Builder.Convert
             _options.physBones = EditorGUILayout.ToggleLeft("PhysBones → DynamicBones", _options.physBones);
             _options.physBoneColliders = EditorGUILayout.ToggleLeft("PhysBone colliders → DynamicBone colliders", _options.physBoneColliders);
             _options.expressions = EditorGUILayout.ToggleLeft("Expression menu + parameters → Advanced Avatar Settings", _options.expressions);
+            using (new EditorGUI.DisabledScope(!_options.expressions))
+            {
+                EditorGUI.indentLevel++;
+                _options.forceLocalParameters = EditorGUILayout.ToggleLeft(
+                    "Make all parameters local (fixes 'over Synced Bit Limit'; others won't see toggles)",
+                    _options.forceLocalParameters);
+                EditorGUI.indentLevel--;
+            }
             _options.mergePlayableLayers = EditorGUILayout.ToggleLeft("Merge FX layer into the CVR animator", _options.mergePlayableLayers);
             using (new EditorGUI.DisabledScope(!_options.mergePlayableLayers))
             {

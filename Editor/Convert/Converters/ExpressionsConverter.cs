@@ -17,10 +17,40 @@ namespace CVRFury.Builder.Convert
         public int Order => 30;
         public bool ShouldRun(ConversionContext ctx) => ctx.Options.expressions || ctx.Options.mergePlayableLayers;
 
+        private int _syncedCount;
+        private int _localCount;
+
         public void Run(ConversionContext ctx)
         {
             if (ctx.Options.mergePlayableLayers) MergeLayers(ctx);
-            if (ctx.Options.expressions) ConvertMenu(ctx);
+            if (ctx.Options.expressions)
+            {
+                BuildParamSyncMap(ctx);
+                ConvertMenu(ctx);
+            }
+        }
+
+        /// <summary>Read VRCExpressionParameters so we know which parameters are network-synced.
+        /// Anything not synced in VRChat becomes a local (zero-bit) setting in CVR.</summary>
+        private static void BuildParamSyncMap(ConversionContext ctx)
+        {
+            var ep = Reflect.GetField(ctx.VrcDescriptor, VrcNames.Desc_ExpressionParameters);
+            var list = Reflect.AsList(ep == null ? null : Reflect.GetField(ep, VrcNames.ExprParams_List));
+            if (list == null)
+            {
+                ctx.Log.Warning("No VRCExpressionParameters found; assuming all menu parameters are synced. " +
+                                "Enable 'Make all parameters local' if you hit the synced-bit limit.");
+                return;
+            }
+            foreach (var p in list)
+            {
+                if (p == null) continue;
+                var name = Reflect.GetField(p, VrcNames.ExprParam_Name) as string;
+                if (string.IsNullOrEmpty(name)) continue;
+                var synced = !(Reflect.GetField(p, VrcNames.ExprParam_NetworkSynced) is bool b) || b;
+                ctx.ParamSynced[name] = synced;
+            }
+            ctx.Log.Info($"Read {ctx.ParamSynced.Count} VRChat expression parameter(s).");
         }
 
         private static void MergeLayers(ConversionContext ctx)
@@ -55,7 +85,7 @@ namespace CVRFury.Builder.Convert
             ctx.Log.Info($"Merged {merged} playable-layer controller(s) into the CVR animator.");
         }
 
-        private static void ConvertMenu(ConversionContext ctx)
+        private void ConvertMenu(ConversionContext ctx)
         {
             var menu = Reflect.GetField(ctx.VrcDescriptor, VrcNames.Desc_ExpressionsMenu);
             if (menu == null)
@@ -76,12 +106,19 @@ namespace CVRFury.Builder.Convert
 
             var added = 0;
             WalkMenu(ctx, menu, new HashSet<object>(), ref added);
-            ctx.Log.Info($"Added {added} Advanced Avatar Setting(s) from the expression menu. " +
-                         "(If this is 0 but the avatar has menu controls, the control field/enum names " +
-                         "in VrcNames may need updating for your SDK version.)");
+            ctx.Log.Info($"Added {added} Advanced Avatar Setting(s): {_syncedCount} synced, {_localCount} local. " +
+                         "(If 0 but the avatar has menu controls, the control field/enum names in VrcNames " +
+                         "may need updating for your SDK version.)");
+
+            if (_syncedCount > 0 && !ctx.Options.forceLocalParameters)
+                ctx.Log.Warning($"{_syncedCount} synced parameter(s) created. ChilloutVR caps synced bits " +
+                                "(3200). If the CCK reports 'over the Synced Bit Limit', re-run with " +
+                                "'Make all parameters local' enabled, or set unneeded parameters to local " +
+                                "in the CVRAvatar inspector. CVRFury already made non-network-synced VRChat " +
+                                "parameters local automatically.");
         }
 
-        private static void WalkMenu(ConversionContext ctx, object menu, HashSet<object> visited, ref int added)
+        private void WalkMenu(ConversionContext ctx, object menu, HashSet<object> visited, ref int added)
         {
             if (menu == null || !visited.Add(menu)) return; // guard against submenu cycles
 
@@ -97,35 +134,49 @@ namespace CVRFury.Builder.Convert
                 {
                     case "Toggle":
                     case "Button":
-                    {
-                        var p = ParamName(control);
-                        if (!string.IsNullOrEmpty(p)) { ctx.Cvr.AddToggle(name, p, false, false); added++; }
+                        if (AddToggle(ctx, name, ParamName(control))) added++;
                         break;
-                    }
                     case "RadialPuppet":
-                    {
-                        var p = SubParamName(control, 0);
-                        if (!string.IsNullOrEmpty(p)) { ctx.Cvr.AddSlider(name, p, 0f, false); added++; }
+                        if (AddSlider(ctx, name, SubParamName(control, 0))) added++;
                         break;
-                    }
                     case "TwoAxisPuppet":
                     case "FourAxisPuppet":
-                    {
                         // CVR has joystick settings, but our reflection wrapper exposes sliders; map
                         // each axis to a slider as an approximation.
                         for (var i = 0; i < 2; i++)
-                        {
-                            var p = SubParamName(control, i);
-                            if (!string.IsNullOrEmpty(p)) { ctx.Cvr.AddSlider($"{name} {i + 1}", p, 0f, false); added++; }
-                        }
+                            if (AddSlider(ctx, $"{name} {i + 1}", SubParamName(control, i))) added++;
                         ctx.Log.Warning($"'{name}' is a puppet; converted to slider(s) (approximate).");
                         break;
-                    }
                     case "SubMenu":
                         WalkMenu(ctx, Reflect.GetField(control, VrcNames.Control_SubMenu), visited, ref added);
                         break;
                 }
             }
+        }
+
+        private bool AddToggle(ConversionContext ctx, string name, string param)
+        {
+            if (string.IsNullOrEmpty(param) || !ctx.AddedParams.Add(param)) return false;
+            var local = IsLocal(ctx, param);
+            ctx.Cvr.AddToggle(name, param, false, local);
+            if (local) _localCount++; else _syncedCount++;
+            return true;
+        }
+
+        private bool AddSlider(ConversionContext ctx, string name, string param)
+        {
+            if (string.IsNullOrEmpty(param) || !ctx.AddedParams.Add(param)) return false;
+            var local = IsLocal(ctx, param);
+            ctx.Cvr.AddSlider(name, param, 0f, local);
+            if (local) _localCount++; else _syncedCount++;
+            return true;
+        }
+
+        /// <summary>A parameter is local if forced, or if VRChat marked it not network-synced.</summary>
+        private static bool IsLocal(ConversionContext ctx, string param)
+        {
+            if (ctx.Options.forceLocalParameters) return true;
+            return ctx.ParamSynced.TryGetValue(param, out var synced) && !synced;
         }
 
         private static string ParamName(object control)

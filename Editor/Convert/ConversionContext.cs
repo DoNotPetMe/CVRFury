@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using UnityEditor;
 using UnityEditor.Animations;
 using UnityEngine;
 
@@ -25,6 +26,14 @@ namespace CVRFury.Builder.Convert
         /// bones can re-reference the right collider in a second pass.</summary>
         public readonly Dictionary<Object, Object> ColliderMap = new Dictionary<Object, Object>();
 
+        /// <summary>Machine names already turned into an AAS entry, so the same VRChat parameter
+        /// referenced by several menu controls only produces one synced setting.</summary>
+        public readonly HashSet<string> AddedParams = new HashSet<string>();
+
+        /// <summary>VRChat expression-parameter name → whether it is network-synced. Parameters not
+        /// in this map (or not synced) are made local in CVR, costing zero synced bits.</summary>
+        public readonly Dictionary<string, bool> ParamSynced = new Dictionary<string, bool>();
+
         public ConversionContext(GameObject root, ConversionOptions options, AssetSaver assets)
         {
             AvatarRoot = root;
@@ -35,13 +44,42 @@ namespace CVRFury.Builder.Convert
         public Transform RootTransform => AvatarRoot.transform;
 
         /// <summary>Lazily create the CVR animator controller as a persistent asset (so generated
-        /// state-machine sub-assets attach correctly), used when merging playable layers.</summary>
+        /// state-machine sub-assets attach correctly). It is seeded from ChilloutVR's default avatar
+        /// animator so locomotion / idle are preserved — otherwise the avatar holds a default pose
+        /// (the "motorcycle pose"). Merged playable layers are then added on top.</summary>
         public AnimatorController GetOrCreateController()
         {
             if (Controller != null) return Controller;
             var path = Assets.NewPath(AvatarRoot.name + " CVR Controller", "controller");
             Controller = AnimatorController.CreateAnimatorControllerAtPath(path);
+
+            var baseAnim = FindCvrDefaultAvatarAnimator();
+            if (baseAnim != null)
+            {
+                ControllerMerger.Merge(Controller, baseAnim, Assets, "", Log);
+                Log.Info($"Seeded CVR animator from default avatar animator '{baseAnim.name}' " +
+                         "(locomotion preserved).");
+            }
+            else
+            {
+                Log.Warning("Couldn't find ChilloutVR's default avatar animator under ABI.CCK; the " +
+                            "merged controller has no locomotion, so the avatar may hold a default pose. " +
+                            "Set the Base Controller to ABI.CCK/Animations' avatar animator manually.");
+            }
             return Controller;
+        }
+
+        /// <summary>Best-effort locate of CVR's default avatar animator controller in ABI.CCK.</summary>
+        private static AnimatorController FindCvrDefaultAvatarAnimator()
+        {
+            foreach (var guid in AssetDatabase.FindAssets("t:AnimatorController"))
+            {
+                var p = AssetDatabase.GUIDToAssetPath(guid);
+                if (p.Contains("ABI.CCK") && p.Contains("Animations") &&
+                    p.ToLowerInvariant().Contains("avatar"))
+                    return AssetDatabase.LoadAssetAtPath<AnimatorController>(p);
+            }
+            return null;
         }
     }
 }

@@ -4,6 +4,28 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.2] - 2026-06-14
+
+Synced-bit budget + pose fixes from the GodWhisper conversion (the CCK was
+refusing to build the AAS controller: "over the Synced Bit Limit").
+
+### Fixed
+- **"Over the Synced Bit Limit" → toggles do nothing.** The converter was syncing
+  every parameter. Now it:
+  - honours VRChat's per-parameter **networkSynced** flag (non-synced params become
+    **local** in CVR, costing zero synced bits),
+  - **de-duplicates** a parameter referenced by multiple menu controls (one AAS
+    entry per parameter), and
+  - reports synced vs local counts + a clear warning about the 3200-bit cap.
+- **"Motorcycle pose."** The merged controller was being set as the Base Controller
+  with no locomotion. It is now **seeded from ChilloutVR's default avatar animator**
+  (locomotion/idle preserved) before FX layers are added on top.
+
+### Added
+- Converter option **"Make all parameters local"** — forces every converted
+  parameter local so the CCK can always build the controller (others won't see your
+  toggles; use it to verify the avatar works, then selectively re-enable sync).
+
 ## [0.5.1] - 2026-06-14
 
 Conversion fixes from first real-world run (GodWhisper avatar).
