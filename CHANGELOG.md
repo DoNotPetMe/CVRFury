@@ -4,6 +4,22 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2026-06-14
+
+Finishes the synced-bit job. 0.6.0 took GodWhisper from 6848 → 3416, still just
+over the 3200 cap. The remaining ~2800 bits were VRChat parameters flagged
+network-synced but **not exposed by any menu control** — driven in VRChat by
+contacts/OSC/parameter-drivers that don't convert, so in CVR they were syncing
+(64 bits per float) for nothing.
+
+### Changed
+- **A parameter stays synced only if it is VRChat-synced *and* reachable from a
+  menu control.** CVRFury now pre-walks the expression menu before merging and
+  localises (`#`) every other parameter — including synced-but-unused ones. This
+  removes the dead-weight synced floats that pushed GodWhisper over the limit,
+  with no behavioural loss (CVR had nothing driving those parameters anyway).
+- Merge log now reports how many menu parameters were kept sync-eligible.
+
 ## [0.6.0] - 2026-06-14
 
 **The actual fix for "over the Synced Bit Limit."** The 0.5.3 readback proved

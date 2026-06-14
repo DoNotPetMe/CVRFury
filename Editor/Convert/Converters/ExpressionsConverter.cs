@@ -20,15 +20,52 @@ namespace CVRFury.Builder.Convert
         private int _syncedCount;
         private int _localCount;
 
+        /// <summary>VRChat parameter names actually exposed by a menu control. Only these (when also
+        /// VRChat-synced) stay network-synced in CVR; every other parameter is localised. A synced
+        /// VRChat parameter with no menu control has nothing driving it in CVR (it was driven by
+        /// contacts/OSC/parameter-drivers that don't convert) — syncing it just wastes bits, and CVR
+        /// floats cost 64 bits each.</summary>
+        private readonly HashSet<string> _menuParams = new HashSet<string>();
+
         public void Run(ConversionContext ctx)
         {
-            // The sync map must be known *before* merging, so the merge can localise (#-prefix)
-            // non-synced parameters. ChilloutVR syncs every animator parameter except #-prefixed
-            // ones; merging VRChat's FX controller (full of local smoothing/driver floats VRChat
-            // never synced) is what blows the 3200 synced-bit budget unless we localise them.
+            // The sync map + menu-parameter set must be known *before* merging, so the merge can
+            // localise (#-prefix) non-synced parameters. ChilloutVR syncs every animator parameter
+            // except #-prefixed ones; merging VRChat's FX controller (full of local smoothing/driver
+            // floats, plus synced-but-unused params) is what blows the 3200 synced-bit budget.
             BuildParamSyncMap(ctx);
+            if (ctx.Options.expressions) CollectMenuParams(ctx);
             if (ctx.Options.mergePlayableLayers) MergeLayers(ctx);
             if (ctx.Options.expressions) ConvertMenu(ctx);
+        }
+
+        /// <summary>Pre-walk the menu to learn which parameters are reachable from a control, so the
+        /// merge can keep only those synced. Does not create AAS entries (that is ConvertMenu's job).</summary>
+        private void CollectMenuParams(ConversionContext ctx)
+        {
+            var menu = Reflect.GetField(ctx.VrcDescriptor, VrcNames.Desc_ExpressionsMenu);
+            if (menu == null) return;
+            CollectFrom(menu, new HashSet<object>());
+        }
+
+        private void CollectFrom(object menu, HashSet<object> visited)
+        {
+            if (menu == null || !visited.Add(menu)) return;
+            var controls = Reflect.AsList(Reflect.GetField(menu, VrcNames.Menu_Controls));
+            if (controls == null) return;
+            foreach (var control in controls)
+            {
+                var main = ParamName(control);
+                if (!string.IsNullOrEmpty(main)) _menuParams.Add(main);
+                for (var i = 0; i < 4; i++)
+                {
+                    var sub = SubParamName(control, i);
+                    if (!string.IsNullOrEmpty(sub)) _menuParams.Add(sub);
+                }
+                var type = Reflect.GetField(control, VrcNames.Control_Type)?.ToString() ?? "";
+                if (type == "SubMenu")
+                    CollectFrom(Reflect.GetField(control, VrcNames.Control_SubMenu), visited);
+            }
         }
 
         /// <summary>ChilloutVR core/locomotion parameters the platform drives by name. Never localise
@@ -47,11 +84,15 @@ namespace CVRFury.Builder.Convert
         /// <c>#</c> so CVR treats it as a local, zero-synced-bit parameter. Honours the "make all
         /// parameters local" option.
         /// </summary>
-        private static string FinalName(ConversionContext ctx, string vrcName)
+        private string FinalName(ConversionContext ctx, string vrcName)
         {
             if (string.IsNullOrEmpty(vrcName) || vrcName[0] == '#' || CoreParams.Contains(vrcName))
                 return vrcName;
+            // Keep synced only if VRChat synced it AND a menu control actually exposes it. A synced
+            // parameter with no menu control has nothing to drive it in CVR, so it would just burn
+            // synced bits (64 each for floats) for no benefit.
             var synced = !ctx.Options.forceLocalParameters &&
+                         _menuParams.Contains(vrcName) &&
                          ctx.ParamSynced.TryGetValue(vrcName, out var s) && s;
             return synced ? vrcName : "#" + vrcName;
         }
@@ -82,7 +123,7 @@ namespace CVRFury.Builder.Convert
             ctx.Log.Info($"Read {ctx.ParamSynced.Count} VRChat expression parameter(s).");
         }
 
-        private static void MergeLayers(ConversionContext ctx)
+        private void MergeLayers(ConversionContext ctx)
         {
             var layers = Reflect.GetField(ctx.VrcDescriptor, VrcNames.Desc_BaseAnimationLayers) as IEnumerable;
             if (layers == null) return;
@@ -113,7 +154,9 @@ namespace CVRFury.Builder.Convert
                 ctx.Log.Info($"Merged '{typeName}' playable layer.");
             }
             ctx.Log.Info($"Merged {merged} playable-layer controller(s) into the CVR animator. " +
-                         "Non-synced parameters were localised (#-prefixed) so they cost zero synced bits.");
+                         $"Kept {_menuParams.Count} menu parameter(s) eligible for sync; all other " +
+                         "parameters (FX-internal locals and synced-but-unused) were localised " +
+                         "(#-prefixed) so they cost zero synced bits.");
         }
 
         private void ConvertMenu(ConversionContext ctx)
