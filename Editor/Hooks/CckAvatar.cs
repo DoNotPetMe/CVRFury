@@ -117,8 +117,12 @@ namespace CVRFury.Builder
 
         /// <summary>Register an on/off toggle that appears in the in-game Advanced Settings menu
         /// and drives an animator parameter of the same machine name. Encoded as a <c>Bool</c>
-        /// parameter so it costs ~1 synced bit (a Float toggle is what blows the 3200-bit budget).</summary>
-        public bool AddToggle(string displayName, string machineName, bool defaultOn, bool isLocal)
+        /// parameter so it costs ~1 synced bit (a Float toggle is what blows the 3200-bit budget).
+        /// When <paramref name="onClip"/> is supplied, ChilloutVR's AAS generator builds the working
+        /// animator layer from it (and <paramref name="offClip"/>) at build time — without a clip the
+        /// generated toggle does nothing in-game.</summary>
+        public bool AddToggle(string displayName, string machineName, bool defaultOn, bool isLocal,
+                              AnimationClip onClip = null, AnimationClip offClip = null)
         {
             return AddEntry(
                 displayName, machineName,
@@ -127,12 +131,20 @@ namespace CVRFury.Builder
                 {
                     Reflect.SetField(setting, CckNames.Setting_DefaultBool, defaultOn);
                     Reflect.SetEnumFieldByName(setting, CckNames.Setting_UsedType, CckNames.ParameterType_Bool);
+                    if (onClip != null)
+                    {
+                        Reflect.SetField(setting, CckNames.Setting_UseAnimationClip, true);
+                        Reflect.SetField(setting, CckNames.Toggle_AnimationClip, onClip);
+                        if (offClip != null) Reflect.SetField(setting, CckNames.Toggle_OffAnimationClip, offClip);
+                    }
                 });
         }
 
         /// <summary>Register a 0..1 slider (radial) menu control. Sliders are inherently continuous,
-        /// so the parameter is encoded as a <c>Float</c>.</summary>
-        public bool AddSlider(string displayName, string machineName, float defaultValue, bool isLocal)
+        /// so the parameter is encoded as a <c>Float</c>. When min/max clips are supplied, CVR's AAS
+        /// generator builds the blend layer from them.</summary>
+        public bool AddSlider(string displayName, string machineName, float defaultValue, bool isLocal,
+                              AnimationClip minClip = null, AnimationClip maxClip = null)
         {
             return AddEntry(
                 displayName, machineName,
@@ -141,6 +153,12 @@ namespace CVRFury.Builder
                 {
                     Reflect.SetField(setting, CckNames.Setting_DefaultFloat, defaultValue);
                     Reflect.SetEnumFieldByName(setting, CckNames.Setting_UsedType, CckNames.ParameterType_Float);
+                    if (minClip != null && maxClip != null)
+                    {
+                        Reflect.SetField(setting, CckNames.Setting_UseAnimationClip, true);
+                        Reflect.SetField(setting, CckNames.Slider_MinAnimationClip, minClip);
+                        Reflect.SetField(setting, CckNames.Slider_MaxAnimationClip, maxClip);
+                    }
                 });
         }
 

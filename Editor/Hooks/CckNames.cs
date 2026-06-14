@@ -20,7 +20,7 @@ namespace CVRFury.Builder
         /// <summary>CVRFury package version, surfaced in the conversion/build log so you can confirm at
         /// a glance which build actually ran (a stale recompile is the usual cause of "same issue").
         /// Keep in sync with package.json.</summary>
-        public const string CvrFuryVersion = "0.7.3";
+        public const string CvrFuryVersion = "0.8.0";
 
         // --- Build pipeline (editor) ---
         // Static UnityEvent&lt;GameObject&gt; fields that the CCK fires immediately before it
@@ -80,6 +80,13 @@ namespace CVRFury.Builder
         public const string Setting_DefaultFloat = "defaultValue";  // slider (float)
         public const string Setting_DefaultInt = "defaultValue";    // dropdown (int)
         public const string Setting_UseAnimationClip = "useAnimationClip";
+
+        // Animation clips a toggle / slider plays. ChilloutVR's AAS generator builds the working
+        // animator layer from THESE at build time — without them a toggle does nothing in-game.
+        public const string Toggle_AnimationClip = "animationClip";        // on
+        public const string Toggle_OffAnimationClip = "offAnimationClip";  // off
+        public const string Slider_MinAnimationClip = "minAnimationClip";  // value 0
+        public const string Slider_MaxAnimationClip = "maxAnimationClip";  // value 1
 
         // How the synced parameter is encoded. ParameterType { Float, Int, Bool }. This is the
         // synced-bit cost driver: a toggle left as Float costs many bits; as Bool it costs ~1.

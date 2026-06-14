@@ -19,6 +19,8 @@ namespace CVRFury.Builder.Convert
 
         private int _syncedCount;
         private int _localCount;
+        private int _toggleWithClip;   // toggles whose driving animation was found and attached
+        private int _toggleNoClip;     // toggles with no discoverable clip (won't animate via AAS)
 
         /// <summary>VRChat parameter names actually exposed by a menu control. Only these (when also
         /// VRChat-synced) stay network-synced in CVR; every other parameter is localised. A synced
@@ -203,6 +205,11 @@ namespace CVRFury.Builder.Convert
             ctx.Log.Info($"Menu parameters: {_syncedCount} synced, {_localCount} local (#-prefixed, zero " +
                          "synced bits). Non-synced VRChat parameters and merged FX-internal parameters are " +
                          "localised automatically; enable 'Make all parameters local' to force everything local.");
+
+            ctx.Log.Info($"Toggle animations: {_toggleWithClip} attached an animation clip to the AAS entry " +
+                         $"(these will work in-game); {_toggleNoClip} had no directly-discoverable clip " +
+                         "(driven indirectly — e.g. AAP — so they may not animate natively and need a manual " +
+                         "clip on the CVRAvatar toggle). ChilloutVR builds the working toggle layer from these clips.");
         }
 
         private void WalkMenu(ConversionContext ctx, object menu, HashSet<object> visited, ref int added)
@@ -249,7 +256,14 @@ namespace CVRFury.Builder.Convert
             var machine = FinalName(ctx, param);
             if (!ctx.AddedParams.Add(machine)) return false;
             var local = machine[0] == '#';
-            ctx.Cvr.AddToggle(name, machine, false, local);
+
+            // Find the animation the toggle plays so ChilloutVR's AAS generator can build a working
+            // layer from it; the VRChat parameter name (pre-FinalName) is what the FX controller uses.
+            AnimationClip on = null, off = null;
+            if (ctx.Controller != null) (on, off) = ToggleClipFinder.FindToggle(ctx.Controller, param, ctx.Assets);
+            if (on != null) _toggleWithClip++; else _toggleNoClip++;
+
+            ctx.Cvr.AddToggle(name, machine, false, local, on, off);
             _toggleParams.Add(machine);
             if (local) _localCount++; else _syncedCount++;
             return true;
@@ -261,7 +275,11 @@ namespace CVRFury.Builder.Convert
             var machine = FinalName(ctx, param);
             if (!ctx.AddedParams.Add(machine)) return false;
             var local = machine[0] == '#';
-            ctx.Cvr.AddSlider(name, machine, 0f, local);
+
+            AnimationClip min = null, max = null;
+            if (ctx.Controller != null) (min, max) = ToggleClipFinder.FindRadial(ctx.Controller, param);
+
+            ctx.Cvr.AddSlider(name, machine, 0f, local, min, max);
             if (local) _localCount++; else _syncedCount++;
             return true;
         }

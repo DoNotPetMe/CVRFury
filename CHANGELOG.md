@@ -4,6 +4,33 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-06-14
+
+**Toggles now actually toggle.** Converted toggles appeared in the menu but did
+nothing in-game — a bug present since the first conversion, unrelated to the
+synced-bit work. Root cause: ChilloutVR builds the working toggle/slider animator
+layer **at upload time from the AAS entry's own animation clips / GameObject
+targets**, not from the merged base controller's parameter-driven layers. CVRFury
+created the AAS entries with neither, so CVR generated empty layers.
+
+### Fixed
+- **Each converted toggle now carries its animation clip on the AAS entry**
+  (`useAnimationClip` + `animationClip` + `offAnimationClip`), and each radial
+  carries its min/max clips, so ChilloutVR's AAS generator builds real, working
+  layers. CVRFury locates the clip in the merged FX controller per parameter:
+  - a per-toggle 1D blend tree → its real off/on clips;
+  - a Direct Blend Tree weight → the child clip as "on", with a synthesised zeroed
+    "off" (correct for blendshape / material-float / object toggles);
+  - a simple two-state transition → the destination/source clips.
+- The conversion log now reports how many toggles got a clip attached (will work)
+  vs. how many are driven indirectly (e.g. AAP parameter chains) and may need a
+  manual clip on the CVRAvatar toggle.
+
+### Notes
+- Toggles whose visual comes through an indirect AAP parameter chain can't be
+  captured as a single clip automatically; they're counted in the log so you know
+  which (if any) to finish by hand.
+
 ## [0.7.3] - 2026-06-14
 
 0.7.2's diagnostic pinpointed it: GodWhisper's toggles live in a **Direct Blend
