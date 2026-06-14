@@ -58,11 +58,12 @@ namespace CVRFury.Builder
                 CollectBlendParams(layer.stateMachine, blendParams);
 
             var ps = controller.parameters;
-            int changed = 0, keptFloat = 0;
+            int changed = 0;
+            var keptFloat = new HashSet<string>();
             foreach (var p in ps)
             {
                 if (!needsInt.Contains(p.name)) continue;
-                if (blendParams.Contains(p.name)) { keptFloat++; continue; } // float blend param — leave it
+                if (blendParams.Contains(p.name)) { keptFloat.Add(p.name); continue; } // float blend param — leave it
                 if (p.type != AnimatorControllerParameterType.Int)
                 {
                     p.type = AnimatorControllerParameterType.Int;
@@ -70,10 +71,185 @@ namespace CVRFury.Builder
                 }
             }
             if (changed > 0) controller.parameters = ps;
-            if (changed > 0 || keptFloat > 0)
+
+            // The kept-Float parameters (e.g. GestureLeft/GestureRight) are driven by CVR as floats AND
+            // feed hand-pose blend trees, so they MUST stay Float — but the merged VRChat layers gate
+            // transitions on them with Equals/NotEqual, which Unity only allows on Int. Left as-is those
+            // transitions are invalid ("not compatible with condition type"): the gesture/weapon layer
+            // can't leave its posed state, which both spams the validator and freezes the arms (the
+            // "motorcycle pose"). Rewrite those conditions into Float-compatible threshold windows.
+            int rewritten = 0, split = 0;
+            if (keptFloat.Count > 0)
+                RewriteFloatEqualityConditions(controller, keptFloat, ref rewritten, ref split);
+
+            if (changed > 0 || keptFloat.Count > 0)
                 log.Info($"Harmonised parameter types for conditions: {changed} retyped to Int to match " +
-                         $"Equals/NotEqual; {keptFloat} left Float because they drive a blend tree " +
-                         "(e.g. GestureLeft/GestureRight) — retyping those would break the blend tree.");
+                         $"Equals/NotEqual; {keptFloat.Count} kept Float because they drive a blend tree " +
+                         $"(e.g. GestureLeft/GestureRight). For those, rewrote {rewritten} transition(s)' " +
+                         $"Equals/NotEqual conditions into Float threshold windows ({split} extra transition(s) " +
+                         "added to express NotEqual as an OR) — fixes the 'not compatible with condition type' " +
+                         "errors and the gesture-locked 'motorcycle pose'.");
+        }
+
+        /// <summary>Window half-width for turning an integer Equals/NotEqual on a Float parameter into
+        /// Greater/Less bounds. Gesture values are whole numbers, so ±0.5 brackets exactly one of them.</summary>
+        private const float GestureWindow = 0.5f;
+
+        /// <summary>
+        /// Rewrite every Equals/NotEqual condition on a <paramref name="floatParams"/> parameter into
+        /// Float-compatible Greater/Less bounds. Equals expands in place (both bounds AND-ed onto the
+        /// same transition); NotEqual is an OR, so the transition is duplicated — one copy bounded below
+        /// the value, one above — preserving all other conditions and transition settings.
+        /// </summary>
+        private static void RewriteFloatEqualityConditions(AnimatorController controller,
+                                                           HashSet<string> floatParams,
+                                                           ref int rewritten, ref int split)
+        {
+            foreach (var layer in controller.layers)
+                RewriteInMachine(layer.stateMachine, floatParams, ref rewritten, ref split);
+        }
+
+        private static void RewriteInMachine(AnimatorStateMachine sm, HashSet<string> floatParams,
+                                             ref int rewritten, ref int split)
+        {
+            // State transitions.
+            foreach (var cs in sm.states.ToArray())
+            {
+                var state = cs.state;
+                foreach (var t in state.transitions.ToArray())
+                {
+                    var branches = ExpandBranches(t.conditions, floatParams, out var changed);
+                    if (!changed) continue;
+                    t.conditions = branches[0];
+                    rewritten++;
+                    for (var k = 1; k < branches.Count; k++)
+                    {
+                        var nt = CloneStateTransition(state, t);
+                        if (nt == null) continue;
+                        nt.conditions = branches[k];
+                        split++;
+                    }
+                }
+            }
+
+            // Any-State transitions.
+            foreach (var t in sm.anyStateTransitions.ToArray())
+            {
+                var branches = ExpandBranches(t.conditions, floatParams, out var changed);
+                if (!changed) continue;
+                t.conditions = branches[0];
+                rewritten++;
+                for (var k = 1; k < branches.Count; k++)
+                {
+                    var nt = CloneAnyStateTransition(sm, t);
+                    if (nt == null) continue;
+                    nt.conditions = branches[k];
+                    split++;
+                }
+            }
+
+            // Entry transitions (conditions only, no timing settings).
+            foreach (var t in sm.entryTransitions.ToArray())
+            {
+                var branches = ExpandBranches(t.conditions, floatParams, out var changed);
+                if (!changed) continue;
+                t.conditions = branches[0];
+                rewritten++;
+                for (var k = 1; k < branches.Count; k++)
+                {
+                    var nt = t.destinationState != null ? sm.AddEntryTransition(t.destinationState)
+                          : t.destinationStateMachine != null ? sm.AddEntryTransition(t.destinationStateMachine)
+                          : null;
+                    if (nt == null) continue;
+                    nt.conditions = branches[k];
+                    split++;
+                }
+            }
+
+            foreach (var child in sm.stateMachines)
+                RewriteInMachine(child.stateMachine, floatParams, ref rewritten, ref split);
+        }
+
+        /// <summary>Expand an AND-list of conditions into one or more AND-lists (OR-branches), turning
+        /// integer Equals/NotEqual on a float parameter into Greater/Less bounds. A single Equals stays
+        /// one branch; each NotEqual doubles the branch count (below-the-value OR above-the-value).</summary>
+        private static List<AnimatorCondition[]> ExpandBranches(AnimatorCondition[] conds,
+                                                                HashSet<string> floatParams, out bool changed)
+        {
+            changed = false;
+            var branches = new List<List<AnimatorCondition>> { new List<AnimatorCondition>() };
+            foreach (var c in conds)
+            {
+                bool target = floatParams.Contains(c.parameter);
+                if (target && c.mode == AnimatorConditionMode.Equals)
+                {
+                    changed = true;
+                    foreach (var b in branches)
+                    {
+                        b.Add(Cond(AnimatorConditionMode.Greater, c.parameter, c.threshold - GestureWindow));
+                        b.Add(Cond(AnimatorConditionMode.Less, c.parameter, c.threshold + GestureWindow));
+                    }
+                }
+                else if (target && c.mode == AnimatorConditionMode.NotEqual)
+                {
+                    changed = true;
+                    var next = new List<List<AnimatorCondition>>(branches.Count * 2);
+                    foreach (var b in branches)
+                    {
+                        var below = new List<AnimatorCondition>(b)
+                            { Cond(AnimatorConditionMode.Less, c.parameter, c.threshold - GestureWindow) };
+                        var above = new List<AnimatorCondition>(b)
+                            { Cond(AnimatorConditionMode.Greater, c.parameter, c.threshold + GestureWindow) };
+                        next.Add(below);
+                        next.Add(above);
+                    }
+                    branches = next;
+                }
+                else
+                {
+                    foreach (var b in branches) b.Add(c);
+                }
+            }
+            return branches.Select(b => b.ToArray()).ToList();
+        }
+
+        private static AnimatorCondition Cond(AnimatorConditionMode mode, string param, float threshold) =>
+            new AnimatorCondition { mode = mode, parameter = param, threshold = threshold };
+
+        private static AnimatorStateTransition CloneStateTransition(AnimatorState src, AnimatorStateTransition t)
+        {
+            AnimatorStateTransition nt;
+            if (t.destinationState != null) nt = src.AddTransition(t.destinationState);
+            else if (t.destinationStateMachine != null) nt = src.AddTransition(t.destinationStateMachine);
+            else if (t.isExit) nt = src.AddExitTransition();
+            else return null;
+            CopyStateTransitionSettings(t, nt);
+            return nt;
+        }
+
+        private static AnimatorStateTransition CloneAnyStateTransition(AnimatorStateMachine sm,
+                                                                       AnimatorStateTransition t)
+        {
+            if (t.destinationState == null && t.destinationStateMachine == null) return null;
+            var nt = t.destinationState != null
+                ? sm.AddAnyStateTransition(t.destinationState)
+                : sm.AddAnyStateTransition(t.destinationStateMachine);
+            CopyStateTransitionSettings(t, nt);
+            nt.canTransitionToSelf = t.canTransitionToSelf;
+            return nt;
+        }
+
+        private static void CopyStateTransitionSettings(AnimatorStateTransition from, AnimatorStateTransition to)
+        {
+            to.hasExitTime = from.hasExitTime;
+            to.exitTime = from.exitTime;
+            to.hasFixedDuration = from.hasFixedDuration;
+            to.duration = from.duration;
+            to.offset = from.offset;
+            to.interruptionSource = from.interruptionSource;
+            to.orderedInterruption = from.orderedInterruption;
+            to.mute = from.mute;
+            to.solo = from.solo;
         }
 
         private static void CollectBlendParams(AnimatorStateMachine sm, HashSet<string> into)

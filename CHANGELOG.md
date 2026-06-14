@@ -4,6 +4,29 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.5] - 2026-06-14
+
+**Root cause of the motorcycle pose + the `GestureLeft/GestureRight ... not compatible with condition
+type` spam, found in the generated controller.** Inspecting the actual `… AAS.controller` asset GodWhisper
+produced: `GestureLeft`/`GestureRight` are **Float** — and have to be, because CVR drives them as floats
+and they feed the hand-pose blend trees (`m_BlendParameter`). But GodWhisper's gesture-driven weapon
+system (merged from the VRChat FX layer) gates **103 Equals + 40 NotEqual** transitions on them. Unity
+only allows Equals/NotEqual on **Int** parameters, so every one of those transitions is invalid: the
+weapon/gesture layer can never leave its posed ("Holding"/"Draw") state, which both spams the validator
+and **freezes the arms in the "motorcycle pose."** A single Mecanim parameter cannot be both Float (for
+the blend trees) and Int (for the conditions), so retyping is not an option.
+
+### Fixed
+- **Gesture-locked motorcycle pose + "not compatible with condition type" errors.** The harmoniser now
+  keeps `GestureLeft`/`GestureRight` (and any Float blend parameter that is also Equals/NotEqual-gated)
+  as Float and **rewrites those conditions into Float-compatible threshold windows**:
+  - `Equals N` → `Greater(N-0.5)` AND `Less(N+0.5)` (in place — a transition's conditions are AND-ed).
+  - `NotEqual N` → `Less(N-0.5)` OR `Greater(N+0.5)`; since one transition is AND-only, the transition is
+    duplicated (one copy bounded below the value, one above), preserving all other conditions and timing.
+  This is applied to both the merged CVR controller and the generated AAS controller, and is idempotent.
+  The build log now reports how many transitions were rewritten and how many extra transitions were
+  added to express NotEqual.
+
 ## [0.9.4] - 2026-06-14
 
 **A build-log X-ray of the generated controller, to pin down the two field-only symptoms.**
