@@ -79,6 +79,25 @@ namespace CVRFury.Builder
             }
         }
 
+        /// <summary>Set an enum field by member name, resolving the enum type from the field itself
+        /// (so we don't need the enum's full type name). Used for CCK SettingsType / ParameterType.</summary>
+        public static bool SetEnumFieldByName(object instance, string field, string member)
+        {
+            if (instance == null) return false;
+            var f = instance.GetType().GetField(field, AllInstance);
+            if (f == null) { Warn($"field '{field}' on '{instance.GetType().FullName}'"); return false; }
+            try
+            {
+                f.SetValue(instance, Enum.Parse(f.FieldType, member));
+                return true;
+            }
+            catch
+            {
+                Warn($"enum member '{member}' for field '{field}' on '{instance.GetType().FullName}'");
+                return false;
+            }
+        }
+
         /// <summary>Construct an instance of a CCK type via its parameterless constructor.</summary>
         public static object New(Type type)
         {

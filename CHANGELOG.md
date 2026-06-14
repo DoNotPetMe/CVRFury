@@ -4,6 +4,40 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.3] - 2026-06-14
+
+The real fix for "toggles do nothing" **and** the synced-bit overflow: CVRFury
+was writing the Advanced Avatar Settings data model with the wrong member names.
+A live CCK type dump pinned the actual model, and the AAS writer was rebuilt
+against it.
+
+### Fixed
+- **Wrong AAS member names → toggles never worked and every parameter was a Float.**
+  The previous writer set a single non-existent `setting` field, an `isLocal`
+  field that doesn't exist, and (the killer) mis-set the parameter's `usedType` to
+  the menu's `SettingsType` value. CVRFury now writes the real model:
+  - the typed settings object is attached to its correct **per-type field**
+    (`toggleSettings` / `sliderSettings` / `dropDownSettings`) on the entry,
+  - the entry's `type` is set to the correct `SettingsType` member
+    (`Toggle` / `Slider` / `Dropdown`), resolved straight from the field's enum, and
+  - each setting's **`usedType`** is set explicitly — **`Bool` for toggles**,
+    `Int` for dropdowns, `Float` for sliders.
+- **"Over the Synced Bit Limit (6848/3200)."** Root cause was the `usedType` bug
+  above: toggles defaulted to **Float** (≈32 bits each) instead of **Bool**
+  (≈1 bit). Encoding toggles as Bool and dropdowns as Int cuts a typical avatar's
+  synced-bit usage by an order of magnitude, so the CCK can build the controller.
+- **`baseController` written to the wrong object.** `CVRAvatar` has no
+  `baseController`; the animator lives on `avatarSettings.baseController`. The
+  setter now targets the AAS container only (and ensures it exists first).
+
+### Notes
+- The "Make all parameters local" option is retained, but the real bit savings
+  now come from correct per-parameter `usedType` encoding (CVR's AAS has no
+  per-entry local flag — bit cost is driven entirely by the parameter type).
+- Verify against your CCK with *Tools ▸ CVRFury ▸ Diagnose CCK Integration*: the
+  data-model contract now checks the per-type setting fields and each setting's
+  `usedType`.
+
 ## [0.5.2] - 2026-06-14
 
 Synced-bit budget + pose fixes from the GodWhisper conversion (the CCK was

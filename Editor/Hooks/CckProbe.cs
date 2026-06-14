@@ -184,7 +184,7 @@ namespace CVRFury.Builder
 
             sb.AppendLine("--- Data model contract ---");
             Fields("CVRAvatar", CckNames.AvatarType,
-                CckNames.Avatar_OverridesField, CckNames.Avatar_BaseControllerField,
+                CckNames.Avatar_OverridesField,
                 CckNames.Avatar_AdvancedSettings, CckNames.Avatar_UsesAdvancedSettings,
                 CckNames.Avatar_ViewPosition, CckNames.Avatar_VoicePosition, CckNames.Avatar_FaceMesh,
                 CckNames.Avatar_UseBlinkBlendshapes, CckNames.Avatar_UseVisemeLipsync,
@@ -195,16 +195,24 @@ namespace CVRFury.Builder
 
             Fields("SettingsEntry", CckNames.SettingsEntryType,
                 CckNames.Entry_Name, CckNames.Entry_MachineName, CckNames.Entry_Type,
-                CckNames.Entry_Setting, CckNames.Entry_UsedType, CckNames.Entry_IsLocal);
+                CckNames.Entry_ToggleSettings, CckNames.Entry_SliderSettings, CckNames.Entry_DropdownSettings);
 
             EnumMembers("SettingsType", CckNames.SettingsTypeEnum,
-                CckNames.SettingsType_GameObjectToggle, CckNames.SettingsType_GameObjectDropdown,
-                CckNames.SettingsType_Slider, CckNames.SettingsType_MaterialColor);
+                CckNames.SettingsType_Toggle, CckNames.SettingsType_Dropdown,
+                CckNames.SettingsType_Slider, CckNames.SettingsType_Color);
 
             Type("Toggle setting class", CckNames.SettingToggleType);
             Type("Slider setting class", CckNames.SettingSliderType);
             Type("Dropdown setting class", CckNames.SettingDropdownType);
             Type("Dropdown option class", CckNames.DropdownOptionType);
+
+            // usedType (the synced-bit cost driver) lives on each typed setting object.
+            Fields("ToggleSetting", CckNames.SettingToggleType,
+                CckNames.Setting_DefaultBool, CckNames.Setting_UsedType, CckNames.Setting_GameObjectTargets);
+            Fields("SliderSetting", CckNames.SettingSliderType,
+                CckNames.Setting_DefaultFloat, CckNames.Setting_UsedType);
+            Fields("DropdownSetting", CckNames.SettingDropdownType,
+                CckNames.Setting_DefaultInt, CckNames.Setting_UsedType, CckNames.Setting_DropdownOptions);
 
             return sb.ToString();
         }

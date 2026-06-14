@@ -26,37 +26,45 @@ namespace CVRFury.Builder
         public const string PrePropBundleEvent = "PrePropBundleEvent";
 
         // --- Avatar component (runtime) ---
+        // NB: CVRAvatar has NO baseController field. The animator the avatar runs lives on the
+        // Advanced Avatar Settings container (avatarSettings.baseController / .animator).
         public const string AvatarType = "ABI.CCK.Components.CVRAvatar";
         public const string Avatar_OverridesField = "overrides";          // AnimatorOverrideController
-        public const string Avatar_BaseControllerField = "baseController"; // RuntimeAnimatorController (some CCK versions)
         public const string Avatar_AdvancedSettings = "avatarSettings";    // CVRAdvancedAvatarSettings
         public const string Avatar_UsesAdvancedSettings = "avatarUsesAdvancedSettings"; // bool
 
         // --- Advanced Avatar Settings container ---
         public const string AdvancedSettingsType = "ABI.CCK.Scripts.CVRAdvancedAvatarSettings";
         public const string AdvancedSettings_List = "settings";            // List&lt;CVRAdvancedSettingsEntry&gt;
-        public const string AdvancedSettings_BaseController = "baseController";
+        public const string AdvancedSettings_BaseController = "baseController"; // RuntimeAnimatorController
 
         // --- A single AAS entry ---
+        // The entry holds a SettingsType discriminator plus a *typed* settings object on a
+        // per-type field (toggleSettings / sliderSettings / dropDownSettings / …). There is NO
+        // single "setting" field, no "isLocal", and no "usedType" on the entry itself — usedType
+        // lives on the typed settings object below.
         public const string SettingsEntryType = "ABI.CCK.Scripts.CVRAdvancedSettingsEntry";
         public const string Entry_Name = "name";            // display name
         public const string Entry_MachineName = "machineName"; // animator/synced parameter name
         public const string Entry_Type = "type";            // SettingsType enum
-        public const string Entry_Setting = "setting";       // typed CVRAdvancesAvatarSettingBase
-        public const string Entry_UsedType = "usedType";
-        public const string Entry_IsLocal = "isLocal";
 
-        // SettingsType enum (nested in CVRAdvancedSettingsEntry on most CCK versions).
+        // Per-type settings object fields on the entry.
+        public const string Entry_ToggleSettings = "toggleSettings";
+        public const string Entry_SliderSettings = "sliderSettings";
+        public const string Entry_DropdownSettings = "dropDownSettings";
+
+        // SettingsType enum (nested in CVRAdvancedSettingsEntry). Resolved from the field itself
+        // via Reflect.SetEnumFieldByName, so the full enum type name is informational only.
         public const string SettingsTypeEnum = "ABI.CCK.Scripts.CVRAdvancedSettingsEntry+SettingsType";
-        public const string SettingsType_GameObjectToggle = "GameObjectToggle";
-        public const string SettingsType_GameObjectDropdown = "GameObjectDropdown";
+        public const string SettingsType_Toggle = "Toggle";
+        public const string SettingsType_Dropdown = "Dropdown";
         public const string SettingsType_Slider = "Slider";
+        public const string SettingsType_Color = "Color";
+        public const string SettingsType_Joystick2D = "Joystick2D";
+        public const string SettingsType_Joystick3D = "Joystick3D";
         public const string SettingsType_InputSingle = "InputSingle";
         public const string SettingsType_InputVector2 = "InputVector2";
         public const string SettingsType_InputVector3 = "InputVector3";
-        public const string SettingsType_Joystick2D = "Joystick2D";
-        public const string SettingsType_Joystick3D = "Joystick3D";
-        public const string SettingsType_MaterialColor = "MaterialColor";
 
         // --- Typed settings classes ---
         public const string SettingToggleType = "ABI.CCK.Scripts.CVRAdvancesAvatarSettingGameObjectToggle";
@@ -68,9 +76,24 @@ namespace CVRFury.Builder
         public const string Setting_DefaultInt = "defaultValue";    // dropdown (int)
         public const string Setting_UseAnimationClip = "useAnimationClip";
 
-        // Dropdown options. Each option is a CVRAdvancedSettingsDropDownOption with a display name.
+        // How the synced parameter is encoded. ParameterType { Float, Int, Bool }. This is the
+        // synced-bit cost driver: a toggle left as Float costs many bits; as Bool it costs ~1.
+        // Resolved from the field itself via Reflect.SetEnumFieldByName.
+        public const string Setting_UsedType = "usedType";
+        public const string ParameterType_Bool = "Bool";
+        public const string ParameterType_Int = "Int";
+        public const string ParameterType_Float = "Float";
+
+        // GameObject targets a toggle / dropdown option drives directly (CVR-native, no animator).
+        public const string Setting_GameObjectTargets = "gameObjectTargets";
+        public const string TargetEntryType = "ABI.CCK.Scripts.CVRAdvancedSettingsTargetEntryGameObject";
+        public const string Target_TreePath = "treePath";
+        public const string Target_OnState = "onState";
+        public const string Target_GameObject = "gameObject";
+
+        // Dropdown options. Each option is a CVRAdvancedSettingsDropDownEntry with a display name.
         public const string Setting_DropdownOptions = "options";
-        public const string DropdownOptionType = "ABI.CCK.Scripts.CVRAdvancesAvatarSettingGameObjectDropdownOption";
+        public const string DropdownOptionType = "ABI.CCK.Scripts.CVRAdvancedSettingsDropDownEntry";
         public const string DropdownOption_Name = "name";
 
         // --- Built-in gesture parameters driven by the platform ---

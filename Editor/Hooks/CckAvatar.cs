@@ -89,18 +89,16 @@ namespace CVRFury.Builder
             get
             {
                 var aas = AdvancedSettings;
-                if (aas != null)
-                {
-                    var c = Reflect.GetField(aas, CckNames.AdvancedSettings_BaseController) as AnimatorController;
-                    if (c != null) return c;
-                }
-                return Reflect.GetField(Component, CckNames.Avatar_BaseControllerField) as AnimatorController;
+                return aas != null
+                    ? Reflect.GetField(aas, CckNames.AdvancedSettings_BaseController) as AnimatorController
+                    : null;
             }
             set
             {
+                // CVRAvatar has no baseController; the controller lives on the AAS container only.
+                EnsureAdvancedSettingsContainer();
                 var aas = AdvancedSettings;
                 if (aas != null) Reflect.SetField(aas, CckNames.AdvancedSettings_BaseController, value);
-                Reflect.SetField(Component, CckNames.Avatar_BaseControllerField, value);
             }
         }
 
@@ -117,35 +115,47 @@ namespace CVRFury.Builder
             }
         }
 
-        /// <summary>Register a synced on/off toggle that appears in the in-game Advanced
-        /// Settings menu and drives an animator parameter of the same machine name.</summary>
+        /// <summary>Register an on/off toggle that appears in the in-game Advanced Settings menu
+        /// and drives an animator parameter of the same machine name. Encoded as a <c>Bool</c>
+        /// parameter so it costs ~1 synced bit (a Float toggle is what blows the 3200-bit budget).</summary>
         public bool AddToggle(string displayName, string machineName, bool defaultOn, bool isLocal)
         {
             return AddEntry(
-                displayName, machineName, isLocal,
-                CckNames.SettingsType_GameObjectToggle, CckNames.SettingToggleType,
-                setting => Reflect.SetField(setting, CckNames.Setting_DefaultBool, defaultOn));
+                displayName, machineName,
+                CckNames.SettingsType_Toggle, CckNames.Entry_ToggleSettings, CckNames.SettingToggleType,
+                setting =>
+                {
+                    Reflect.SetField(setting, CckNames.Setting_DefaultBool, defaultOn);
+                    Reflect.SetEnumFieldByName(setting, CckNames.Setting_UsedType, CckNames.ParameterType_Bool);
+                });
         }
 
-        /// <summary>Register a synced 0..1 slider (radial) menu control.</summary>
+        /// <summary>Register a 0..1 slider (radial) menu control. Sliders are inherently continuous,
+        /// so the parameter is encoded as a <c>Float</c>.</summary>
         public bool AddSlider(string displayName, string machineName, float defaultValue, bool isLocal)
         {
             return AddEntry(
-                displayName, machineName, isLocal,
-                CckNames.SettingsType_Slider, CckNames.SettingSliderType,
-                setting => Reflect.SetField(setting, CckNames.Setting_DefaultFloat, defaultValue));
+                displayName, machineName,
+                CckNames.SettingsType_Slider, CckNames.Entry_SliderSettings, CckNames.SettingSliderType,
+                setting =>
+                {
+                    Reflect.SetField(setting, CckNames.Setting_DefaultFloat, defaultValue);
+                    Reflect.SetEnumFieldByName(setting, CckNames.Setting_UsedType, CckNames.ParameterType_Float);
+                });
         }
 
-        /// <summary>Register a synced dropdown (exclusive multi-option) menu control.</summary>
+        /// <summary>Register a dropdown (exclusive multi-option) menu control. Encoded as an
+        /// <c>Int</c> parameter (cheap: a handful of bits regardless of option count).</summary>
         public bool AddDropdown(string displayName, string machineName, string[] optionNames,
                                 int defaultIndex, bool isLocal)
         {
             return AddEntry(
-                displayName, machineName, isLocal,
-                CckNames.SettingsType_GameObjectDropdown, CckNames.SettingDropdownType,
+                displayName, machineName,
+                CckNames.SettingsType_Dropdown, CckNames.Entry_DropdownSettings, CckNames.SettingDropdownType,
                 setting =>
                 {
                     Reflect.SetField(setting, CckNames.Setting_DefaultInt, defaultIndex);
+                    Reflect.SetEnumFieldByName(setting, CckNames.Setting_UsedType, CckNames.ParameterType_Int);
 
                     var optionType = Reflect.FindType(CckNames.DropdownOptionType);
                     var list = Reflect.AsList(Reflect.GetField(setting, CckNames.Setting_DropdownOptions));
@@ -171,10 +181,12 @@ namespace CVRFury.Builder
         public void SetUseVisemes(bool b) => Reflect.SetField(Component, CckNames.Avatar_UseVisemeLipsync, b);
         public void SetUseEyeMovement(bool b) => Reflect.SetField(Component, CckNames.Avatar_UseEyeMovement, b);
 
-        private bool AddEntry(string displayName, string machineName, bool isLocal,
-                              string settingsTypeEnumMember, string settingClassName,
+        private bool AddEntry(string displayName, string machineName,
+                              string settingsTypeEnumMember, string settingFieldName, string settingClassName,
                               Action<object> configureSetting)
         {
+            EnsureAdvancedSettingsContainer();
+
             var list = SettingsList;
             if (list == null)
             {
@@ -188,21 +200,16 @@ namespace CVRFury.Builder
 
             Reflect.SetField(entry, CckNames.Entry_Name, displayName);
             Reflect.SetField(entry, CckNames.Entry_MachineName, machineName);
-            Reflect.SetField(entry, CckNames.Entry_IsLocal, isLocal);
+            Reflect.SetEnumFieldByName(entry, CckNames.Entry_Type, settingsTypeEnumMember);
 
-            var enumType = Reflect.FindType(CckNames.SettingsTypeEnum);
-            var enumVal = Reflect.EnumValue(enumType, settingsTypeEnumMember);
-            if (enumVal != null)
-            {
-                Reflect.SetField(entry, CckNames.Entry_Type, enumVal);
-                Reflect.SetField(entry, CckNames.Entry_UsedType, enumVal);
-            }
-
+            // Build the typed settings object and attach it to its per-type field on the entry
+            // (toggleSettings / sliderSettings / dropDownSettings). The setting carries usedType,
+            // which determines synced-bit cost.
             var setting = Reflect.New(Reflect.FindType(settingClassName));
             if (setting != null)
             {
                 configureSetting?.Invoke(setting);
-                Reflect.SetField(entry, CckNames.Entry_Setting, setting);
+                Reflect.SetField(entry, settingFieldName, setting);
             }
 
             list.Add(entry);
