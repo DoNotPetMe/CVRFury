@@ -68,6 +68,10 @@ namespace CVRFury.Builder
                 var newList = Reflect.New(listType);
                 if (newList != null) Reflect.SetField(aas, CckNames.AdvancedSettings_List, newList);
             }
+
+            // Mark the container as initialized, or the CCK inspector will wipe it (and every entry we
+            // add) the first time the avatar is selected. See AdvancedSettings_Initialized.
+            Reflect.SetField(aas, CckNames.AdvancedSettings_Initialized, true);
         }
 
         // ------------------------------------------------------------------ animators

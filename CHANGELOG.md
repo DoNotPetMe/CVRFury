@@ -4,6 +4,27 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.3] - 2026-06-14
+
+**The actual root cause: the CCK inspector was silently wiping every entry CVRFury added.**
+The CCK source (`CCK_CVRAvatarEditorAdvSettings.InitializeSettingsListIfNeeded`) shows that when the
+CVRAvatar inspector first draws, it checks `avatarSettings.initialized`. If that flag is false it calls
+`CreateAvatarSettings`, which **replaces `avatarSettings` with a brand-new empty container** (empty
+settings list, Base Controller reset to the default `AvatarAnimator`). CVRFury never set that flag, so
+the instant the avatar was selected, all 127 converted entries were destroyed — which is precisely why
+the list showed empty, the Base Controller read "AvatarAnimator", and toggles did nothing. The log's
+readback saw 127 entries only because it ran *during* conversion, before the inspector redrew.
+
+### Fixed
+- **All converted AAS entries were wiped the moment the avatar was selected.** CVRFury now sets
+  `avatarSettings.initialized = true` when it creates/populates the container (and again after
+  generation), so the CCK inspector keeps the entries instead of replacing the container.
+- **AAS generation now mirrors the CCK's own `CreateAASController`.** Entries whose machine name is
+  already a parameter in the base (merged) controller are left to that controller's existing layer
+  instead of being regenerated — matching CCK exactly and avoiding the `AddParameter` "already exists"
+  throw on local (`#`) entries and redundant conflicting layers. Only genuinely-new parameters get a
+  freshly generated layer. The log now reports reused vs. built vs. failed.
+
 ## [0.9.2] - 2026-06-14
 
 **The generated controller is now actually the one the avatar runs — toggles drive in-game.**

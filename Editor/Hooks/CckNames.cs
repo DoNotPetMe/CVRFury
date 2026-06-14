@@ -20,7 +20,7 @@ namespace CVRFury.Builder
         /// <summary>CVRFury package version, surfaced in the conversion/build log so you can confirm at
         /// a glance which build actually ran (a stale recompile is the usual cause of "same issue").
         /// Keep in sync with package.json.</summary>
-        public const string CvrFuryVersion = "0.9.2";
+        public const string CvrFuryVersion = "0.9.3";
 
         // --- Build pipeline (editor) ---
         // Static UnityEvent&lt;GameObject&gt; fields that the CCK fires immediately before it
@@ -44,6 +44,12 @@ namespace CVRFury.Builder
         public const string AdvancedSettings_BaseController = "baseController"; // RuntimeAnimatorController (clean base)
         public const string AdvancedSettings_Animator = "animator";        // generated AnimatorController
         public const string AdvancedSettings_Overrides = "overrides";      // generated AnimatorOverrideController
+        // CRITICAL: the CCK inspector treats an avatarSettings whose `initialized` flag is false as
+        // "never set up" and SILENTLY REPLACES it with a fresh, empty container the first time the
+        // CVRAvatar inspector draws (CCK_CVRAvatarEditorAdvSettings.InitializeSettingsListIfNeeded →
+        // CreateAvatarSettings). If CVRFury doesn't set this, every entry it added is wiped the instant
+        // the avatar is selected — which is exactly why toggles vanished and the list showed empty.
+        public const string AdvancedSettings_Initialized = "initialized";  // bool — must be set true
         public const string Entry_Setting = "setting";                     // property → per-type settings object
         public const string Setting_SetupAnimator = "SetupAnimator";       // generates this entry's layer/param/states
 

@@ -65,7 +65,15 @@ namespace CVRFury.Builder.Convert
 
             var folder = Path.GetDirectoryName(genPath)?.Replace('\\', '/');
 
-            int ok = 0, failed = 0, i = 0;
+            // Mirror the CCK's own CreateAASController exactly: an entry whose machine name is ALREADY a
+            // parameter in the base controller is driven by the base's existing layer, so SetupAnimator
+            // is NOT called for it (calling it would throw on AddParameter and/or add a redundant,
+            // conflicting layer). Because our base is the merged controller — which already contains a
+            // layer + parameter for every converted menu control — virtually every entry is satisfied by
+            // the base; only genuinely-new parameters get a fresh generated layer.
+            var baseParams = new System.Collections.Generic.HashSet<string>(gen.parameters.Select(p => p.name));
+
+            int built = 0, reused = 0, failed = 0, i = 0;
             foreach (var entry in entries)
             {
                 i++;
@@ -74,12 +82,7 @@ namespace CVRFury.Builder.Convert
                 var setting = Reflect.GetProperty(entry, CckNames.Entry_Setting);
                 if (string.IsNullOrEmpty(machineName) || setting == null) { failed++; continue; }
 
-                // SetupAnimator calls AddParameter, which throws if the base already declares the
-                // parameter (the merged controller does, for every menu param). Drop it first; the
-                // entry re-adds it with the correct synced type, and the existing layer — which
-                // references the parameter by name — keeps working.
-                if (gen.parameters.Any(p => p.name == machineName))
-                    gen.parameters = gen.parameters.Where(p => p.name != machineName).ToArray();
+                if (baseParams.Contains(machineName)) { reused++; continue; } // existing layer drives it
 
                 // SetupAnimator(ref AnimatorController controller, string machineName, string folderPath, string fileName)
                 var fileName = Sanitize(machineName) + "_" + i;
@@ -87,7 +90,8 @@ namespace CVRFury.Builder.Convert
                 if (Reflect.InvokeMethod(setting, CckNames.Setting_SetupAnimator, args))
                 {
                     if (args[0] is AnimatorController updated) gen = updated; // honour the ref parameter
-                    ok++;
+                    baseParams.Add(machineName);
+                    built++;
                 }
                 else failed++;
             }
@@ -102,6 +106,8 @@ namespace CVRFury.Builder.Convert
             // Attach — the generated controller is what the avatar actually runs.
             Reflect.SetField(aas, CckNames.AdvancedSettings_BaseController, baseController);
             Reflect.SetField(aas, CckNames.AdvancedSettings_Animator, gen);
+            // Belt and braces: keep the container marked initialized so the inspector never wipes it.
+            Reflect.SetField(aas, CckNames.AdvancedSettings_Initialized, true);
 
             var aoc = new AnimatorOverrideController(gen) { name = gen.name + " (Override)" };
             AssetDatabase.AddObjectToAsset(aoc, gen);
@@ -118,10 +124,10 @@ namespace CVRFury.Builder.Convert
             EditorUtility.SetDirty(gen);
             AssetDatabase.SaveAssets();
 
-            ctx.Log.Info($"Generated AAS controller '{gen.name}': {ok} entr(y/ies) built, {failed} skipped " +
-                         "(seeded from the merged CVR controller). Attached as the avatar's animator + " +
-                         "override — this is the automatic equivalent of clicking Create Controller + Attach, " +
-                         "so toggles drive in-game without doing it by hand.");
+            ctx.Log.Info($"Generated AAS controller '{gen.name}': {reused} entr(y/ies) driven by the merged " +
+                         $"controller's existing layers, {built} got a freshly generated layer, {failed} failed. " +
+                         "Attached as the avatar's animator + override — the automatic equivalent of clicking " +
+                         "Create Controller + Attach.");
         }
 
         /// <summary>Make a machine name safe for an asset file name (CVR machine names contain
