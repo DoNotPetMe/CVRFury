@@ -36,14 +36,24 @@ namespace CVRFury.Builder
         }
 
         /// <summary>True if the clip animates a humanoid muscle, root-motion or IK-goal curve — i.e. it
-        /// poses the rig. AAP parameter curves (same <c>Animator</c> binding type) return false.</summary>
-        public static bool PosesHumanoid(AnimationClip clip)
+        /// poses the rig. AAP parameter curves (same <c>Animator</c> binding type) return false. When
+        /// <paramref name="humanoidBonePaths"/> is supplied, a Transform curve on one of those bones also
+        /// counts — that catches GoGoLoco / calibration / IK layers that pose via bone transforms rather
+        /// than muscles.</summary>
+        public static bool PosesHumanoid(AnimationClip clip, HashSet<string> humanoidBonePaths = null)
         {
             if (clip == null) return false;
             foreach (var b in AnimationUtility.GetCurveBindings(clip))
             {
-                if (b.type != typeof(Animator)) continue;
-                if (string.IsNullOrEmpty(b.path) && Muscles.Contains(b.propertyName)) return true;
+                if (b.type == typeof(Animator))
+                {
+                    if (string.IsNullOrEmpty(b.path) && Muscles.Contains(b.propertyName)) return true;
+                }
+                else if (b.type == typeof(Transform) && humanoidBonePaths != null &&
+                         !string.IsNullOrEmpty(b.path) && humanoidBonePaths.Contains(b.path))
+                {
+                    return true; // moves an actual humanoid bone → poses the rig
+                }
             }
             return false;
         }

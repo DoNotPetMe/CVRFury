@@ -30,7 +30,8 @@ namespace CVRFury.Builder
         public static void Merge(AnimatorController dst, AnimatorController src, AssetSaver assets,
                                  string paramPrefix, BuildLog log,
                                  System.Func<string, string> renameParameter = null,
-                                 bool dropHumanoidPoseLayers = false)
+                                 bool dropHumanoidPoseLayers = false,
+                                 HashSet<string> humanoidBonePaths = null)
         {
             if (dst == null || src == null) return;
             var remap = new Dictionary<string, string>();
@@ -68,9 +69,11 @@ namespace CVRFury.Builder
                 // VRChat layer that poses the humanoid rig (muscle/root/IK curves) runs at Override
                 // weight on top of those systems and freezes the avatar — the "motorcycle pose". Drop
                 // such layers. AAP/object/blendshape toggle layers don't pose the rig and are kept.
-                if (dropHumanoidPoseLayers && LayerPosesHumanoid(srcLayer))
+                if (dropHumanoidPoseLayers && LayerPosesHumanoid(srcLayer, humanoidBonePaths))
                 {
                     droppedPoseLayers++;
+                    if (log != null)
+                        log.Info($"  dropped pose layer '{srcLayer.name}'");
                     continue;
                 }
 
@@ -99,11 +102,11 @@ namespace CVRFury.Builder
 
         /// <summary>True if any clip reachable from the layer poses the humanoid rig (muscle/root/IK
         /// curves). Such layers duplicate CVR-native systems and must not be merged.</summary>
-        private static bool LayerPosesHumanoid(AnimatorControllerLayer layer)
+        private static bool LayerPosesHumanoid(AnimatorControllerLayer layer, HashSet<string> humanoidBonePaths)
         {
             if (layer?.stateMachine == null) return false;
             foreach (var clip in ClipsIn(layer.stateMachine))
-                if (HumanoidCurves.PosesHumanoid(clip)) return true;
+                if (HumanoidCurves.PosesHumanoid(clip, humanoidBonePaths)) return true;
             return false;
         }
 

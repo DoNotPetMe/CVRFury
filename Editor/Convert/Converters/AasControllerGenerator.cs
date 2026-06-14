@@ -135,7 +135,7 @@ namespace CVRFury.Builder.Convert
 
             // X-ray the generated controller so the two field-only symptoms — the "motorcycle pose" and
             // toggles that do nothing — show up in the build log instead of only in-game.
-            ControllerDiagnostics.Report(gen, entries.Cast<object>(), ctx.Log);
+            ControllerDiagnostics.Report(gen, entries.Cast<object>(), ctx.Log, ctx.HumanoidBonePaths);
         }
 
         /// <summary>Make a machine name safe for an asset file name (CVR machine names contain

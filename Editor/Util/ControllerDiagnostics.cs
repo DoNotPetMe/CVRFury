@@ -27,48 +27,52 @@ namespace CVRFury.Builder
     {
         private const int MaxList = 20;
 
-        public static void Report(AnimatorController gen, IEnumerable<object> entries, BuildLog log)
+        public static void Report(AnimatorController gen, IEnumerable<object> entries, BuildLog log,
+                                  HashSet<string> humanoidBonePaths = null)
         {
             if (gen == null) { log.Warning("AAS diagnostic skipped: no generated controller."); return; }
 
-            ReportPoseSuspects(gen, log);
+            ReportPoseSuspects(gen, humanoidBonePaths, log);
             ReportDeadToggles(gen, entries, log);
         }
 
-        // --- "motorcycle pose": layers that pose the body at their default state ---------------
-        private static void ReportPoseSuspects(AnimatorController gen, BuildLog log)
+        // --- "motorcycle pose": layers that still pose the humanoid rig (any state) -------------
+        private static void ReportPoseSuspects(AnimatorController gen, HashSet<string> bonePaths, BuildLog log)
         {
             var suspects = new List<string>();
             int bodyLayers = 0;
             foreach (var layer in gen.layers)
             {
-                var def = layer.stateMachine != null ? layer.stateMachine.defaultState : null;
-                var defClip = def != null ? def.motion as AnimationClip : null;
-                bool muscles = false, transforms = false;
-                foreach (var clip in ClipsIn(def != null ? def.motion : null))
-                {
-                    if (AnimatesMuscles(clip)) muscles = true;
-                    if (AnimatesTransforms(clip)) transforms = true;
-                }
-                if (!muscles && !transforms) continue;
+                if (layer.stateMachine == null) continue;
+                // Pose layers can hold the body in a NON-default state (e.g. a stuck calibration pose),
+                // so check every reachable clip, not just the default state.
+                bool poses = false;
+                foreach (var clip in AllClips(layer.stateMachine))
+                    if (HumanoidCurves.PosesHumanoid(clip, bonePaths)) { poses = true; break; }
+                if (!poses) continue;
                 bodyLayers++;
-                // Weight-1 Override layers posing the body are the ones that fight locomotion.
                 if (layer.defaultWeight > 0f && suspects.Count < MaxList)
-                    suspects.Add($"  L '{layer.name}' weight={layer.defaultWeight:0.##} " +
-                                 $"mode={layer.blendingMode} default='{(defClip ? defClip.name : "(none/blendtree)")}'" +
-                                 $"{(muscles ? " [muscles]" : "")}{(transforms ? " [transforms]" : "")}");
+                    suspects.Add($"  L '{layer.name}' weight={layer.defaultWeight:0.##} mode={layer.blendingMode}");
             }
 
             if (bodyLayers == 0)
             {
-                log.Info("AAS diagnostic — pose: no layer animates humanoid muscles/Transforms at its " +
-                         "default state, so the generated controller should not force a body pose.");
+                log.Info("AAS diagnostic — pose: no merged layer poses the humanoid rig (muscles or bone " +
+                         "transforms), so the controller should not force a body pose — CVR drives the body.");
                 return;
             }
 
-            log.Warning($"AAS diagnostic — pose: {bodyLayers} layer(s) animate the body (muscles/Transforms) " +
-                        $"at their default state. At weight>0 these override CVR locomotion and are the likely " +
-                        $"cause of the 'motorcycle pose'. Suspects:\n" + string.Join("\n", suspects));
+            log.Warning($"AAS diagnostic — pose: {bodyLayers} layer(s) still pose the humanoid rig (muscle or " +
+                        "humanoid-bone transform curves). At weight>0 these override CVR and freeze the avatar " +
+                        "(the stuck pose). These should have been dropped:\n" + string.Join("\n", suspects));
+        }
+
+        private static IEnumerable<AnimationClip> AllClips(AnimatorStateMachine sm)
+        {
+            foreach (var cs in sm.states)
+                foreach (var c in ClipsIn(cs.state.motion)) yield return c;
+            foreach (var child in sm.stateMachines)
+                foreach (var c in AllClips(child.stateMachine)) yield return c;
         }
 
         // --- "dead toggles": machineNames no layer reads ---------------------------------------
@@ -149,17 +153,6 @@ namespace CVRFury.Builder
         }
 
         // --- curve / motion helpers -------------------------------------------------------------
-        private static bool AnimatesMuscles(AnimationClip clip) =>
-            HumanoidCurves.PosesHumanoid(clip); // muscle/root/IK curves only — not AAP parameter curves
-
-        private static bool AnimatesTransforms(AnimationClip clip)
-        {
-            if (clip == null) return false;
-            foreach (var b in AnimationUtility.GetCurveBindings(clip))
-                if (b.type == typeof(Transform)) return true;
-            return false;
-        }
-
         private static IEnumerable<AnimationClip> ClipsIn(Motion m)
         {
             if (m is AnimationClip clip) { yield return clip; yield break; }

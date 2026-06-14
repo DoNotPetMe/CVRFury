@@ -4,6 +4,26 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.8] - 2026-06-14
+
+**The stuck "measure" pose: drop VRChat body-pose layers that move humanoid *bones*, not just muscles.**
+0.9.7 brought the clothing/species back (the `Blend` fix worked — the avatar now renders correctly), but
+the arms-out, fingers-splayed pose remained. Reading the controller: the avatar ships **GoGoLoco + a
+calibration system** (`Calibration`, `LocalSolver` layers, plus `CalibrationCheck` in the hierarchy),
+stacked at weight-1 Override *above* the gesture layers. CVR can't complete VRChat's contact-driven
+calibration, so that layer holds the avatar in its measurement pose forever — overriding everything
+below. 0.9.6's "drop humanoid-pose layers" only detected **muscle** curves; these layers pose the rig
+through **Transform curves on humanoid bones** (and IK), which slipped through — so only 2 layers dropped
+and the pose stayed.
+
+### Fixed
+- **Stuck calibration / IK / emote pose.** The merge now also drops a VRChat layer when its clips animate
+  Transform curves on the avatar's actual **humanoid bones** (computed from the rig), not only muscle
+  curves. This removes GoGoLoco's calibration "measure" pose, IK solvers and emote-pose layers — which
+  CVR neither needs nor can drive — while keeping prop toggles (e.g. the daggers move their own objects,
+  not bones) and CVR's own seeded locomotion. The build log now lists each dropped layer by name, and the
+  pose diagnostic checks every state (not just the default) so a stuck non-default pose is reported.
+
 ## [0.9.7] - 2026-06-14
 
 **The real root cause of dead toggles + invisible clothing + the human/furry blend stuck mid-morph: a

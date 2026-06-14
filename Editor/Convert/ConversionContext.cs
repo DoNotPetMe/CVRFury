@@ -49,6 +49,33 @@ namespace CVRFury.Builder.Convert
 
         public Transform RootTransform => AvatarRoot.transform;
 
+        private HashSet<string> _humanoidBonePaths;
+
+        /// <summary>Animation-clip paths of every humanoid bone on this avatar (relative to the root),
+        /// so a merge can recognise — and drop — VRChat layers that pose the rig via Transform/IK curves
+        /// (GoGoLoco locomotion, the calibration "measure" pose, IK solvers). CVR drives the body
+        /// natively; those layers sit at weight-1 Override and freeze the avatar otherwise.</summary>
+        public HashSet<string> HumanoidBonePaths
+        {
+            get
+            {
+                if (_humanoidBonePaths != null) return _humanoidBonePaths;
+                _humanoidBonePaths = new HashSet<string>();
+                var animator = AvatarRoot.GetComponent<Animator>();
+                if (animator != null && animator.isHuman)
+                {
+                    foreach (HumanBodyBones bone in System.Enum.GetValues(typeof(HumanBodyBones)))
+                    {
+                        if (bone == HumanBodyBones.LastBone) continue;
+                        var t = animator.GetBoneTransform(bone);
+                        if (t != null)
+                            _humanoidBonePaths.Add(AnimationUtility.CalculateTransformPath(t, AvatarRoot.transform));
+                    }
+                }
+                return _humanoidBonePaths;
+            }
+        }
+
         /// <summary>Lazily create the CVR animator controller as a persistent asset (so generated
         /// state-machine sub-assets attach correctly). It is seeded from ChilloutVR's default avatar
         /// animator so locomotion / idle are preserved — otherwise the avatar holds a default pose
