@@ -11,19 +11,22 @@ namespace CVRFury.Builder
     /// ChilloutVR network-syncs every animator-controller parameter that isn't local (name starting
     /// with <c>#</c>) or a core parameter, and the synced-bit cost is driven by the *animator*
     /// parameter type — a Float costs ~32 bits, a Bool ~1. VRChat avatars frequently back a simple
-    /// on/off toggle with a Float (a transition driver, or — on modern avatars — a single Direct
-    /// Blend Tree weight per toggle), so after conversion the CCK can still report "over the Synced
-    /// Bit Limit" even though the AAS entries say Bool.
+    /// on/off menu toggle with a Float (a transition driver, a per-toggle 1D blend tree, or a Direct
+    /// Blend Tree weight), so after conversion the CCK can still report "over the Synced Bit Limit"
+    /// even though the AAS entries say Bool.
     ///
-    /// This is CVRFury's CVR-native parameter compressor. Because CVR bills by type (not by a flat
-    /// per-parameter budget like VRChat), the win is retyping binary float "toggles" to Bool:
-    ///  1. floats used only as on/off transition conditions → retype to Bool, rewrite conditions;
-    ///  2. floats used only as Direct Blend Tree weights for an on/off menu toggle → lift each child
-    ///     out of the blend tree into its own Bool-driven On/Off layer (a generated Off clip zeroes
-    ///     the animated blendshape / active-state bindings), then retype the parameter to Bool.
+    /// This is CVRFury's CVR-native parameter compressor. Because CVR bills by type (not a flat
+    /// per-parameter budget like VRChat), the win is retyping binary float "toggles" to Bool. It
+    /// recognises three shapes of float-backed menu toggle and converts each to a Bool-driven On/Off
+    /// layer, then retypes the parameter:
+    ///   • transition-only floats (conditions with 0..1 thresholds) → retype + rewrite conditions;
+    ///   • a per-toggle 1D blend tree (param, 2 clip children at min/max) → On/Off layer using the
+    ///     tree's *real* off/on clips (works for any property — materials, scale, blendshapes);
+    ///   • a Direct Blend Tree weight whose child clip only drives blendshapes / object-active state
+    ///     → On/Off layer with a generated zeroed Off clip.
     ///
-    /// Genuinely-continuous floats (radial puppets, 1D/2D blend parameters, state speed/time params)
-    /// are reported and left untouched.
+    /// Genuine radials (≠2-child or 2D blend trees), state speed/time params, and ambiguous
+    /// direct-blend clips (scale/material) are reported and left as floats.
     /// </summary>
     internal static class SyncBitOptimizer
     {
@@ -34,91 +37,270 @@ namespace CVRFury.Builder
         {
             if (controller == null) return;
 
-            var usage = Usage.Collect(controller);
+            var floatType = new HashSet<string>(controller.parameters
+                .Where(p => p.type == AnimatorControllerParameterType.Float).Select(p => p.name));
 
-            // --- 1. transition-only binary floats → Bool ---
-            var retype = new HashSet<string>();
-            foreach (var p in controller.parameters)
+            var analysis = Analyse(controller, canTouch, binaryToggleParams, floatType);
+
+            log.Info(analysis.BeforeReport(controller, canTouch, FloatBits, IntBits, BoolBits));
+
+            // 1) transition-only float conditions → Bool.
+            if (analysis.ConditionToggles.Count > 0)
             {
-                if (p.type != AnimatorControllerParameterType.Float || !canTouch(p.name)) continue;
-                if (usage.OneDimBlend.Contains(p.name) || usage.DirectBlend.ContainsKey(p.name) ||
-                    usage.Motion.Contains(p.name)) continue;
-                if (usage.ConditionThresholds.TryGetValue(p.name, out var ths) && ths.Count > 0 &&
-                    ths.All(t => t >= -0.001f && t <= 1.001f))
-                    retype.Add(p.name);
+                RetypeToBool(controller, analysis.ConditionToggles);
+                RewriteConditions(controller, analysis.ConditionToggles);
             }
 
-            // --- 2. direct-blend-tree binary toggles → Bool-driven On/Off layers ---
-            var extractable = new List<string>();
-            foreach (var p in controller.parameters)
+            // 2) per-toggle 1D blend trees → Bool On/Off layers (real off/on clips).
+            foreach (var occ in analysis.OneDimToggles)
             {
-                if (p.type != AnimatorControllerParameterType.Float || !canTouch(p.name)) continue;
-                if (!binaryToggleParams.Contains(p.name)) continue;        // only menu toggles are binary
-                if (!usage.DirectBlend.ContainsKey(p.name)) continue;       // must be a blend-tree weight
-                if (usage.OneDimBlend.Contains(p.name) || usage.Motion.Contains(p.name)) continue;
-                if (usage.ConditionThresholds.ContainsKey(p.name)) continue; // also a condition — leave it
-                if (usage.DirectBlend[p.name].All(IsSafeToggleClip))         // every child is a safe on-clip
-                    extractable.Add(p.name);
+                AddBoolToggleLayer(controller, occ.Param, occ.On, occ.Off, assets, generateOff: false);
+                if (occ.SourceState != null) occ.SourceState.motion = null; // neutralise the float-driven source
             }
 
-            log.Info(Report(controller, canTouch, usage, retype.Count, extractable.Count));
+            // 3) Direct Blend Tree binary weights (safe clips) → Bool On/Off layers (generated off).
+            foreach (var occ in analysis.DirectToggles)
+                AddBoolToggleLayer(controller, occ.Param, occ.On, null, assets, generateOff: true);
+            if (analysis.DirectToggleParams.Count > 0)
+                PruneDirectChildren(controller, analysis.DirectToggleParams);
 
-            if (retype.Count > 0)
-            {
-                RetypeToBool(controller, retype);
-                RewriteConditions(controller, retype);
-                log.Info($"Sync-bit optimiser: retyped {retype.Count} on/off float condition(s) to Bool.");
-            }
+            var convertedNames = new HashSet<string>(analysis.ConditionToggles);
+            convertedNames.UnionWith(analysis.OneDimToggles.Select(o => o.Param));
+            convertedNames.UnionWith(analysis.DirectToggleParams);
+            if (convertedNames.Count > 0) RetypeToBool(controller, convertedNames);
 
-            if (extractable.Count > 0)
-            {
-                var set = new HashSet<string>(extractable);
-                RetypeToBool(controller, set);
-                var layers = ExtractDirectBlendToggles(controller, set, assets);
-                log.Info($"Sync-bit optimiser: lifted {extractable.Count} blend-tree toggle(s) into Bool layers " +
-                         $"({layers} layer(s) added). Each saved ~{FloatBits - BoolBits} synced bits. NOTE: the " +
-                         "generated Off states zero blendshape / object-active bindings; if a toggle drove scale, " +
-                         "position or a material value, set its Off animation in the controller manually.");
-            }
+            log.Info($"Sync-bit optimiser: compressed {convertedNames.Count} float toggle(s) to Bool " +
+                     $"({analysis.ConditionToggles.Count} condition, {analysis.OneDimToggles.Count} 1D-blend-tree, " +
+                     $"{analysis.DirectToggles.Count} direct-blend), reclaiming ~{convertedNames.Count * (FloatBits - BoolBits)} " +
+                     "synced bits. " + analysis.Skips());
 
-            if (retype.Count + extractable.Count > 0)
-                log.Info("Sync-bit optimiser: " + Report(controller,
-                    canTouch, Usage.Collect(controller), 0, 0));
+            if (convertedNames.Count > 0)
+                log.Info("After compression — " +
+                         Analyse(controller, canTouch, binaryToggleParams, new HashSet<string>())
+                             .BeforeReport(controller, canTouch, FloatBits, IntBits, BoolBits));
         }
 
-        // ---------------------------------------------------------------- reporting
+        // ---------------------------------------------------------------- analysis
 
-        private static string Report(AnimatorController controller, Predicate<string> canTouch,
-                                     Usage usage, int willRetype, int willExtract)
+        private sealed class Occ
         {
-            int boolN = 0, intN = 0, floatBlend = 0, floatCond = 0, floatOther = 0;
-            foreach (var p in controller.parameters)
+            public string Param;
+            public AnimationClip On;
+            public AnimationClip Off;              // 1D only (direct generates its own)
+            public AnimatorState SourceState;      // 1D only — neutralised after extraction
+        }
+
+        private sealed class Analysis
+        {
+            public readonly HashSet<string> ConditionToggles = new HashSet<string>();
+            public readonly List<Occ> OneDimToggles = new List<Occ>();
+            public readonly List<Occ> DirectToggles = new List<Occ>();
+            public readonly HashSet<string> DirectToggleParams = new HashSet<string>();
+
+            // Reasons a binary toggle param could NOT be compressed (for the report).
+            public int SkipRadial, SkipMaterialScale, SkipMotion, Skip2D;
+            public string SampleUnsafe;
+
+            public string Skips()
             {
-                if (!canTouch(p.name)) continue;
-                switch (p.type)
+                if (SkipRadial + SkipMaterialScale + SkipMotion + Skip2D == 0) return "No toggles left as float.";
+                var s = $"Left as float: {SkipRadial} radial/complex-blend, {SkipMaterialScale} " +
+                        $"material/scale clip, {Skip2D} 2D-blend, {SkipMotion} motion-param.";
+                if (SampleUnsafe != null) s += $" (e.g. binding '{SampleUnsafe}')";
+                return s;
+            }
+
+            public string BeforeReport(AnimatorController c, Predicate<string> canTouch,
+                                       int fBits, int iBits, int bBits)
+            {
+                int boolN = 0, intN = 0, floatN = 0;
+                foreach (var p in c.parameters)
                 {
-                    case AnimatorControllerParameterType.Bool:
-                    case AnimatorControllerParameterType.Trigger: boolN++; break;
-                    case AnimatorControllerParameterType.Int: intN++; break;
-                    case AnimatorControllerParameterType.Float:
-                        if (usage.OneDimBlend.Contains(p.name) || usage.Motion.Contains(p.name)) floatBlend++;
-                        else if (usage.DirectBlend.ContainsKey(p.name)) floatBlend++;
-                        else if (usage.ConditionThresholds.ContainsKey(p.name)) floatCond++;
-                        else floatOther++;
-                        break;
+                    if (!canTouch(p.name)) continue;
+                    if (p.type == AnimatorControllerParameterType.Float) floatN++;
+                    else if (p.type == AnimatorControllerParameterType.Int) intN++;
+                    else boolN++;
+                }
+                var est = boolN * bBits + intN * iBits + floatN * fBits;
+                var plan = (ConditionToggles.Count + OneDimToggles.Count + DirectToggles.Count) > 0
+                    ? $" Compressible toggles found: {ConditionToggles.Count} condition, " +
+                      $"{OneDimToggles.Count} 1D-blend, {DirectToggles.Count} direct-blend."
+                    : "";
+                return $"Synced animator parameters (non-#, non-core): {boolN} Bool, {intN} Int, {floatN} Float " +
+                       $"— est. ~{est} synced bits (cap 3200).{plan}";
+            }
+        }
+
+        private static Analysis Analyse(AnimatorController controller, Predicate<string> canTouch,
+                                        HashSet<string> binary, HashSet<string> floatType)
+        {
+            var a = new Analysis();
+
+            // --- usage roles ---
+            var oneDimBlend = new HashSet<string>();   // any 1D/2D blendParameter
+            var twoDimBlend = new HashSet<string>();
+            var motion = new HashSet<string>();
+            var conds = new Dictionary<string, List<float>>();
+            // candidate occurrences keyed by param; param is only converted if it has NO blocking role.
+            var oneDimCand = new Dictionary<string, Occ>();
+            var directCand = new Dictionary<string, List<AnimationClip>>();
+            var blocked = new HashSet<string>();       // disqualified entirely
+
+            void Block(string p) { if (!string.IsNullOrEmpty(p)) blocked.Add(p); }
+
+            void WalkTree(Motion m, bool topOfState, AnimatorState state)
+            {
+                if (!(m is BlendTree tree)) return;
+
+                if (tree.blendType == BlendTreeType.Simple1D)
+                {
+                    var p = tree.blendParameter;
+                    var clips = tree.children.Select(ch => ch.motion as AnimationClip).ToArray();
+                    // A clean per-toggle toggle: exactly 2 clip children, top-level motion of a state,
+                    // driven by a binary menu-toggle float.
+                    if (topOfState && state != null && binary.Contains(p) && canTouch(p) && floatType.Contains(p)
+                        && tree.children.Length == 2 && clips.All(cl => cl != null) && !oneDimCand.ContainsKey(p))
+                    {
+                        var ch = tree.children;
+                        var offIdx = ch[0].threshold <= ch[1].threshold ? 0 : 1;
+                        oneDimCand[p] = new Occ
+                        {
+                            Param = p, SourceState = state,
+                            Off = clips[offIdx], On = clips[1 - offIdx],
+                        };
+                    }
+                    else
+                    {
+                        Block(p); // radial / complex 1D tree — keep as float
+                    }
+                }
+                else if (tree.blendType == BlendTreeType.Direct)
+                {
+                    foreach (var ch in tree.children)
+                    {
+                        var p = ch.directBlendParameter;
+                        if (string.IsNullOrEmpty(p)) continue;
+                        if (binary.Contains(p) && canTouch(p) && floatType.Contains(p))
+                        {
+                            if (!directCand.TryGetValue(p, out var l)) directCand[p] = l = new List<AnimationClip>();
+                            l.Add(ch.motion as AnimationClip);
+                        }
+                    }
+                }
+                else // 2D
+                {
+                    Block(tree.blendParameter);
+                    twoDimBlend.Add(tree.blendParameter);
+                    Block(tree.blendParameterY);
+                    twoDimBlend.Add(tree.blendParameterY);
+                }
+
+                if (!string.IsNullOrEmpty(tree.blendParameter)) oneDimBlend.Add(tree.blendParameter);
+
+                foreach (var ch in tree.children) WalkTree(ch.motion, false, null); // nested → not a clean toggle
+            }
+
+            void WalkMachine(AnimatorStateMachine sm)
+            {
+                foreach (var t in sm.anyStateTransitions) CollectConds(t, conds);
+                foreach (var t in sm.entryTransitions) CollectConds(t, conds);
+                foreach (var cs in sm.states)
+                {
+                    var s = cs.state;
+                    foreach (var t in s.transitions) CollectConds(t, conds);
+                    if (s.speedParameterActive) motion.Add(s.speedParameter);
+                    if (s.timeParameterActive) motion.Add(s.timeParameter);
+                    if (s.mirrorParameterActive) motion.Add(s.mirrorParameter);
+                    if (s.cycleOffsetParameterActive) motion.Add(s.cycleOffsetParameter);
+                    WalkTree(s.motion, true, s);
+                }
+                foreach (var child in sm.stateMachines)
+                {
+                    foreach (var t in sm.GetStateMachineTransitions(child.stateMachine)) CollectConds(t, conds);
+                    WalkMachine(child.stateMachine);
                 }
             }
-            var floatTotal = floatBlend + floatCond + floatOther;
-            var est = boolN * BoolBits + intN * IntBits + floatTotal * FloatBits;
-            var note = (willRetype + willExtract) > 0
-                ? $" Will compress {willRetype} condition float(s) + {willExtract} blend-tree toggle(s) to Bool."
-                : "";
-            return $"Synced animator parameters (non-#, non-core): {boolN} Bool, {intN} Int, {floatTotal} Float " +
-                   $"({floatBlend} blend-tree/continuous, {floatCond} condition, {floatOther} other) " +
-                   $"— est. ~{est} synced bits (cap 3200).{note}";
+
+            foreach (var layer in controller.layers) WalkMachine(layer.stateMachine);
+
+            foreach (var m in motion) Block(m);
+
+            // --- transition-only binary float conditions ---
+            foreach (var p in floatType)
+            {
+                if (!canTouch(p) || blocked.Contains(p)) continue;
+                if (oneDimBlend.Contains(p) || directCand.ContainsKey(p) || motion.Contains(p)) continue;
+                if (conds.TryGetValue(p, out var ths) && ths.Count > 0 && ths.All(t => t >= -0.001f && t <= 1.001f))
+                    a.ConditionToggles.Add(p);
+            }
+
+            // --- 1D-blend-tree toggles ---
+            foreach (var kv in oneDimCand)
+            {
+                var p = kv.Key;
+                if (blocked.Contains(p) || conds.ContainsKey(p) || directCand.ContainsKey(p)) continue;
+                a.OneDimToggles.Add(kv.Value);
+            }
+
+            // --- direct-blend toggles (need all children safe + a generatable off) ---
+            foreach (var kv in directCand)
+            {
+                var p = kv.Key;
+                if (blocked.Contains(p) || conds.ContainsKey(p) || oneDimBlend.Contains(p)) continue;
+                if (kv.Value.All(cl => IsSafeToggleClip(cl, a)))
+                {
+                    a.DirectToggleParams.Add(p);
+                    foreach (var clip in kv.Value) a.DirectToggles.Add(new Occ { Param = p, On = clip });
+                }
+                else
+                {
+                    a.SkipMaterialScale++;
+                }
+            }
+
+            // --- categorise blocked binary toggles for the report ---
+            foreach (var p in binary)
+            {
+                if (!canTouch(p) || !floatType.Contains(p)) continue;
+                if (a.ConditionToggles.Contains(p) || a.OneDimToggles.Any(o => o.Param == p) ||
+                    a.DirectToggleParams.Contains(p)) continue;
+                if (motion.Contains(p)) a.SkipMotion++;
+                else if (twoDimBlend.Contains(p)) a.Skip2D++;
+                else if (directCand.ContainsKey(p)) { /* counted in SkipMaterialScale above */ }
+                else a.SkipRadial++;
+            }
+
+            return a;
         }
 
-        // ---------------------------------------------------------------- retype + conditions
+        private static void CollectConds(AnimatorTransitionBase t, Dictionary<string, List<float>> conds)
+        {
+            foreach (var c in t.conditions)
+            {
+                if (string.IsNullOrEmpty(c.parameter)) continue;
+                if (!conds.TryGetValue(c.parameter, out var l)) conds[c.parameter] = l = new List<float>();
+                l.Add(c.threshold);
+            }
+        }
+
+        private static bool IsSafeToggleClip(AnimationClip clip, Analysis a)
+        {
+            if (clip == null) return false;
+            if (AnimationUtility.GetObjectReferenceCurveBindings(clip).Length > 0)
+            {
+                a.SampleUnsafe = a.SampleUnsafe ?? "material/object-reference swap";
+                return false;
+            }
+            foreach (var b in AnimationUtility.GetCurveBindings(clip))
+                if (!(b.propertyName.StartsWith("blendShape.") || b.propertyName == "m_IsActive"))
+                {
+                    a.SampleUnsafe = a.SampleUnsafe ?? b.propertyName;
+                    return false;
+                }
+            return true;
+        }
+
+        // ---------------------------------------------------------------- mutation
 
         private static void RetypeToBool(AnimatorController controller, HashSet<string> names)
         {
@@ -134,23 +316,22 @@ namespace CVRFury.Builder
 
         private static void RewriteConditions(AnimatorController controller, HashSet<string> names)
         {
-            foreach (var layer in controller.layers)
-                WalkMachine(layer.stateMachine, names);
+            foreach (var layer in controller.layers) WalkConds(layer.stateMachine, names);
         }
 
-        private static void WalkMachine(AnimatorStateMachine sm, HashSet<string> names)
+        private static void WalkConds(AnimatorStateMachine sm, HashSet<string> names)
         {
-            FixTransitions(sm.anyStateTransitions, names);
-            FixTransitions(sm.entryTransitions, names);
-            foreach (var cs in sm.states) FixTransitions(cs.state.transitions, names);
+            Fix(sm.anyStateTransitions, names);
+            Fix(sm.entryTransitions, names);
+            foreach (var cs in sm.states) Fix(cs.state.transitions, names);
             foreach (var child in sm.stateMachines)
             {
-                FixTransitions(sm.GetStateMachineTransitions(child.stateMachine), names);
-                WalkMachine(child.stateMachine, names);
+                Fix(sm.GetStateMachineTransitions(child.stateMachine), names);
+                WalkConds(child.stateMachine, names);
             }
         }
 
-        private static void FixTransitions(IEnumerable<AnimatorTransitionBase> transitions, HashSet<string> names)
+        private static void Fix(IEnumerable<AnimatorTransitionBase> transitions, HashSet<string> names)
         {
             foreach (var t in transitions)
             {
@@ -168,62 +349,26 @@ namespace CVRFury.Builder
             }
         }
 
-        // ---------------------------------------------------------------- blend-tree extraction
-
-        /// <summary>An on-clip is safe to auto-generate an Off for when it only animates blendshapes
-        /// and GameObject active-state (Off = 0/inactive). Material/transform toggles are ambiguous.</summary>
-        private static bool IsSafeToggleClip(AnimationClip clip)
+        private static void PruneDirectChildren(AnimatorController controller, HashSet<string> extract)
         {
-            if (clip == null) return false;
-            if (AnimationUtility.GetObjectReferenceCurveBindings(clip).Length > 0) return false;
-            foreach (var b in AnimationUtility.GetCurveBindings(clip))
-                if (!(b.propertyName.StartsWith("blendShape.") || b.propertyName == "m_IsActive"))
-                    return false;
-            return true;
-        }
-
-        private static int ExtractDirectBlendToggles(AnimatorController controller, HashSet<string> extract,
-                                                     AssetSaver assets)
-        {
-            // Gather (param, onClip) tasks while removing the children from their blend trees.
-            var tasks = new List<(string param, AnimationClip on)>();
             foreach (var layer in controller.layers)
-                foreach (var tree in BlendTreesIn(layer.stateMachine))
-                    PruneTree(tree, extract, tasks);
-
-            var layersAdded = 0;
-            foreach (var (param, on) in tasks)
-            {
-                AddBoolToggleLayer(controller, param, on, assets);
-                layersAdded++;
-            }
-            return layersAdded;
-        }
-
-        private static void PruneTree(BlendTree tree, HashSet<string> extract,
-                                      List<(string, AnimationClip)> tasks)
-        {
-            var keep = new List<ChildMotion>();
-            foreach (var ch in tree.children)
-            {
-                if (ch.motion is BlendTree nested) PruneTree(nested, extract, tasks);
-
-                if (!string.IsNullOrEmpty(ch.directBlendParameter) &&
-                    extract.Contains(ch.directBlendParameter) && ch.motion is AnimationClip clip)
+                foreach (var tree in AllTrees(layer.stateMachine))
                 {
-                    tasks.Add((ch.directBlendParameter, clip));
-                    continue; // drop from the tree
+                    var keep = tree.children.Where(ch =>
+                        string.IsNullOrEmpty(ch.directBlendParameter) || !extract.Contains(ch.directBlendParameter))
+                        .ToArray();
+                    if (keep.Length != tree.children.Length) tree.children = keep;
                 }
-                keep.Add(ch);
-            }
-            if (keep.Count != tree.children.Length) tree.children = keep.ToArray();
         }
 
         private static void AddBoolToggleLayer(AnimatorController c, string param, AnimationClip onClip,
-                                               AssetSaver assets)
+                                               AnimationClip offClip, AssetSaver assets, bool generateOff)
         {
-            var offClip = MakeOffClip(onClip);
-            assets.AddSubAsset(offClip, c);
+            if (generateOff)
+            {
+                offClip = MakeOffClip(onClip);
+                assets.AddSubAsset(offClip, c);
+            }
 
             var name = AnimatorUtil.UniqueLayerName(c, "CVRFury Toggle: " + param.TrimStart('#'));
             c.AddLayer(name);
@@ -244,100 +389,37 @@ namespace CVRFury.Builder
             var toOn = off.AddTransition(on);
             toOn.hasExitTime = false; toOn.duration = 0f; toOn.canTransitionToSelf = false;
             toOn.AddCondition(AnimatorConditionMode.If, 0f, param);
-
             var toOff = on.AddTransition(off);
             toOff.hasExitTime = false; toOff.duration = 0f; toOff.canTransitionToSelf = false;
             toOff.AddCondition(AnimatorConditionMode.IfNot, 0f, param);
         }
 
-        /// <summary>Clone an on-clip with every (safe) binding driven to 0 — the toggle's "off" pose,
-        /// matching a direct-blend-tree weight of 0.</summary>
         private static AnimationClip MakeOffClip(AnimationClip on)
         {
-            var off = new AnimationClip { name = on.name + " (Off)", frameRate = on.frameRate };
-            foreach (var b in AnimationUtility.GetCurveBindings(on))
-                AnimationUtility.SetEditorCurve(off, b, new AnimationCurve(new Keyframe(0f, 0f)));
+            var off = new AnimationClip { name = (on != null ? on.name : "Toggle") + " (Off)" };
+            if (on != null)
+            {
+                off.frameRate = on.frameRate;
+                foreach (var b in AnimationUtility.GetCurveBindings(on))
+                    AnimationUtility.SetEditorCurve(off, b, new AnimationCurve(new Keyframe(0f, 0f)));
+            }
             return off;
         }
 
-        private static IEnumerable<BlendTree> BlendTreesIn(AnimatorStateMachine sm)
+        private static IEnumerable<BlendTree> AllTrees(AnimatorStateMachine sm)
         {
             foreach (var cs in sm.states)
-                if (cs.state.motion is BlendTree t)
-                    yield return t;
+                foreach (var t in TreesIn(cs.state.motion)) yield return t;
             foreach (var child in sm.stateMachines)
-                foreach (var t in BlendTreesIn(child.stateMachine))
-                    yield return t;
+                foreach (var t in AllTrees(child.stateMachine)) yield return t;
         }
 
-        // ---------------------------------------------------------------- usage collection
-
-        private sealed class Usage
+        private static IEnumerable<BlendTree> TreesIn(Motion m)
         {
-            public readonly HashSet<string> OneDimBlend = new HashSet<string>();   // blendParameter / Y
-            public readonly Dictionary<string, List<AnimationClip>> DirectBlend =  // directBlendParameter → on-clips
-                new Dictionary<string, List<AnimationClip>>();
-            public readonly HashSet<string> Motion = new HashSet<string>();        // state speed/time/mirror/cycle
-            public readonly Dictionary<string, List<float>> ConditionThresholds =
-                new Dictionary<string, List<float>>();
-
-            public static Usage Collect(AnimatorController controller)
-            {
-                var u = new Usage();
-                foreach (var layer in controller.layers)
-                    u.Machine(layer.stateMachine);
-                return u;
-            }
-
-            private void Machine(AnimatorStateMachine sm)
-            {
-                Conds(sm.anyStateTransitions);
-                Conds(sm.entryTransitions);
-                foreach (var cs in sm.states)
-                {
-                    var s = cs.state;
-                    Conds(s.transitions);
-                    if (s.speedParameterActive) Motion.Add(s.speedParameter);
-                    if (s.timeParameterActive) Motion.Add(s.timeParameter);
-                    if (s.mirrorParameterActive) Motion.Add(s.mirrorParameter);
-                    if (s.cycleOffsetParameterActive) Motion.Add(s.cycleOffsetParameter);
-                    Tree(s.motion);
-                }
-                foreach (var child in sm.stateMachines)
-                {
-                    Conds(sm.GetStateMachineTransitions(child.stateMachine));
-                    Machine(child.stateMachine);
-                }
-            }
-
-            private void Conds(IEnumerable<AnimatorTransitionBase> ts)
-            {
-                foreach (var t in ts)
-                    foreach (var c in t.conditions)
-                    {
-                        if (string.IsNullOrEmpty(c.parameter)) continue;
-                        if (!ConditionThresholds.TryGetValue(c.parameter, out var l))
-                            ConditionThresholds[c.parameter] = l = new List<float>();
-                        l.Add(c.threshold);
-                    }
-            }
-
-            private void Tree(Motion motion)
-            {
-                if (!(motion is BlendTree tree)) return;
-                if (!string.IsNullOrEmpty(tree.blendParameter)) OneDimBlend.Add(tree.blendParameter);
-                if (!string.IsNullOrEmpty(tree.blendParameterY)) OneDimBlend.Add(tree.blendParameterY);
-                foreach (var ch in tree.children)
-                {
-                    if (!string.IsNullOrEmpty(ch.directBlendParameter))
-                    {
-                        if (!DirectBlend.TryGetValue(ch.directBlendParameter, out var l))
-                            DirectBlend[ch.directBlendParameter] = l = new List<AnimationClip>();
-                        l.Add(ch.motion as AnimationClip); // null if nested tree → IsSafeToggleClip rejects
-                    }
-                    Tree(ch.motion);
-                }
-            }
+            if (!(m is BlendTree tree)) yield break;
+            yield return tree;
+            foreach (var ch in tree.children)
+                foreach (var t in TreesIn(ch.motion)) yield return t;
         }
     }
 }

@@ -4,6 +4,29 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.2] - 2026-06-14
+
+0.7.1 compressed nothing on GodWhisper (`compressed 0`) because its float toggles
+aren't Direct-Blend-Tree-with-blendshape-clips — they're a different shape. This
+release broadens the compressor and makes the diagnostic pinpoint the pattern.
+
+### Added
+- **Per-toggle 1D blend-tree compression.** The common "one toggle = one 1D blend
+  tree (param, two clips at 0 and 1)" layout is now compressed: each becomes a
+  Bool-driven On/Off layer using the tree's **real** off and on clips, and the
+  original float-driven blend-tree state is neutralised. Because the off clip
+  already exists, this works for **any** property the toggle animates — materials,
+  shader floats, scale, blendshapes — not just blendshape/active toggles.
+- **Detailed compressor diagnostic.** The log now reports the compressible toggles
+  it found by shape (condition / 1D-blend / direct-blend), and for anything left as
+  a float, *why* (radial/complex blend, 2D blend, material/scale direct clip, motion
+  param) with a sample binding name — so the remaining synced-bit cost is fully
+  attributable.
+
+### Notes
+- Direct-blend-tree weights whose clips drive materials/scale still can't be
+  auto-compressed (no real off pose to fall back on) and are reported, not touched.
+
 ## [0.7.1] - 2026-06-14
 
 The diagnostic from 0.7.0 nailed it: on GodWhisper all 104 synced floats were
