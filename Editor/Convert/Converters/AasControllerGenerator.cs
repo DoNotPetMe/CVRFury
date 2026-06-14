@@ -128,6 +128,10 @@ namespace CVRFury.Builder.Convert
                          $"controller's existing layers, {built} got a freshly generated layer, {failed} failed. " +
                          "Attached as the avatar's animator + override — the automatic equivalent of clicking " +
                          "Create Controller + Attach.");
+
+            // X-ray the generated controller so the two field-only symptoms — the "motorcycle pose" and
+            // toggles that do nothing — show up in the build log instead of only in-game.
+            ControllerDiagnostics.Report(gen, entries.Cast<object>(), ctx.Log);
         }
 
         /// <summary>Make a machine name safe for an asset file name (CVR machine names contain

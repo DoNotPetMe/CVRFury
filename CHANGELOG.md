@@ -4,6 +4,25 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.4] - 2026-06-14
+
+**A build-log X-ray of the generated controller, to pin down the two field-only symptoms.**
+After 0.9.3 the conversion log reports success, yet in-game the avatar still holds the "motorcycle
+pose" and the menu toggles still do nothing — and this persists even after clicking the CCK's own
+**Create Controller + Attach**. Neither symptom is visible from CVRFury's own bookkeeping, so this
+release adds a diagnostic that inspects the controller CVRFury actually attaches and reports the two
+mechanical causes directly into the build log, so the next build tells us which one it is.
+
+### Added
+- **AAS controller diagnostic (`ControllerDiagnostics`).** After generating/attaching the AAS
+  controller, CVRFury now logs:
+  - **Pose suspects** — layers that animate humanoid muscles / Transforms at their *default* state.
+    At weight > 0 these override CVR locomotion and produce the motorcycle pose.
+  - **Dead toggles** — AAS `machineName` parameters that are not *read* by any transition condition
+    or blend-tree parameter in the generated controller (and any that aren't even declared). Nothing
+    responds when CVR drives these, which is the "toggle does nothing" symptom.
+  Output is bounded so it stays readable when pasted back from the Unity console.
+
 ## [0.9.3] - 2026-06-14
 
 **The actual root cause: the CCK inspector was silently wiping every entry CVRFury added.**
