@@ -172,6 +172,46 @@ namespace CVRFury.Builder
                 });
         }
 
+        /// <summary>
+        /// Read back every AAS entry and report how each synced parameter is encoded (Bool/Int/Float),
+        /// with an estimated synced-bit total. This is the ground truth for the "over the Synced Bit
+        /// Limit" problem: if toggles show up as Float here, the usedType write didn't take effect
+        /// (most likely the package didn't recompile) — a fleet of Float toggles is what blows the cap.
+        /// </summary>
+        public string SummarizeSyncCost()
+        {
+            var list = SettingsList;
+            if (list == null) return "AAS list unavailable — cannot summarise sync cost.";
+
+            int boolN = 0, intN = 0, floatN = 0, unknownN = 0, estBits = 0;
+
+            foreach (var entry in list)
+            {
+                if (entry == null) continue;
+                var setting =
+                    Reflect.GetField(entry, CckNames.Entry_ToggleSettings) ??
+                    Reflect.GetField(entry, CckNames.Entry_SliderSettings) ??
+                    Reflect.GetField(entry, CckNames.Entry_DropdownSettings);
+
+                var used = setting == null ? null : Reflect.GetField(setting, CckNames.Setting_UsedType)?.ToString();
+                switch (used)
+                {
+                    case CckNames.ParameterType_Bool:  boolN++;  estBits += 1;  break;
+                    case CckNames.ParameterType_Int:   intN++;   estBits += 8;  break;
+                    case CckNames.ParameterType_Float: floatN++; estBits += 64; break;
+                    default:                           unknownN++; estBits += 64; break; // unset defaults to Float
+                }
+            }
+
+            var line = $"AAS encoding readback: {boolN} Bool, {intN} Int, {floatN} Float" +
+                       (unknownN > 0 ? $", {unknownN} UNSET(→Float)" : "") +
+                       $" — est. ~{estBits} synced bits (CVR cap 3200).";
+            if (floatN + unknownN > 0 && boolN == 0)
+                line += " WARNING: no Bool toggles were written — the usedType fix is NOT active. " +
+                        "Confirm CVRFury shows v" + CckNames.CvrFuryVersion + " and reimport the package.";
+            return line;
+        }
+
         // ------------------------------------------------------------------ spatial / face
 
         public void SetViewPosition(Vector3 v) => Reflect.SetField(Component, CckNames.Avatar_ViewPosition, v);

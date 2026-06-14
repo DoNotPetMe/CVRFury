@@ -110,12 +110,16 @@ namespace CVRFury.Builder.Convert
                          "(If 0 but the avatar has menu controls, the control field/enum names in VrcNames " +
                          "may need updating for your SDK version.)");
 
+            // Ground-truth readback: report how each parameter is actually encoded. If toggles are
+            // Float here, the usedType fix didn't take effect (almost always a stale recompile).
+            var summary = ctx.Cvr.SummarizeSyncCost();
+            if (summary.Contains("WARNING")) ctx.Log.Warning(summary); else ctx.Log.Info(summary);
+
             if (_syncedCount > 0 && !ctx.Options.forceLocalParameters)
                 ctx.Log.Warning($"{_syncedCount} synced parameter(s) created. ChilloutVR caps synced bits " +
-                                "(3200). If the CCK reports 'over the Synced Bit Limit', re-run with " +
-                                "'Make all parameters local' enabled, or set unneeded parameters to local " +
-                                "in the CVRAvatar inspector. CVRFury already made non-network-synced VRChat " +
-                                "parameters local automatically.");
+                                "(3200). Toggles are encoded as Bool (~1 bit) and dropdowns as Int, so this " +
+                                "should fit comfortably. If the CCK still reports 'over the Synced Bit Limit', " +
+                                "check the encoding readback above — Float toggles mean a stale CVRFury build.");
         }
 
         private void WalkMenu(ConversionContext ctx, object menu, HashSet<object> visited, ref int added)

@@ -49,7 +49,7 @@ namespace CVRFury.Builder.Convert
             }
             ctx.Cvr.EnsureAdvancedSettingsContainer();
 
-            ctx.Log.Info($"Converting '{avatarRoot.name}' from VRChat to ChilloutVR…");
+            ctx.Log.Info($"CVRFury v{CckNames.CvrFuryVersion} — converting '{avatarRoot.name}' from VRChat to ChilloutVR…");
 
             foreach (var step in Steps().OrderBy(s => s.Order))
             {

@@ -4,6 +4,29 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.4] - 2026-06-14
+
+Diagnostics to pin down why the synced-bit overflow can persist after the 0.5.3
+fix. When the bit count comes back *identical* (e.g. still 6848/3200), the new
+encoding isn't reaching the entries — almost always because the package didn't
+recompile in the Unity project.
+
+### Added
+- **Version stamp in the conversion log** — the first line now reads
+  `CVRFury vX.Y.Z — converting …` so you can confirm at a glance which build ran.
+  If it doesn't say the latest version, update/reimport the package (Package
+  Manager ▸ CVRFury ▸ Update, or reimport the git package) and re-run.
+- **AAS encoding readback** — after building Advanced Avatar Settings, CVRFury
+  reads each entry back and reports `N Bool, N Int, N Float — est. ~X synced bits`.
+  Toggles should be **Bool**; if they show as **Float**, the `usedType` fix is not
+  active (stale build) and the log says so explicitly. `6848` bits ≈ 107 Float
+  toggles × 64 bits — the readback makes that visible without an upload.
+
+### Notes
+- This release changes no conversion behaviour beyond logging; if the readback
+  shows all-Float toggles on the latest version, that's a genuine bug to report
+  (paste the readback line).
+
 ## [0.5.3] - 2026-06-14
 
 The real fix for "toggles do nothing" **and** the synced-bit overflow: CVRFury

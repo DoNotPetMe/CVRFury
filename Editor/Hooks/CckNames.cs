@@ -17,6 +17,11 @@ namespace CVRFury.Builder
     /// </summary>
     internal static class CckNames
     {
+        /// <summary>CVRFury package version, surfaced in the conversion/build log so you can confirm at
+        /// a glance which build actually ran (a stale recompile is the usual cause of "same issue").
+        /// Keep in sync with package.json.</summary>
+        public const string CvrFuryVersion = "0.5.4";
+
         // --- Build pipeline (editor) ---
         // Static UnityEvent&lt;GameObject&gt; fields that the CCK fires immediately before it
         // bundles an avatar / prop for upload. These are CVRFury's equivalent of VRChat's
