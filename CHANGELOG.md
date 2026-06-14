@@ -4,6 +4,35 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-06-14
+
+**Toggles are now generated and attached automatically — the real fix.** The CCK
+source revealed that ChilloutVR doesn't run the Base Controller directly: it
+generates a fresh AnimatorController by calling each AAS entry's `SetupAnimator()`
+on top of the base, then attaches it (the "Create Controller" + "Attach Created
+Override to Avatar" buttons). CVRFury never triggered this, so the avatar had no
+working controller and every toggle was dead.
+
+Worse, `SetupAnimator()` calls `AddParameter()` for each entry, and we had set the
+Base Controller to the **merged VRChat FX controller, which already contained those
+parameters** — so even clicking the buttons manually threw "parameter already
+exists" and generation aborted. That's why nothing worked.
+
+### Added
+- **Automatic AAS controller generation** (`AasControllerGenerator`). After the menu
+  entries are built it: seeds a fresh controller from CVR's **clean locomotion**
+  animator, calls each entry's `SetupAnimator()` via reflection (using the clips
+  attached in 0.8.0) to build that toggle/slider's layer + parameter + states, then
+  attaches the generated controller (and an override) to the avatar — exactly what
+  the inspector buttons do, but hands-free. Each entry is wrapped in try/catch so one
+  bad entry can't abort the whole generation, and the log reports built vs. skipped.
+
+### Fixed
+- Generation no longer aborts on "parameter already exists": the generated controller
+  is built on a **clean** base, not the parameter-laden merged FX controller, so
+  `AddParameter` succeeds for every entry. The merged FX controller is now used only
+  as a source for toggle clips, not as the avatar's runtime controller.
+
 ## [0.8.1] - 2026-06-14
 
 ### Fixed

@@ -20,7 +20,7 @@ namespace CVRFury.Builder
         /// <summary>CVRFury package version, surfaced in the conversion/build log so you can confirm at
         /// a glance which build actually ran (a stale recompile is the usual cause of "same issue").
         /// Keep in sync with package.json.</summary>
-        public const string CvrFuryVersion = "0.8.1";
+        public const string CvrFuryVersion = "0.9.0";
 
         // --- Build pipeline (editor) ---
         // Static UnityEvent&lt;GameObject&gt; fields that the CCK fires immediately before it
@@ -41,7 +41,11 @@ namespace CVRFury.Builder
         // --- Advanced Avatar Settings container ---
         public const string AdvancedSettingsType = "ABI.CCK.Scripts.CVRAdvancedAvatarSettings";
         public const string AdvancedSettings_List = "settings";            // List&lt;CVRAdvancedSettingsEntry&gt;
-        public const string AdvancedSettings_BaseController = "baseController"; // RuntimeAnimatorController
+        public const string AdvancedSettings_BaseController = "baseController"; // RuntimeAnimatorController (clean base)
+        public const string AdvancedSettings_Animator = "animator";        // generated AnimatorController
+        public const string AdvancedSettings_Overrides = "overrides";      // generated AnimatorOverrideController
+        public const string Entry_Setting = "setting";                     // property → per-type settings object
+        public const string Setting_SetupAnimator = "SetupAnimator";       // generates this entry's layer/param/states
 
         // --- A single AAS entry ---
         // The entry holds a SettingsType discriminator plus a *typed* settings object on a

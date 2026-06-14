@@ -88,6 +88,7 @@ namespace CVRFury.Builder.Convert
             yield return new AvatarBasicsConverter();
             yield return new PhysBoneConverter();
             yield return new ExpressionsConverter();
+            yield return new AasControllerGenerator();
             yield return new FinalCleanupConverter();
         }
 

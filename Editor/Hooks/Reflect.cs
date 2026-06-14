@@ -62,6 +62,32 @@ namespace CVRFury.Builder
             return f.GetValue(instance);
         }
 
+        /// <summary>Read a property by name (e.g. the CCK entry's <c>setting</c> get-only property
+        /// that resolves the per-type settings object).</summary>
+        public static object GetProperty(object instance, string prop)
+        {
+            if (instance == null) return null;
+            var p = instance.GetType().GetProperty(prop, AllInstance);
+            if (p == null) { Warn($"property '{prop}' on '{instance.GetType().FullName}'"); return null; }
+            try { return p.GetValue(instance); }
+            catch (Exception e) { Warn($"getting property '{prop}': {e.Message}"); return null; }
+        }
+
+        /// <summary>Invoke an instance method, supporting a leading <c>ref</c> parameter (read back
+        /// from the args array after the call). Returns true on success.</summary>
+        public static bool InvokeMethod(object instance, string method, object[] args)
+        {
+            if (instance == null) return false;
+            var m = instance.GetType().GetMethod(method, AllInstance);
+            if (m == null) { Warn($"method '{method}' on '{instance.GetType().FullName}'"); return false; }
+            try { m.Invoke(instance, args); return true; }
+            catch (Exception e)
+            {
+                Warn($"invoking '{method}' on '{instance.GetType().FullName}': {(e.InnerException ?? e).Message}");
+                return false;
+            }
+        }
+
         public static bool SetField(object instance, string field, object value)
         {
             if (instance == null) return false;

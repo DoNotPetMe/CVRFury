@@ -69,6 +69,10 @@ namespace CVRFury.Builder.Convert
             return Controller;
         }
 
+        /// <summary>CVR's default avatar (locomotion) animator, used as the clean base the AAS
+        /// generator extends. Exposed so the controller-generation step can seed from it.</summary>
+        public AnimatorController FindCvrLocomotion() => FindCvrDefaultAvatarAnimator();
+
         /// <summary>Best-effort locate of CVR's default avatar animator controller. The CCK ships it
         /// as <c>…/CCK/Animations/AvatarAnimator.controller</c>, but the install folder varies
         /// (<c>ABI.CCK</c> on older kits, <c>CVR.CCK</c> on newer ones), so match on ".CCK" + the
