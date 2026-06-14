@@ -18,8 +18,18 @@ namespace CVRFury.Builder
     /// </summary>
     internal static class ControllerMerger
     {
+        /// <param name="renameParameter">
+        /// Optional final-name chooser for a source parameter that does not already exist in the
+        /// destination. ChilloutVR network-syncs every animator parameter except those whose name
+        /// starts with <c>#</c> (and core params), so the converter passes a function here that
+        /// prefixes non-synced parameters with <c>#</c> to keep them local — the fix for the
+        /// "over the Synced Bit Limit" error after merging VRChat's local-heavy FX controller.
+        /// Parameters already present in the destination (CVR core/locomotion) are never renamed.
+        /// When null, the simple <paramref name="paramPrefix"/> behaviour is used.
+        /// </param>
         public static void Merge(AnimatorController dst, AnimatorController src, AssetSaver assets,
-                                 string paramPrefix, BuildLog log)
+                                 string paramPrefix, BuildLog log,
+                                 System.Func<string, string> renameParameter = null)
         {
             if (dst == null || src == null) return;
             var remap = new Dictionary<string, string>();
@@ -28,7 +38,14 @@ namespace CVRFury.Builder
             var existing = new HashSet<string>(dst.parameters.Select(p => p.name));
             foreach (var p in src.parameters)
             {
-                var newName = string.IsNullOrEmpty(paramPrefix) ? p.name : paramPrefix + p.name;
+                string newName;
+                if (existing.Contains(p.name))
+                    newName = p.name;                       // shared/core param — never rename
+                else if (renameParameter != null)
+                    newName = renameParameter(p.name);
+                else
+                    newName = string.IsNullOrEmpty(paramPrefix) ? p.name : paramPrefix + p.name;
+
                 remap[p.name] = newName;
                 if (existing.Contains(newName)) continue;
                 dst.AddParameter(new AnimatorControllerParameter

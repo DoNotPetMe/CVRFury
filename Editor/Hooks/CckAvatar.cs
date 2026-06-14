@@ -183,11 +183,16 @@ namespace CVRFury.Builder
             var list = SettingsList;
             if (list == null) return "AAS list unavailable — cannot summarise sync cost.";
 
-            int boolN = 0, intN = 0, floatN = 0, unknownN = 0, estBits = 0;
+            int boolN = 0, intN = 0, floatN = 0, unknownN = 0, localN = 0, estBits = 0;
 
             foreach (var entry in list)
             {
                 if (entry == null) continue;
+
+                // ChilloutVR does not sync parameters whose machine name starts with '#'.
+                var machine = Reflect.GetField(entry, CckNames.Entry_MachineName) as string;
+                if (!string.IsNullOrEmpty(machine) && machine[0] == '#') { localN++; continue; }
+
                 var setting =
                     Reflect.GetField(entry, CckNames.Entry_ToggleSettings) ??
                     Reflect.GetField(entry, CckNames.Entry_SliderSettings) ??
@@ -203,13 +208,11 @@ namespace CVRFury.Builder
                 }
             }
 
-            var line = $"AAS encoding readback: {boolN} Bool, {intN} Int, {floatN} Float" +
-                       (unknownN > 0 ? $", {unknownN} UNSET(→Float)" : "") +
-                       $" — est. ~{estBits} synced bits (CVR cap 3200).";
-            if (floatN + unknownN > 0 && boolN == 0)
-                line += " WARNING: no Bool toggles were written — the usedType fix is NOT active. " +
-                        "Confirm CVRFury shows v" + CckNames.CvrFuryVersion + " and reimport the package.";
-            return line;
+            return $"AAS readback: {boolN} Bool, {intN} Int, {floatN} Float synced" +
+                   (unknownN > 0 ? $", {unknownN} UNSET(→Float)" : "") +
+                   $", {localN} local(#) — est. ~{estBits} synced bits from AAS (CVR cap 3200). " +
+                   "Note: CVR's own counter also sums non-#-prefixed parameters in the base controller, " +
+                   "so localising (#) the merged FX parameters is what actually clears the limit.";
         }
 
         // ------------------------------------------------------------------ spatial / face

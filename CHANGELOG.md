@@ -4,6 +4,41 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-06-14
+
+**The actual fix for "over the Synced Bit Limit."** The 0.5.3 readback proved
+the AAS was being written correctly (toggles as Bool) yet the CCK still reported
+`6848/3200`. That number is `107 × 64` — ChilloutVR was syncing ~107 **Float**
+parameters in the *base animator controller*, not the AAS entries.
+
+### Root cause
+ChilloutVR network-syncs **every animator-controller parameter by default**, and
+only treats a parameter as local if its name starts with **`#`** (e.g. the
+documented `#MotionScale`). The converter was merging VRChat's entire FX
+controller, which is full of local smoothing/driver/remap floats that VRChat
+never synced — and CVR dutifully synced all of them. The AAS `usedType` controls
+the menu encoding, but the synced-bit cost comes from the controller parameters.
+
+### Fixed
+- **Non-synced parameters are now localised with `#` during the merge.** CVRFury
+  reads VRChat's `VRCExpressionParameters` to learn which parameters are actually
+  network-synced; everything else (non-synced expression params **and** all
+  FX-internal locals) is renamed to `#name` in the merged controller, with every
+  reference (transition conditions, blend trees, state speed/time/mirror params)
+  remapped automatically. CVR core/locomotion params (`GestureLeft`, `Grounded`,
+  …) and genuinely-synced params keep their names. Result: only the handful of
+  real synced parameters count toward the 3200-bit budget.
+- **AAS menu entries drive the final (possibly `#`-localised) parameter name**, so
+  toggles keep working after localisation — local toggles work for you, cost zero
+  synced bits, just aren't visible to others.
+- **"Make all parameters local" now genuinely works** — it forces the `#` prefix
+  on everything, guaranteeing a 0-bit avatar that always builds.
+
+### Changed
+- The sync map is now read **before** merging (so the merge can localise), and the
+  diagnostic readback reports synced-vs-`#`-local counts and notes that CVR's
+  counter sums the controller's non-`#` parameters.
+
 ## [0.5.4] - 2026-06-14
 
 Diagnostics to pin down why the synced-bit overflow can persist after the 0.5.3

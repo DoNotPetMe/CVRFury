@@ -22,12 +22,38 @@ namespace CVRFury.Builder.Convert
 
         public void Run(ConversionContext ctx)
         {
+            // The sync map must be known *before* merging, so the merge can localise (#-prefix)
+            // non-synced parameters. ChilloutVR syncs every animator parameter except #-prefixed
+            // ones; merging VRChat's FX controller (full of local smoothing/driver floats VRChat
+            // never synced) is what blows the 3200 synced-bit budget unless we localise them.
+            BuildParamSyncMap(ctx);
             if (ctx.Options.mergePlayableLayers) MergeLayers(ctx);
-            if (ctx.Options.expressions)
-            {
-                BuildParamSyncMap(ctx);
-                ConvertMenu(ctx);
-            }
+            if (ctx.Options.expressions) ConvertMenu(ctx);
+        }
+
+        /// <summary>ChilloutVR core/locomotion parameters the platform drives by name. Never localise
+        /// or sync these — CVR recognises them as core (they don't count toward the synced budget),
+        /// and #-prefixing them would stop the game writing to them. (Normally these are already in
+        /// the seeded base controller and kept as-is; this guards the case where seeding failed.)</summary>
+        private static readonly HashSet<string> CoreParams = new HashSet<string>
+        {
+            "GestureLeft", "GestureRight", "Grounded", "Travelling", "Sitting", "Crouching",
+            "Prone", "Flying", "Emote", "MovementX", "MovementY",
+        };
+
+        /// <summary>
+        /// The parameter name ChilloutVR should actually use. CVR core params keep their name; synced
+        /// VRChat parameters keep their name (CVR syncs them); everything else is prefixed with
+        /// <c>#</c> so CVR treats it as a local, zero-synced-bit parameter. Honours the "make all
+        /// parameters local" option.
+        /// </summary>
+        private static string FinalName(ConversionContext ctx, string vrcName)
+        {
+            if (string.IsNullOrEmpty(vrcName) || vrcName[0] == '#' || CoreParams.Contains(vrcName))
+                return vrcName;
+            var synced = !ctx.Options.forceLocalParameters &&
+                         ctx.ParamSynced.TryGetValue(vrcName, out var s) && s;
+            return synced ? vrcName : "#" + vrcName;
         }
 
         /// <summary>Read VRCExpressionParameters so we know which parameters are network-synced.
@@ -38,8 +64,11 @@ namespace CVRFury.Builder.Convert
             var list = Reflect.AsList(ep == null ? null : Reflect.GetField(ep, VrcNames.ExprParams_List));
             if (list == null)
             {
-                ctx.Log.Warning("No VRCExpressionParameters found; assuming all menu parameters are synced. " +
-                                "Enable 'Make all parameters local' if you hit the synced-bit limit.");
+                ctx.Log.Warning("No VRCExpressionParameters found, so CVRFury can't tell which parameters " +
+                                "VRChat network-synced. To stay under the synced-bit limit it will localise " +
+                                "(#-prefix) ALL converted parameters — your toggles will work locally but " +
+                                "won't be visible to others. If you need specific parameters synced, set them " +
+                                "manually in the CVRAvatar inspector (remove the leading #).");
                 return;
             }
             foreach (var p in list)
@@ -78,11 +107,13 @@ namespace CVRFury.Builder.Convert
                     continue;
                 }
 
-                ControllerMerger.Merge(ctx.GetOrCreateController(), controller, ctx.Assets, "", ctx.Log);
+                ControllerMerger.Merge(ctx.GetOrCreateController(), controller, ctx.Assets, "", ctx.Log,
+                                       renameParameter: n => FinalName(ctx, n));
                 merged++;
                 ctx.Log.Info($"Merged '{typeName}' playable layer.");
             }
-            ctx.Log.Info($"Merged {merged} playable-layer controller(s) into the CVR animator.");
+            ctx.Log.Info($"Merged {merged} playable-layer controller(s) into the CVR animator. " +
+                         "Non-synced parameters were localised (#-prefixed) so they cost zero synced bits.");
         }
 
         private void ConvertMenu(ConversionContext ctx)
@@ -110,16 +141,12 @@ namespace CVRFury.Builder.Convert
                          "(If 0 but the avatar has menu controls, the control field/enum names in VrcNames " +
                          "may need updating for your SDK version.)");
 
-            // Ground-truth readback: report how each parameter is actually encoded. If toggles are
-            // Float here, the usedType fix didn't take effect (almost always a stale recompile).
-            var summary = ctx.Cvr.SummarizeSyncCost();
-            if (summary.Contains("WARNING")) ctx.Log.Warning(summary); else ctx.Log.Info(summary);
+            // Ground-truth readback: report how each parameter is actually encoded.
+            ctx.Log.Info(ctx.Cvr.SummarizeSyncCost());
 
-            if (_syncedCount > 0 && !ctx.Options.forceLocalParameters)
-                ctx.Log.Warning($"{_syncedCount} synced parameter(s) created. ChilloutVR caps synced bits " +
-                                "(3200). Toggles are encoded as Bool (~1 bit) and dropdowns as Int, so this " +
-                                "should fit comfortably. If the CCK still reports 'over the Synced Bit Limit', " +
-                                "check the encoding readback above — Float toggles mean a stale CVRFury build.");
+            ctx.Log.Info($"Menu parameters: {_syncedCount} synced, {_localCount} local (#-prefixed, zero " +
+                         "synced bits). Non-synced VRChat parameters and merged FX-internal parameters are " +
+                         "localised automatically; enable 'Make all parameters local' to force everything local.");
         }
 
         private void WalkMenu(ConversionContext ctx, object menu, HashSet<object> visited, ref int added)
@@ -160,27 +187,26 @@ namespace CVRFury.Builder.Convert
 
         private bool AddToggle(ConversionContext ctx, string name, string param)
         {
-            if (string.IsNullOrEmpty(param) || !ctx.AddedParams.Add(param)) return false;
-            var local = IsLocal(ctx, param);
-            ctx.Cvr.AddToggle(name, param, false, local);
+            if (string.IsNullOrEmpty(param)) return false;
+            // The AAS entry must drive the *final* (possibly #-localised) controller parameter name,
+            // so the toggle keeps working after the merge renames non-synced params to local.
+            var machine = FinalName(ctx, param);
+            if (!ctx.AddedParams.Add(machine)) return false;
+            var local = machine[0] == '#';
+            ctx.Cvr.AddToggle(name, machine, false, local);
             if (local) _localCount++; else _syncedCount++;
             return true;
         }
 
         private bool AddSlider(ConversionContext ctx, string name, string param)
         {
-            if (string.IsNullOrEmpty(param) || !ctx.AddedParams.Add(param)) return false;
-            var local = IsLocal(ctx, param);
-            ctx.Cvr.AddSlider(name, param, 0f, local);
+            if (string.IsNullOrEmpty(param)) return false;
+            var machine = FinalName(ctx, param);
+            if (!ctx.AddedParams.Add(machine)) return false;
+            var local = machine[0] == '#';
+            ctx.Cvr.AddSlider(name, machine, 0f, local);
             if (local) _localCount++; else _syncedCount++;
             return true;
-        }
-
-        /// <summary>A parameter is local if forced, or if VRChat marked it not network-synced.</summary>
-        private static bool IsLocal(ConversionContext ctx, string param)
-        {
-            if (ctx.Options.forceLocalParameters) return true;
-            return ctx.ParamSynced.TryGetValue(param, out var synced) && !synced;
         }
 
         private static string ParamName(object control)
