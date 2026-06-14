@@ -98,14 +98,16 @@ namespace CVRFury.Builder
             public readonly HashSet<string> DirectToggleParams = new HashSet<string>();
 
             // Reasons a binary toggle param could NOT be compressed (for the report).
-            public int SkipRadial, SkipMaterialScale, SkipMotion, Skip2D;
+            public int SkipRadial, SkipMaterialScale, SkipMotion, Skip2D, SkipShared;
             public string SampleUnsafe;
 
             public string Skips()
             {
-                if (SkipRadial + SkipMaterialScale + SkipMotion + Skip2D == 0) return "No toggles left as float.";
+                if (SkipRadial + SkipMaterialScale + SkipMotion + Skip2D + SkipShared == 0)
+                    return "No toggles left as float.";
                 var s = $"Left as float: {SkipRadial} radial/complex-blend, {SkipMaterialScale} " +
-                        $"material/scale clip, {Skip2D} 2D-blend, {SkipMotion} motion-param.";
+                        $"material-swap/transform clip, {SkipShared} shared-binding, {Skip2D} 2D-blend, " +
+                        $"{SkipMotion} motion-param.";
                 if (SampleUnsafe != null) s += $" (e.g. binding '{SampleUnsafe}')";
                 return s;
             }
@@ -145,6 +147,7 @@ namespace CVRFury.Builder
             var oneDimCand = new Dictionary<string, Occ>();
             var directCand = new Dictionary<string, List<AnimationClip>>();
             var blocked = new HashSet<string>();       // disqualified entirely
+            var sharedBinding = new HashSet<string>();  // direct-blend child shares a binding with a sibling
 
             void Block(string p) { if (!string.IsNullOrEmpty(p)) blocked.Add(p); }
 
@@ -176,15 +179,26 @@ namespace CVRFury.Builder
                 }
                 else if (tree.blendType == BlendTreeType.Direct)
                 {
+                    // Count how many children in THIS tree touch each binding. A toggle can only be
+                    // safely lifted into an override layer if its bindings are exclusive to it — if a
+                    // sibling "base" child also drives the same property, an override layer would lose
+                    // the additive sum and corrupt the value.
+                    var bindingCount = new Dictionary<string, int>();
+                    var childKeys = new List<(string p, AnimationClip clip, List<string> keys)>();
                     foreach (var ch in tree.children)
                     {
-                        var p = ch.directBlendParameter;
-                        if (string.IsNullOrEmpty(p)) continue;
-                        if (binary.Contains(p) && canTouch(p) && floatType.Contains(p))
-                        {
-                            if (!directCand.TryGetValue(p, out var l)) directCand[p] = l = new List<AnimationClip>();
-                            l.Add(ch.motion as AnimationClip);
-                        }
+                        var clip = ch.motion as AnimationClip;
+                        var keys = BindingKeys(clip);
+                        foreach (var k in keys) bindingCount[k] = bindingCount.TryGetValue(k, out var n) ? n + 1 : 1;
+                        childKeys.Add((ch.directBlendParameter, clip, keys));
+                    }
+                    foreach (var (p, clip, keys) in childKeys)
+                    {
+                        if (string.IsNullOrEmpty(p) || !(binary.Contains(p) && canTouch(p) && floatType.Contains(p)))
+                            continue;
+                        if (keys.Any(k => bindingCount[k] > 1)) { sharedBinding.Add(p); continue; }
+                        if (!directCand.TryGetValue(p, out var l)) directCand[p] = l = new List<AnimationClip>();
+                        l.Add(clip);
                     }
                 }
                 else // 2D
@@ -246,7 +260,8 @@ namespace CVRFury.Builder
             foreach (var kv in directCand)
             {
                 var p = kv.Key;
-                if (blocked.Contains(p) || conds.ContainsKey(p) || oneDimBlend.Contains(p)) continue;
+                if (blocked.Contains(p) || sharedBinding.Contains(p) || conds.ContainsKey(p) ||
+                    oneDimBlend.Contains(p)) continue;
                 if (kv.Value.All(cl => IsSafeToggleClip(cl, a)))
                 {
                     a.DirectToggleParams.Add(p);
@@ -266,11 +281,23 @@ namespace CVRFury.Builder
                     a.DirectToggleParams.Contains(p)) continue;
                 if (motion.Contains(p)) a.SkipMotion++;
                 else if (twoDimBlend.Contains(p)) a.Skip2D++;
+                else if (sharedBinding.Contains(p)) a.SkipShared++;
                 else if (directCand.ContainsKey(p)) { /* counted in SkipMaterialScale above */ }
                 else a.SkipRadial++;
             }
 
             return a;
+        }
+
+        private static List<string> BindingKeys(AnimationClip clip)
+        {
+            var keys = new List<string>();
+            if (clip == null) return keys;
+            foreach (var b in AnimationUtility.GetCurveBindings(clip))
+                keys.Add(b.path + "|" + b.type + "|" + b.propertyName);
+            foreach (var b in AnimationUtility.GetObjectReferenceCurveBindings(clip))
+                keys.Add(b.path + "|" + b.type + "|" + b.propertyName);
+            return keys;
         }
 
         private static void CollectConds(AnimatorTransitionBase t, Dictionary<string, List<float>> conds)
@@ -286,15 +313,24 @@ namespace CVRFury.Builder
         private static bool IsSafeToggleClip(AnimationClip clip, Analysis a)
         {
             if (clip == null) return false;
+
+            // Object-reference curves (material swaps) have no meaningful "zero", so we can't
+            // synthesise an off pose for them.
             if (AnimationUtility.GetObjectReferenceCurveBindings(clip).Length > 0)
             {
                 a.SampleUnsafe = a.SampleUnsafe ?? "material/object-reference swap";
                 return false;
             }
+
+            // In a Direct Blend Tree a weight of 0 means the child contributes 0 to the sum, so the
+            // correct "off" value for any FLOAT binding is exactly 0 — that holds for blendshapes,
+            // material floats and AAP (animator-parameter) curves alike. The one exception is the
+            // Transform: zeroing scale/position/rotation would collapse or teleport the object, so
+            // those are treated as ambiguous and left as a synced float.
             foreach (var b in AnimationUtility.GetCurveBindings(clip))
-                if (!(b.propertyName.StartsWith("blendShape.") || b.propertyName == "m_IsActive"))
+                if (b.type == typeof(Transform))
                 {
-                    a.SampleUnsafe = a.SampleUnsafe ?? b.propertyName;
+                    a.SampleUnsafe = a.SampleUnsafe ?? (b.propertyName + " (transform)");
                     return false;
                 }
             return true;

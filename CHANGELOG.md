@@ -4,6 +4,30 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.3] - 2026-06-14
+
+0.7.2's diagnostic pinpointed it: GodWhisper's toggles live in a **Direct Blend
+Tree**, and 52 were rejected only because their clips drive material floats / AAP
+(Animated Animator Parameter) curves rather than blendshapes — the sample binding
+`(AAP-f)Bodysuit` gave it away. They're plain float curves, and in a direct blend
+tree a weight of 0 means a child contributes 0, so the correct "off" value for any
+float binding is exactly 0.
+
+### Changed
+- **Direct-blend toggle compression now handles material-float and AAP toggles.** The
+  "safe clip" check no longer restricts to blendshape/active bindings; it accepts any
+  float curve (zeroing it for the Off pose, which matches a blend weight of 0) and
+  only rejects genuine ambiguities: **object-reference (material swap)** curves and
+  **Transform** (scale/position/rotation) curves.
+- **Exclusivity guard.** A direct-blend child is only lifted into an override layer if
+  its bindings aren't also animated by a sibling child in the same tree — otherwise the
+  additive sum would be lost. Shared-binding toggles are reported and left as floats.
+
+### Notes
+- AAP-driven toggles keep working only if ChilloutVR plays parameter-driving clips in
+  ordinary states; this gets the avatar under the synced-bit cap regardless. Verify
+  toggles in-world and report any that don't visually change.
+
 ## [0.7.2] - 2026-06-14
 
 0.7.1 compressed nothing on GodWhisper (`compressed 0`) because its float toggles
