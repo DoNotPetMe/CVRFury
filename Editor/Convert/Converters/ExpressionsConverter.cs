@@ -55,6 +55,10 @@ namespace CVRFury.Builder.Convert
                                      _toggleParams, ctx.Assets, ctx.Log);
                 // Clear the VRChat Int-gesture vs CVR Float-gesture condition-type errors.
                 SyncBitOptimizer.HarmonizeConditionParamTypes(ctx.Controller, ctx.Log);
+                // Recreate the VRCFury-injected Direct Blend Tree weight ('Blend' = 1) and any other
+                // blend-tree parameter the authored controller references but never declares — without it
+                // the whole toggle/blendshape/species system multiplies to zero.
+                AnimatorUtil.EnsureBlendTreeParametersExist(ctx.Controller, ctx.Log);
             }
         }
 

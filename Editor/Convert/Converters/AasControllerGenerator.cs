@@ -100,6 +100,10 @@ namespace CVRFury.Builder.Convert
             // GestureLeft/GestureRight) must stay Float, so only Equals/NotEqual-gated params that are
             // NOT blend parameters are retyped to Int.
             SyncBitOptimizer.HarmonizeConditionParamTypes(gen, ctx.Log);
+            // Recreate any blend-tree parameter the controller references but doesn't declare (the
+            // VRCFury Direct Blend Tree weight 'Blend' = 1); without it the toggle/blendshape/species
+            // system multiplies to zero on the controller the avatar actually runs.
+            AnimatorUtil.EnsureBlendTreeParametersExist(gen, ctx.Log);
             EditorUtility.SetDirty(gen);
             AssetDatabase.SaveAssets();
 

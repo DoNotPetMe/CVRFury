@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using UnityEditor.Animations;
 using UnityEngine;
@@ -211,6 +212,79 @@ namespace CVRFury.Builder
             while (c.layers.Any(l => l.name == name))
                 name = $"{desired} ({i++})";
             return name;
+        }
+
+        /// <summary>
+        /// Ensure every parameter referenced by a blend tree actually exists on the controller.
+        ///
+        /// VRChat avatars built with VRCFury / d4rk's "Direct Blend Tree" optimiser drive their entire
+        /// toggle / blendshape / material / AAP system through one always-on Direct Blend Tree whose
+        /// children are weighted by a constant parameter (conventionally named <c>Blend</c>, held at 1).
+        /// VRCFury <em>injects that parameter at VRChat build time</em>, so the authored FX controller
+        /// references it in 100s of children but never declares it. After merging into the CVR animator
+        /// the reference survives but the parameter is undefined — and Unity evaluates a missing
+        /// <c>directBlendParameter</c> as 0, multiplying the whole tree to nothing. The result: clothing
+        /// blendshapes never reach their "shown" value (invisible-but-enabled clothing), the species blend
+        /// sits at its default (stuck between human and furry) and every toggle does nothing.
+        ///
+        /// We recreate the missing parameters: a missing <c>directBlendParameter</c> is a multiplicative
+        /// weight, so it defaults to 1 ("apply"); a missing 1D/2D <c>blendParameter</c> is a position and
+        /// defaults to 0 (neutral). Parameters that already exist (real toggles) are left untouched.
+        /// </summary>
+        public static int EnsureBlendTreeParametersExist(AnimatorController c, BuildLog log)
+        {
+            if (c == null) return 0;
+            var declared = new HashSet<string>(c.parameters.Select(p => p.name));
+            var directWeights = new HashSet<string>();
+            var positions = new HashSet<string>();
+
+            void Walk(Motion m)
+            {
+                if (!(m is BlendTree tree)) return;
+                if (!string.IsNullOrEmpty(tree.blendParameter)) positions.Add(tree.blendParameter);
+                if (!string.IsNullOrEmpty(tree.blendParameterY)) positions.Add(tree.blendParameterY);
+                foreach (var ch in tree.children)
+                {
+                    if (tree.blendType == BlendTreeType.Direct && !string.IsNullOrEmpty(ch.directBlendParameter))
+                        directWeights.Add(ch.directBlendParameter);
+                    Walk(ch.motion);
+                }
+            }
+            foreach (var layer in c.layers)
+                foreach (var cs in AllStates(layer.stateMachine))
+                    Walk(cs.motion);
+
+            var added = new List<string>();
+            // Direct-blend constant weights → default 1 so the tree actually applies.
+            foreach (var name in directWeights)
+            {
+                if (declared.Contains(name)) continue;
+                EnsureFloatParam(c, name, 1f);
+                declared.Add(name);
+                added.Add(name + "=1 (Direct Blend weight)");
+            }
+            // Positional blend parameters → default 0 (neutral).
+            foreach (var name in positions)
+            {
+                if (declared.Contains(name)) continue;
+                EnsureFloatParam(c, name, 0f);
+                declared.Add(name);
+                added.Add(name + "=0 (blend position)");
+            }
+
+            if (added.Count > 0)
+                log.Info($"Restored {added.Count} blend-tree parameter(s) that were referenced but not " +
+                         "declared (VRCFury injects these at build time). Without them a Direct Blend Tree " +
+                         "multiplies to zero — the cause of invisible/enabled clothing, a species blend stuck " +
+                         "between variants, and dead toggles. Restored: " + string.Join(", ", added));
+            return added.Count;
+        }
+
+        private static IEnumerable<AnimatorState> AllStates(AnimatorStateMachine sm)
+        {
+            foreach (var cs in sm.states) yield return cs.state;
+            foreach (var child in sm.stateMachines)
+                foreach (var s in AllStates(child.stateMachine)) yield return s;
         }
     }
 }

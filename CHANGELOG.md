@@ -4,6 +4,27 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.7] - 2026-06-14
+
+**The real root cause of dead toggles + invisible clothing + the human/furry blend stuck mid-morph: a
+missing Direct Blend Tree weight parameter.** Reading the generated controller directly: the avatar's
+entire toggle / blendshape / material / AAP system is driven by one always-on **Direct Blend Tree**
+(VRCFury / d4rk style — layers `DBT_Toggles`, `DBT_Smoothing`, `DBT_Logic`). Every one of its **559**
+children is weighted by a constant parameter named **`Blend`** — but `Blend` was **never declared as a
+parameter** (VRCFury injects it at VRChat build time). Unity evaluates a missing `directBlendParameter`
+as **0**, so the whole tree multiplied to zero: clothing shrink-blendshapes never reached their "shown"
+value (enabled-but-invisible garments), the `Species` blend sat at its default (stuck between human and
+furry — and being a body-shape blend, it also distorted the silhouette), and every AAP/toggle did
+nothing. This was invisible in the build log because the conversion itself "succeeds" — the controller
+is structurally valid, it just computes nothing.
+
+### Fixed
+- **Toggles / clothing / species now actually drive: missing blend-tree parameters are recreated.**
+  `AnimatorUtil.EnsureBlendTreeParametersExist` scans every blend tree after the merge and declares any
+  referenced parameter that doesn't exist — a Direct-Blend constant weight (e.g. `Blend`) defaults to
+  **1** ("apply"), a 1D/2D blend position defaults to 0 (neutral). Run on both the merged and the
+  generated/attached controller. The build log reports exactly what was restored.
+
 ## [0.9.6] - 2026-06-14
 
 **The motorcycle pose, found by the v0.9.4 diagnostic and fixed at the source.** With the gesture
