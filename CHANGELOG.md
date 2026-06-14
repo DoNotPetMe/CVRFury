@@ -4,6 +4,15 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.1] - 2026-06-14
+
+### Fixed
+- **Locomotion / default-pose warning.** The default-avatar-animator search only matched the
+  `ABI.CCK` install folder; newer kits ship under `CVR.CCK`, so it never found
+  `…/CCK/Animations/AvatarAnimator.controller` and the merged controller had no locomotion. Now
+  matches any `.CCK` install (with a name-based fallback), so the avatar keeps CVR's locomotion
+  instead of holding a default pose.
+
 ## [0.8.0] - 2026-06-14
 
 **Toggles now actually toggle.** Converted toggles appeared in the menu but did

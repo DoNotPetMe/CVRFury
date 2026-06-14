@@ -69,14 +69,25 @@ namespace CVRFury.Builder.Convert
             return Controller;
         }
 
-        /// <summary>Best-effort locate of CVR's default avatar animator controller in ABI.CCK.</summary>
+        /// <summary>Best-effort locate of CVR's default avatar animator controller. The CCK ships it
+        /// as <c>…/CCK/Animations/AvatarAnimator.controller</c>, but the install folder varies
+        /// (<c>ABI.CCK</c> on older kits, <c>CVR.CCK</c> on newer ones), so match on ".CCK" + the
+        /// Animations folder + an avatar-animator-looking file name.</summary>
         private static AnimatorController FindCvrDefaultAvatarAnimator()
         {
             foreach (var guid in AssetDatabase.FindAssets("t:AnimatorController"))
             {
                 var p = AssetDatabase.GUIDToAssetPath(guid);
-                if (p.Contains("ABI.CCK") && p.Contains("Animations") &&
-                    p.ToLowerInvariant().Contains("avatar"))
+                var lower = p.ToLowerInvariant();
+                if (lower.Contains(".cck") && lower.Contains("/animations/") &&
+                    lower.Contains("avatar") && lower.Contains("animator"))
+                    return AssetDatabase.LoadAssetAtPath<AnimatorController>(p);
+            }
+            // Fallback: any AvatarAnimator.controller shipped under a CCK folder.
+            foreach (var guid in AssetDatabase.FindAssets("AvatarAnimator t:AnimatorController"))
+            {
+                var p = AssetDatabase.GUIDToAssetPath(guid);
+                if (p.ToLowerInvariant().Contains(".cck"))
                     return AssetDatabase.LoadAssetAtPath<AnimatorController>(p);
             }
             return null;
