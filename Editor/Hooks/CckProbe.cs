@@ -208,5 +208,72 @@ namespace CVRFury.Builder
 
             return sb.ToString();
         }
+
+        /// <summary>
+        /// Dump the actual fields (and nested/enums) of the core AAS types so the exact member
+        /// names can be pinned without guessing. Recurses one level into ABI.CCK field types.
+        /// </summary>
+        public static string DumpModel()
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("--- Raw CCK type dump (paste this) ---");
+
+            var seen = new HashSet<string>();
+            DumpType(sb, Reflect.FindType(CckNames.AvatarType), seen, recurse: false);
+            DumpType(sb, Reflect.FindType(CckNames.AdvancedSettingsType), seen, recurse: true);
+            DumpType(sb, Reflect.FindType(CckNames.SettingsEntryType), seen, recurse: true);
+
+            return sb.ToString();
+        }
+
+        private static void DumpType(System.Text.StringBuilder sb, Type t, HashSet<string> seen, bool recurse)
+        {
+            if (t == null) { sb.AppendLine("  (type not found)"); return; }
+            if (!seen.Add(t.FullName)) return;
+
+            sb.AppendLine();
+            sb.AppendLine($"TYPE {t.FullName}");
+
+            // Nested enums (e.g. SettingsType) with their members.
+            foreach (var nested in t.GetNestedTypes(BindingFlags.Public | BindingFlags.NonPublic))
+            {
+                if (!nested.IsEnum) continue;
+                sb.AppendLine($"  ENUM {nested.Name} {{ {string.Join(", ", Enum.GetNames(nested))} }}");
+            }
+
+            var follow = new System.Collections.Generic.List<Type>();
+            foreach (var f in t.GetFields(AnyMember))
+            {
+                if (f.IsStatic && !f.IsLiteral && f.Name.StartsWith("_")) continue;
+                var ft = f.FieldType;
+                sb.AppendLine($"  {(f.IsPublic ? "pub " : "    ")}{TypeLabel(ft)} {f.Name}");
+                if (ft.IsEnum)
+                    sb.AppendLine($"      = {{ {string.Join(", ", Enum.GetNames(ft))} }}");
+                else if (recurse && IsCckType(ElementType(ft)))
+                    follow.Add(ElementType(ft));
+            }
+
+            foreach (var ct in follow)
+                DumpType(sb, ct, seen, recurse: true);
+        }
+
+        private static Type ElementType(Type t)
+        {
+            if (t.IsArray) return t.GetElementType();
+            if (t.IsGenericType) { var a = t.GetGenericArguments(); if (a.Length == 1) return a[0]; }
+            return t;
+        }
+
+        private static bool IsCckType(Type t) =>
+            t != null && (t.FullName?.IndexOf("CCK", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                          t.FullName?.IndexOf("ABI", StringComparison.OrdinalIgnoreCase) >= 0);
+
+        private static string TypeLabel(Type t)
+        {
+            if (t.IsArray) return TypeLabel(t.GetElementType()) + "[]";
+            if (t.IsGenericType)
+                return t.Name.Split('`')[0] + "<" + string.Join(",", System.Linq.Enumerable.Select(t.GetGenericArguments(), TypeLabel)) + ">";
+            return t.Name;
+        }
     }
 }

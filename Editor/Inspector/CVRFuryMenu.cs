@@ -145,7 +145,10 @@ namespace CVRFury.Builder
             sb.Append(CckProbe.ValidateDataModel());
 
             sb.AppendLine();
-            sb.AppendLine("If an event is mis-classified or a field shows MISSING, paste this to the CVRFury maintainer.");
+            sb.Append(CckProbe.DumpModel());
+
+            sb.AppendLine();
+            sb.AppendLine("Paste the entire output (especially the 'Raw CCK type dump') to the CVRFury maintainer.");
             Debug.Log(sb.ToString());
             EditorUtility.DisplayDialog("CVRFury", "CCK diagnosis written to the Console.", "OK");
         }

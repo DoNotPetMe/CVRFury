@@ -125,9 +125,17 @@ namespace CVRFury.Builder
         /// <summary>Treat a value as a non-generic <see cref="IList"/> (List&lt;T&gt; implements it).</summary>
         public static IList AsList(object value) => value as IList;
 
-        private static void Warn(string what) =>
+        private static readonly System.Collections.Generic.HashSet<string> _warned =
+            new System.Collections.Generic.HashSet<string>();
+
+        private static void Warn(string what)
+        {
+            // De-duplicate: a single missing member would otherwise log once per element
+            // (hundreds of times for a big avatar). Report each unique problem once.
+            if (!_warned.Add(what)) return;
             Debug.LogWarning($"[CVRFury] CCK reflection: could not resolve {what}. " +
-                             "Your CCK version may differ from the one CVRFury expects — update " +
-                             "Editor/Hooks/CckNames.cs. The affected feature was skipped.");
+                             "Your CCK version may differ from the one CVRFury expects — run " +
+                             "Tools ▸ CVRFury ▸ Diagnose CCK Integration and update Editor/Hooks/CckNames.cs.");
+        }
     }
 }
