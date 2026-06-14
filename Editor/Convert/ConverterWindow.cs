@@ -60,7 +60,21 @@ namespace CVRFury.Builder.Convert
             _options.physBones = EditorGUILayout.ToggleLeft("PhysBones → DynamicBones", _options.physBones);
             _options.physBoneColliders = EditorGUILayout.ToggleLeft("PhysBone colliders → DynamicBone colliders", _options.physBoneColliders);
             _options.expressions = EditorGUILayout.ToggleLeft("Expression menu + parameters → Advanced Avatar Settings", _options.expressions);
-            _options.mergePlayableLayers = EditorGUILayout.ToggleLeft("Merge playable layers (FX/Gesture/Action) into the CVR animator", _options.mergePlayableLayers);
+            _options.mergePlayableLayers = EditorGUILayout.ToggleLeft("Merge FX layer into the CVR animator", _options.mergePlayableLayers);
+            using (new EditorGUI.DisabledScope(!_options.mergePlayableLayers))
+            {
+                EditorGUI.indentLevel++;
+                _options.mergeGestureLayer = EditorGUILayout.ToggleLeft(
+                    "…also merge the Gesture layer (may clash with CVR hand gestures)", _options.mergeGestureLayer);
+                EditorGUI.indentLevel--;
+            }
+            EditorGUILayout.HelpBox(
+                "Only the FX layer is merged. Base/Additive/Action/Sitting layers are skipped on " +
+                "purpose — merging them pins the avatar in a full-body pose (the \"motorcycle pose\").",
+                MessageType.None);
+
+            _options.removeFinalIK = EditorGUILayout.ToggleLeft(
+                "Remove FinalIK / VRIK (recommended — CVR has its own IK)", _options.removeFinalIK);
 
             EditorGUILayout.EndScrollView();
 

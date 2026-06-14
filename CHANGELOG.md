@@ -4,6 +4,25 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-06-14
+
+Conversion fixes from first real-world run (GodWhisper avatar).
+
+### Fixed
+- **"Motorcycle pose" / avatar stuck in a pose** — the playable-layer merge was
+  bringing in VRChat's Base/Additive/Action/Sitting layers, whose full-body
+  animations fight ChilloutVR's own locomotion. Now **only the FX layer is
+  merged** (Gesture is opt-in); the rest are skipped and logged.
+
+### Added
+- Option **Remove FinalIK / VRIK** (recommended for CVR, which has its own IK) —
+  a leftover VRIK can lock the avatar in a pose.
+- Option to also merge the Gesture layer (off by default; can clash with CVR
+  hand gestures).
+- Much louder expression-conversion logging: reports whether the menu and its
+  control list resolved and how many controls/entries were processed, so an empty
+  in-game menu can be diagnosed from the CVRFury Build Log.
+
 ## [0.5.0] - 2026-06-13
 
 The big one: a VRChat → ChilloutVR conversion engine.

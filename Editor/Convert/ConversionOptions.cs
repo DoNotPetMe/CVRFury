@@ -18,7 +18,9 @@ namespace CVRFury.Builder.Convert
         public bool physBones = false;        // VRCPhysBone → DynamicBone
         public bool physBoneColliders = false;// VRCPhysBoneCollider → DynamicBoneCollider
         public bool expressions = false;      // ExpressionParameters + ExpressionsMenu → CVR AAS
-        public bool mergePlayableLayers = false; // FX/Gesture/Action controllers → CVR animator
+        public bool mergePlayableLayers = false; // FX controller → CVR animator (FX only by default)
+        public bool mergeGestureLayer = false;   // also merge the Gesture layer (can conflict with CVR gestures)
+        public bool removeFinalIK = false;       // strip RootMotion.FinalIK (VRIK) — often needed for CVR
 
         /// <summary>Convenience: flip every "hard" step on at once.</summary>
         public void EnableAllAutomatic()

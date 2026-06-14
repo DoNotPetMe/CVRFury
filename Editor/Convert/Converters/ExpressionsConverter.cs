@@ -31,11 +31,26 @@ namespace CVRFury.Builder.Convert
             var merged = 0;
             foreach (var layer in layers)
             {
-                if (Reflect.GetField(layer, VrcNames.Layer_Controller) is AnimatorController ac)
+                var controller = Reflect.GetField(layer, VrcNames.Layer_Controller) as AnimatorController;
+                if (controller == null) continue;
+
+                var typeName = Reflect.GetField(layer, VrcNames.Layer_Type)?.ToString() ?? "?";
+
+                // Only the FX layer is safe to merge. Base/Additive/Action/Sitting/etc. carry
+                // full-body animation that fights ChilloutVR's own locomotion and pins the avatar
+                // in a pose (the classic "motorcycle pose"). Gesture is opt-in (it can still clash
+                // with CVR's hand gestures).
+                var include = typeName == "FX" || (ctx.Options.mergeGestureLayer && typeName == "Gesture");
+                if (!include)
                 {
-                    ControllerMerger.Merge(ctx.GetOrCreateController(), ac, ctx.Assets, "", ctx.Log);
-                    merged++;
+                    ctx.Log.Info($"Skipped '{typeName}' playable layer (only FX is merged to avoid " +
+                                 "full-body pose conflicts with CVR locomotion).");
+                    continue;
                 }
+
+                ControllerMerger.Merge(ctx.GetOrCreateController(), controller, ctx.Assets, "", ctx.Log);
+                merged++;
+                ctx.Log.Info($"Merged '{typeName}' playable layer.");
             }
             ctx.Log.Info($"Merged {merged} playable-layer controller(s) into the CVR animator.");
         }
@@ -45,12 +60,25 @@ namespace CVRFury.Builder.Convert
             var menu = Reflect.GetField(ctx.VrcDescriptor, VrcNames.Desc_ExpressionsMenu);
             if (menu == null)
             {
-                ctx.Log.Warning("No VRCExpressionsMenu on the descriptor; skipped menu conversion.");
+                ctx.Log.Warning("No VRCExpressionsMenu found on the descriptor (field '" +
+                                VrcNames.Desc_ExpressionsMenu + "' was null or unresolved). " +
+                                "If the avatar definitely has a menu, the field name may differ for your " +
+                                "SDK version — update Editor/Convert/VrcNames.cs.");
                 return;
             }
+
+            var topControls = Reflect.AsList(Reflect.GetField(menu, VrcNames.Menu_Controls));
+            if (topControls == null)
+                ctx.Log.Warning("Found the menu but its '" + VrcNames.Menu_Controls +
+                                "' list was unresolved — check VrcNames for your SDK version.");
+            else
+                ctx.Log.Info($"Expression menu top level has {topControls.Count} control(s).");
+
             var added = 0;
             WalkMenu(ctx, menu, new HashSet<object>(), ref added);
-            ctx.Log.Info($"Added {added} Advanced Avatar Setting(s) from the expression menu.");
+            ctx.Log.Info($"Added {added} Advanced Avatar Setting(s) from the expression menu. " +
+                         "(If this is 0 but the avatar has menu controls, the control field/enum names " +
+                         "in VrcNames may need updating for your SDK version.)");
         }
 
         private static void WalkMenu(ConversionContext ctx, object menu, HashSet<object> visited, ref int added)
