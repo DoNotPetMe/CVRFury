@@ -27,6 +27,11 @@ namespace CVRFury.Builder.Convert
         /// floats cost 64 bits each.</summary>
         private readonly HashSet<string> _menuParams = new HashSet<string>();
 
+        /// <summary>Machine names exposed as on/off menu toggles. These are semantically binary, so the
+        /// sync-bit optimiser may compress them to Bool even when VRChat backed them with a float
+        /// (e.g. a direct-blend-tree weight).</summary>
+        private readonly HashSet<string> _toggleParams = new HashSet<string>();
+
         public void Run(ConversionContext ctx)
         {
             // The sync map + menu-parameter set must be known *before* merging, so the merge can
@@ -43,7 +48,8 @@ namespace CVRFury.Builder.Convert
             // toggles down to Bool — the native, zero-latency CVR equivalent of VRCFury's parameter
             // compressor. Genuinely-continuous floats (radials/blend trees) are reported, not touched.
             if (ctx.Controller != null)
-                SyncBitOptimizer.Run(ctx.Controller, n => n[0] != '#' && !CoreParams.Contains(n), ctx.Log);
+                SyncBitOptimizer.Run(ctx.Controller, n => n[0] != '#' && !CoreParams.Contains(n),
+                                     _toggleParams, ctx.Assets, ctx.Log);
         }
 
         /// <summary>Pre-walk the menu to learn which parameters are reachable from a control, so the
@@ -244,6 +250,7 @@ namespace CVRFury.Builder.Convert
             if (!ctx.AddedParams.Add(machine)) return false;
             var local = machine[0] == '#';
             ctx.Cvr.AddToggle(name, machine, false, local);
+            _toggleParams.Add(machine);
             if (local) _localCount++; else _syncedCount++;
             return true;
         }

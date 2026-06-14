@@ -4,6 +4,33 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1] - 2026-06-14
+
+The diagnostic from 0.7.0 nailed it: on GodWhisper all 104 synced floats were
+**Direct Blend Tree weights** (a modern avatar puts every toggle into one big DBT
+as a 0/1 float weight), and the real CVR float cost is ~32 bits, not 64
+(104 × 32 + 14 bools ≈ the observed 3344). None were transition conditions, so the
+0.7.0 retyper found nothing to do.
+
+### Added
+- **Blend-tree toggle compression.** The sync-bit optimiser now lifts each binary
+  **menu toggle** that is implemented as a Direct Blend Tree weight out of the tree
+  into its own Bool-driven On/Off layer, then retypes the parameter to Bool — taking
+  it from ~32 synced bits to ~1. A generated Off clip zeroes the toggle's blendshape
+  / object-active bindings (matching a blend weight of 0). Toggles whose clip drives
+  scale / position / a material value are detected and **left as floats** (their Off
+  pose is ambiguous), so nothing silently breaks.
+- Real radial puppets (1D/2D blend parameters) and state speed/time params are still
+  left intact.
+
+### Fixed
+- Corrected the synced-bit estimate to CVR's actual ~32 bits per float (was 64), so
+  the log's estimate now tracks the CCK's counter.
+
+### Result
+- A typical toggle-heavy avatar drops from "100+ synced floats" to a handful of real
+  radials plus cheap bools — clearing the 3200-bit cap with large headroom.
+
 ## [0.7.0] - 2026-06-14
 
 Automatic synced-bit compression — the CVR-native equivalent of VRCFury's

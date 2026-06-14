@@ -203,8 +203,8 @@ namespace CVRFury.Builder
                 {
                     case CckNames.ParameterType_Bool:  boolN++;  estBits += 1;  break;
                     case CckNames.ParameterType_Int:   intN++;   estBits += 8;  break;
-                    case CckNames.ParameterType_Float: floatN++; estBits += 64; break;
-                    default:                           unknownN++; estBits += 64; break; // unset defaults to Float
+                    case CckNames.ParameterType_Float: floatN++; estBits += 32; break;
+                    default:                           unknownN++; estBits += 32; break; // unset defaults to Float
                 }
             }
 
