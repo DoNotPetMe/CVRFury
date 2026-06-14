@@ -4,6 +4,32 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-06-14
+
+Automatic synced-bit compression — the CVR-native equivalent of VRCFury's
+parameter compressor. After 0.6.1 GodWhisper sat at 3344/3200; the remaining
+cost was synced **Float** parameters, because many VRChat "toggles" are backed by
+a float (for smooth blends) and ChilloutVR charges synced bits by the *animator
+parameter's type* (a float ≈ 64 bits, a bool ≈ 1).
+
+### Added
+- **Sync-bit optimiser** (runs automatically at the end of a conversion). It
+  analyses the merged animator controller and **retypes float parameters that are
+  only ever used as on/off transition conditions (thresholds within 0..1) down to
+  Bool**, rewriting their conditions (`Greater`→`If`, `Less`→`IfNot`). That turns a
+  64-bit synced float into a ~1-bit synced bool with no behavioural change — a
+  native, zero-latency form of parameter compression suited to CVR's cost model
+  (unlike VRChat, where VRCFury time-multiplexes a flat-cost budget).
+- **Synced-parameter breakdown in the log**: reports how many synced parameters are
+  Bool / Int / Float, splits the floats into *blend-tree/continuous*,
+  *on/off-convertible*, and *other*, and estimates the synced bits before and after
+  optimisation — so it's obvious whether any remaining overage is genuine radials
+  (which need a structural compressor or to be made local) rather than toggles.
+
+### Notes
+- Genuinely-continuous floats (radial puppets, blend-tree drivers) are left intact;
+  collapsing those requires more than a retype and would change behaviour.
+
 ## [0.6.1] - 2026-06-14
 
 Finishes the synced-bit job. 0.6.0 took GodWhisper from 6848 → 3416, still just

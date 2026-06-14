@@ -37,6 +37,13 @@ namespace CVRFury.Builder.Convert
             if (ctx.Options.expressions) CollectMenuParams(ctx);
             if (ctx.Options.mergePlayableLayers) MergeLayers(ctx);
             if (ctx.Options.expressions) ConvertMenu(ctx);
+
+            // Final pass: ChilloutVR's synced-bit cost is driven by each animator parameter's TYPE
+            // (a float ≈ 64 bits, a bool ≈ 1). Retype float parameters that are really just on/off
+            // toggles down to Bool — the native, zero-latency CVR equivalent of VRCFury's parameter
+            // compressor. Genuinely-continuous floats (radials/blend trees) are reported, not touched.
+            if (ctx.Controller != null)
+                SyncBitOptimizer.Run(ctx.Controller, n => n[0] != '#' && !CoreParams.Contains(n), ctx.Log);
         }
 
         /// <summary>Pre-walk the menu to learn which parameters are reachable from a control, so the
