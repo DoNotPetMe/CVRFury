@@ -4,6 +4,32 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.6] - 2026-06-14
+
+**The motorcycle pose, found by the v0.9.4 diagnostic and fixed at the source.** With the gesture
+conditions fixed in 0.9.5, the build log's `AAS diagnostic — pose` line finally named the cause: 59
+merged layers animate the humanoid rig at their default state, including `Locomotion/Emotes`, `LeftHand`
+(`HandLeftOpen`), `RightHand` (`HandRightOpen`) and `Face Reset` — all at weight 1, Override. These are
+VRChat playable-layer body-pose layers baked into the FX controller. ChilloutVR drives locomotion, hand
+gestures, emotes and visemes/blink **natively** (from the seeded `AvatarAnimator`), so running these on
+top overrides CVR's whole body and freezes the avatar in the motorcycle pose — which is why even CVR's
+own *Create Controller* couldn't fix it: the conflict was in the merged data.
+
+### Fixed
+- **Motorcycle pose: humanoid-pose layers are no longer merged.** The merge now drops VRChat layers that
+  animate humanoid muscles, root motion or IK goals — the hand-gesture, locomotion, emote and face
+  layers CVR already provides. The build log reports how many were dropped.
+- **VRCFury AAP toggles are preserved.** AAP clips drive a float *parameter* through a curve whose
+  binding type is `Animator` — the same type as a muscle curve — so the new `HumanoidCurves` detector
+  matches property names against Unity's humanoid muscle/root/IK list instead of binding type alone.
+  Clothing/object/blendshape toggles (including AAP) are kept; only true body-pose layers are dropped.
+  The pose diagnostic uses the same precise check, so AAP toggles are no longer mislabelled `[muscles]`.
+
+### Known
+- One `#`-local toggle (`#Nsfw/Toy/(s-b)Sps`) still reports a single "not compatible with condition
+  type" transition at upload; CCK ignores that transition. It is local (zero synced bits) and does not
+  affect other toggles — to be addressed separately.
+
 ## [0.9.5] - 2026-06-14
 
 **Root cause of the motorcycle pose + the `GestureLeft/GestureRight ... not compatible with condition

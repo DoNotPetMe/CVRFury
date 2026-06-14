@@ -149,13 +149,8 @@ namespace CVRFury.Builder
         }
 
         // --- curve / motion helpers -------------------------------------------------------------
-        private static bool AnimatesMuscles(AnimationClip clip)
-        {
-            if (clip == null) return false;
-            foreach (var b in AnimationUtility.GetCurveBindings(clip))
-                if (b.type == typeof(Animator)) return true; // humanoid muscle / IK goal curves
-            return false;
-        }
+        private static bool AnimatesMuscles(AnimationClip clip) =>
+            HumanoidCurves.PosesHumanoid(clip); // muscle/root/IK curves only — not AAP parameter curves
 
         private static bool AnimatesTransforms(AnimationClip clip)
         {

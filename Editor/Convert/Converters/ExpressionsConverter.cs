@@ -168,7 +168,8 @@ namespace CVRFury.Builder.Convert
                 }
 
                 ControllerMerger.Merge(ctx.GetOrCreateController(), controller, ctx.Assets, "", ctx.Log,
-                                       renameParameter: n => FinalName(ctx, n));
+                                       renameParameter: n => FinalName(ctx, n),
+                                       dropHumanoidPoseLayers: true);
                 merged++;
                 ctx.Log.Info($"Merged '{typeName}' playable layer.");
             }

@@ -29,7 +29,8 @@ namespace CVRFury.Builder
         /// </param>
         public static void Merge(AnimatorController dst, AnimatorController src, AssetSaver assets,
                                  string paramPrefix, BuildLog log,
-                                 System.Func<string, string> renameParameter = null)
+                                 System.Func<string, string> renameParameter = null,
+                                 bool dropHumanoidPoseLayers = false)
         {
             if (dst == null || src == null) return;
             var remap = new Dictionary<string, string>();
@@ -60,8 +61,19 @@ namespace CVRFury.Builder
             }
 
             // --- layers ---
+            int droppedPoseLayers = 0;
             foreach (var srcLayer in src.layers)
             {
+                // CVR drives locomotion, hand gestures, emotes and visemes/blink natively. A merged
+                // VRChat layer that poses the humanoid rig (muscle/root/IK curves) runs at Override
+                // weight on top of those systems and freezes the avatar — the "motorcycle pose". Drop
+                // such layers. AAP/object/blendshape toggle layers don't pose the rig and are kept.
+                if (dropHumanoidPoseLayers && LayerPosesHumanoid(srcLayer))
+                {
+                    droppedPoseLayers++;
+                    continue;
+                }
+
                 var name = AnimatorUtil.UniqueLayerName(dst, srcLayer.name);
                 dst.AddLayer(name);
                 var layers = dst.layers;
@@ -78,6 +90,37 @@ namespace CVRFury.Builder
                 Populate(dst, dst.layers[idx].stateMachine, srcLayer.stateMachine, remap, assets, stateMap, smMap);
                 Wire(srcLayer.stateMachine, remap, stateMap, smMap);
             }
+
+            if (droppedPoseLayers > 0)
+                log.Info($"Dropped {droppedPoseLayers} humanoid-pose layer(s) (hand gestures / locomotion / " +
+                         "emotes / face) from the merge — ChilloutVR drives these natively, so merging them " +
+                         "would override CVR's body and freeze the avatar in the 'motorcycle pose'.");
+        }
+
+        /// <summary>True if any clip reachable from the layer poses the humanoid rig (muscle/root/IK
+        /// curves). Such layers duplicate CVR-native systems and must not be merged.</summary>
+        private static bool LayerPosesHumanoid(AnimatorControllerLayer layer)
+        {
+            if (layer?.stateMachine == null) return false;
+            foreach (var clip in ClipsIn(layer.stateMachine))
+                if (HumanoidCurves.PosesHumanoid(clip)) return true;
+            return false;
+        }
+
+        private static IEnumerable<AnimationClip> ClipsIn(AnimatorStateMachine sm)
+        {
+            foreach (var cs in sm.states)
+                foreach (var clip in ClipsIn(cs.state.motion)) yield return clip;
+            foreach (var child in sm.stateMachines)
+                foreach (var clip in ClipsIn(child.stateMachine)) yield return clip;
+        }
+
+        private static IEnumerable<AnimationClip> ClipsIn(Motion m)
+        {
+            if (m is AnimationClip clip) { yield return clip; yield break; }
+            if (m is BlendTree tree)
+                foreach (var ch in tree.children)
+                    foreach (var c in ClipsIn(ch.motion)) yield return c;
         }
 
         /// <summary>Copy states + nested machines into <paramref name="dstSm"/> (already owned by
