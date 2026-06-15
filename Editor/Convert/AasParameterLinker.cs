@@ -22,45 +22,32 @@ namespace CVRFury.Builder.Convert
     /// </summary>
     public static class AasParameterLinker
     {
-        [MenuItem("Tools/CVRFury/Link CCK Parameters from VRChat Menu (keep my controller)", false, 1)]
-        public static void Run()
+        /// <summary>Create/refresh the CCK Advanced Avatar Settings entries from the avatar's VRChat menu.
+        /// Non-destructive (only adds parameters not already present) and never touches the controller.
+        /// Returns a human-readable report. Hosted by the unified CVRFury window.</summary>
+        public static string LinkParameters(GameObject target)
         {
-            var target = Selection.activeGameObject;
             if (target == null)
-            {
-                Tell("Select your avatar (the root that has the VRChat descriptor) in the Hierarchy first.");
-                return;
-            }
+                return "Select your avatar (the root that has the VRChat descriptor) first.";
 
             var descType = Reflect.FindType(VrcNames.AvatarDescriptorType);
             if (descType == null)
-            {
-                Tell("VRChat SDK not found in this project. Its types have to be loadable for CVRFury to read the menu.");
-                return;
-            }
+                return "VRChat SDK not found in this project. Its types have to be loadable for CVRFury to read the menu.";
             var desc = target.GetComponent(descType);
             if (desc == null)
-            {
-                Tell($"'{target.name}' has no VRCAvatarDescriptor.\n\nSelect the avatar root that shows the VRChat " +
-                     "'Expressions' section (Menu + Parameters).");
-                return;
-            }
+                return $"'{target.name}' has no VRCAvatarDescriptor. Select the avatar root that shows the VRChat " +
+                       "'Expressions' section (Menu + Parameters).";
 
             var menu = Reflect.GetField(desc, VrcNames.Desc_ExpressionsMenu);
             if (menu == null)
-            {
-                Tell("The VRChat descriptor has no Expressions Menu assigned (the 'Menu' slot is empty).");
-                return;
-            }
+                return "The VRChat descriptor has no Expressions Menu assigned (the 'Menu' slot is empty).";
+
             var defaults = BuildParamMap(Reflect.GetField(desc, VrcNames.Desc_ExpressionParameters));
             var index = BuildNameIndex(target);
 
             var cvr = CckAvatar.EnsureOn(target);
             if (cvr == null)
-            {
-                Tell("ChilloutVR CCK not found in this project (the CVRAvatar type is missing).");
-                return;
-            }
+                return "ChilloutVR CCK not found in this project (the CVRAvatar type is missing).";
             cvr.EnsureAdvancedSettingsContainer();
 
             // Non-destructive: keep every existing entry (and any clips you set on them), and only add
@@ -82,21 +69,18 @@ namespace CVRFury.Builder.Convert
                      ref toggles, ref sliders, ref matched, unmatched);
 
             cvr.Persist();
-            Reselect(target);
 
-            var msg = $"Added {toggles + sliders} new CCK setting(s) ({toggles} toggle, {sliders} slider)" +
-                      (existing > 0 ? $"; {existing} already existed and were left untouched" : "") + ".\n\n" +
-                      $"GameObject targets auto-assigned: {matched}/{toggles} toggles.\n";
+            var msg = $"Added {toggles + sliders} new setting(s) ({toggles} toggle, {sliders} slider)" +
+                      (existing > 0 ? $"; {existing} already existed and were left untouched" : "") + ".\n" +
+                      $"GameObject targets auto-assigned: {matched}/{toggles} toggles.";
             if (unmatched.Count > 0)
             {
-                msg += $"\nCouldn't match {unmatched.Count} toggle(s) to a GameObject (assign these by hand in " +
-                       "Autogeneration Options — they're usually presets or idle/animation toggles, not single objects):\n  " +
-                       string.Join("\n  ", unmatched.GetRange(0, Math.Min(unmatched.Count, 25)));
-                if (unmatched.Count > 25) msg += $"\n  …and {unmatched.Count - 25} more.";
+                msg += $"\nNo GameObject match for {unmatched.Count} toggle(s) (presets/idle toggles, or driven " +
+                       "by clips — link clips in step 2):\n  " +
+                       string.Join("\n  ", unmatched.GetRange(0, Math.Min(unmatched.Count, 20)));
+                if (unmatched.Count > 20) msg += $"\n  …and {unmatched.Count - 20} more.";
             }
-            msg += "\n\nFinal step: click the CCK's Create Controller (then Attach). That generates the " +
-                   "parameters (clearing the red ❗) and the GameObject toggles will work. Your controller is untouched.";
-            Tell(msg);
+            return msg;
         }
 
         private static void WalkMenu(object menu, Dictionary<string, (int type, float def)> defaults, CckAvatar cvr,
@@ -239,13 +223,5 @@ namespace CVRFury.Builder.Convert
             var sp = subs[index];
             return sp == null ? null : Reflect.GetField(sp, VrcNames.Control_ParameterName) as string;
         }
-
-        private static void Reselect(GameObject target)
-        {
-            Selection.activeObject = null;
-            EditorApplication.delayCall += () => { if (target != null) Selection.activeObject = target; };
-        }
-
-        private static void Tell(string msg) => EditorUtility.DisplayDialog("CVRFury — Link CCK Parameters", msg, "OK");
     }
 }

@@ -4,6 +4,25 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.14] - 2026-06-15
+
+### Added
+- **One unified window: `Tools ▸ CVRFury ▸ CVRFury`.** A guided, numbered workflow replacing the
+  scattered menu items — pick the avatar once, then run each step, with a shared log: **1) Parameters**
+  (link from the VRChat menu), **2) Toggle clips + build/attach controller**, **3) PhysBones →
+  DynamicBones**, **4) Magica Cloth** (detected-if-installed; conversion options coming next). The
+  separate "Link CCK Parameters" and "Link Toggle Animations" menu items are folded into this window.
+
+### Fixed
+- **Float/slider "motorbike pose" guard.** When building toggle layers from clips, a clip that animates
+  the humanoid rig (muscles or actual bones) is no longer turned into a layer — that's what posed the
+  whole body when a control hit its extreme. Such toggles get their parameter (so the red ❗ still clears)
+  but no body-posing layer, and the build reports how many were skipped.
+
+### Changed
+- `AasParameterLinker` and the toggle-clip linker are now reusable library logic behind the unified
+  window (single source of truth) instead of separate windows.
+
 ## [0.9.13] - 2026-06-15
 
 ### Added

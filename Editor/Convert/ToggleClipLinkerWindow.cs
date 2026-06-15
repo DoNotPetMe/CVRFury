@@ -7,113 +7,35 @@ using UnityEngine;
 namespace CVRFury.Builder.Convert
 {
     /// <summary>
-    /// Scans a folder of animation clips and links them onto the avatar's existing ChilloutVR Advanced
-    /// Avatar Settings toggle entries as on/off clips, then (optionally) builds and attaches a working
-    /// controller so the entries' parameters actually exist — clearing the CCK's "parameter not present"
-    /// warnings.
+    /// Logic for linking a folder of animation clips onto the avatar's existing ChilloutVR Advanced
+    /// Avatar Settings toggle entries as on/off clips, and (optionally) building + attaching a working
+    /// controller so the entries' parameters exist (clearing the CCK's "parameter not present" warnings).
+    /// Hosted by the unified CVRFury window.
     ///
-    /// You tell it how on/off clips are named (the word each clip's name ends with — e.g. "toggled" for ON
-    /// and "default" for OFF); it pairs the clips by base name, matches each base to a toggle entry (by
-    /// display name or machine-name leaf), and assigns the pair. It is non-destructive: it never clears or
-    /// removes AAS entries — it only fills clip fields and, when asked, generates a controller asset.
+    /// Clips are paired by base name using the on/off suffix words you provide (e.g. "toggled"/"default");
+    /// each base is matched to a toggle entry by display name or machine-name leaf. Non-destructive — it
+    /// only fills clip fields and generates a controller asset; it never clears AAS entries.
     /// </summary>
-    public class ToggleClipLinkerWindow : EditorWindow
+    internal static class ToggleClipLinker
     {
-        private GameObject _avatar;
-        private DefaultAsset _folder;
-        private string _onSuffix = "toggled";
-        private string _offSuffix = "default";
-        private AnimatorController _controller;
-        private bool _buildController = true;
-        private Vector2 _scroll;
-        private string _report = "";
-
-        [MenuItem("Tools/CVRFury/Link Toggle Animations from Folder", false, 2)]
-        public static void Open()
+        public static string LinkClips(GameObject avatar, string folderPath, string onSuffix, string offSuffix,
+                                       bool build, AnimatorController controller)
         {
-            var w = GetWindow<ToggleClipLinkerWindow>("Toggle Clip Linker");
-            w.minSize = new Vector2(440, 460);
-            w.Show();
-        }
-
-        private void OnGUI()
-        {
-            EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Link Toggle Animations from a Folder", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox(
-                "Assigns on/off clips to your CCK toggle entries by matching names: a clip ending with the " +
-                "ON word is the on-clip, the OFF word is the off-clip; the text before that word is matched " +
-                "to a toggle (by its menu name or the last part of its Machine Name).\n\n" +
-                "Non-destructive: it only fills clip fields and (optionally) generates a controller. It never " +
-                "clears entries.",
-                MessageType.Info);
-
-            _avatar = (GameObject)EditorGUILayout.ObjectField(
-                "Avatar", _avatar != null ? _avatar : Selection.activeGameObject, typeof(GameObject), true);
-            _folder = (DefaultAsset)EditorGUILayout.ObjectField(
-                "Animations Folder", _folder, typeof(DefaultAsset), false);
-            _onSuffix = EditorGUILayout.TextField("ON  clip name ends with", _onSuffix);
-            _offSuffix = EditorGUILayout.TextField("OFF clip name ends with", _offSuffix);
-
-            EditorGUILayout.Space();
-            _buildController = EditorGUILayout.ToggleLeft(
-                "Build & attach a controller (creates the parameters → clears the red ❗)", _buildController);
-            using (new EditorGUI.DisabledScope(!_buildController))
-            {
-                EditorGUI.indentLevel++;
-                _controller = (AnimatorController)EditorGUILayout.ObjectField(
-                    "Controller (optional)", _controller, typeof(AnimatorController), false);
-                EditorGUILayout.HelpBox(
-                    "Optional. A COPY of this controller is made and the toggle layers are added to the copy " +
-                    "(your original is never modified). Leave empty to copy ChilloutVR's stock AvatarAnimator " +
-                    "(so the avatar keeps locomotion). The copy is attached as the avatar's AAS controller.",
-                    MessageType.None);
-                EditorGUI.indentLevel--;
-            }
-
-            EditorGUILayout.Space();
-            using (new EditorGUI.DisabledScope(_avatar == null || _folder == null ||
-                                               string.IsNullOrWhiteSpace(_onSuffix) || string.IsNullOrWhiteSpace(_offSuffix)))
-            {
-                if (GUILayout.Button("Scan & Link", GUILayout.Height(30))) Run();
-            }
-
-            if (!string.IsNullOrEmpty(_report))
-            {
-                EditorGUILayout.Space();
-                EditorGUILayout.LabelField("Result", EditorStyles.boldLabel);
-                _scroll = EditorGUILayout.BeginScrollView(_scroll);
-                EditorGUILayout.TextArea(_report, GUILayout.ExpandHeight(true));
-                EditorGUILayout.EndScrollView();
-            }
-        }
-
-        private void Run()
-        {
-            var folderPath = AssetDatabase.GetAssetPath(_folder);
+            if (avatar == null) return "Select your avatar first.";
             if (string.IsNullOrEmpty(folderPath) || !AssetDatabase.IsValidFolder(folderPath))
-            {
-                _report = "That object isn't a folder. Drag a project folder into 'Animations Folder'.";
-                return;
-            }
+                return "Pick a valid project folder of animation clips.";
 
-            var cvr = CckAvatar.FindOn(_avatar);
-            if (cvr == null)
-            {
-                _report = "No CVRAvatar found on the selected avatar (is the CCK installed and the component added?).";
-                return;
-            }
+            var cvr = CckAvatar.FindOn(avatar);
+            if (cvr == null) return "No CVRAvatar found on the selected avatar (run step 1 first).";
             var entries = cvr.SettingsList;
             if (entries == null || entries.Count == 0)
-            {
-                _report = "The avatar has no Advanced Avatar Settings entries yet. Run " +
-                          "'Link CCK Parameters from VRChat Menu' first to create them, then link clips here.";
-                return;
-            }
+                return "No Advanced Avatar Settings entries yet — run step 1 (Link parameters) first.";
+
+            var on = (onSuffix ?? "").Trim();
+            var off = (offSuffix ?? "").Trim();
+            if (on.Length == 0 || off.Length == 0) return "Set both the ON and OFF suffix words.";
 
             // --- pair clips by base name ---
-            var on = _onSuffix.Trim();
-            var off = _offSuffix.Trim();
             var pairs = new Dictionary<string, (AnimationClip onClip, AnimationClip offClip, string baseName)>();
             int clipCount = 0;
             foreach (var guid in AssetDatabase.FindAssets("t:AnimationClip", new[] { folderPath }))
@@ -134,52 +56,47 @@ namespace CVRFury.Builder.Convert
                 if (entry == null) continue;
                 var name = CckAvatar.EntryName(entry) ?? "";
                 var machine = CckAvatar.EntryMachineName(entry) ?? "";
-                var leaf = Leaf(machine);
-
-                string keyName = Norm(name), keyLeaf = Norm(leaf);
+                string keyName = Norm(name), keyLeaf = Norm(Leaf(machine));
                 string hitKey = pairs.ContainsKey(keyName) ? keyName : (pairs.ContainsKey(keyLeaf) ? keyLeaf : null);
                 if (hitKey == null) { if (!string.IsNullOrEmpty(name)) noClip.Add(name); continue; }
-
                 var p = pairs[hitKey];
                 if (cvr.SetToggleClips(entry, p.onClip, p.offClip)) { linked++; usedBases.Add(hitKey); }
             }
 
-            // --- optionally build + attach a controller so every parameter exists (clears red ❗) ---
-            string buildReport = "";
-            if (_buildController) buildReport = BuildAndAttach(cvr, entries);
+            string buildReport = build ? BuildAndAttach(cvr, avatar, entries, controller) : "";
 
             cvr.Persist();
-            Reselect(_avatar);
 
             var unusedClips = pairs.Where(kv => !usedBases.Contains(kv.Key)).Select(kv => kv.Value.baseName).ToList();
             var sb = new System.Text.StringBuilder();
-            sb.AppendLine($"Scanned {clipCount} clip(s) → {pairs.Count} on/off pair(s) in:\n  {folderPath}\n");
+            sb.AppendLine($"Scanned {clipCount} clip(s) → {pairs.Count} on/off pair(s).");
             sb.AppendLine($"Linked clips onto {linked} toggle(s).");
             if (noClip.Count > 0)
-                sb.AppendLine($"\nToggles with NO matching clip ({noClip.Count}):\n  " + string.Join("\n  ", noClip));
+                sb.AppendLine($"Toggles with no matching clip ({noClip.Count}): " +
+                              string.Join(", ", noClip.Take(20)) + (noClip.Count > 20 ? " …" : ""));
             if (unusedClips.Count > 0)
-                sb.AppendLine($"\nClip pairs with NO matching toggle ({unusedClips.Count}):\n  " + string.Join("\n  ", unusedClips));
+                sb.AppendLine($"Clip pairs with no matching toggle ({unusedClips.Count}): " +
+                              string.Join(", ", unusedClips.Take(20)) + (unusedClips.Count > 20 ? " …" : ""));
             if (!string.IsNullOrEmpty(buildReport)) sb.AppendLine("\n" + buildReport);
-            else sb.AppendLine("\nNext: press the CCK's Create Controller → Attach to generate the parameters.");
-            _report = sb.ToString();
+            else sb.AppendLine("\nNext: press the CCK's Create Controller → Attach, or enable 'Build & attach' above.");
+            return sb.ToString();
         }
 
-        /// <summary>Copy a base controller and add a parameter (plus a clip-driven layer for toggles that
-        /// have clips) for every AAS entry, then attach it. After this the controller contains every
-        /// machine-name parameter, so the CCK's "parameter not present" warnings clear.</summary>
-        private string BuildAndAttach(CckAvatar cvr, System.Collections.IList entries)
+        private static string BuildAndAttach(CckAvatar cvr, GameObject avatar, System.Collections.IList entries,
+                                             AnimatorController provided)
         {
-            var source = _controller != null ? _controller : FindCvrAvatarAnimator();
+            var source = provided != null ? provided : FindCvrAvatarAnimator();
             if (source == null)
-                return "Controller build skipped: no controller given and CVR's stock AvatarAnimator wasn't found. " +
-                       "Assign a controller in the 'Controller (optional)' slot and run again.";
+                return "Controller build skipped: no controller given and CVR's stock AvatarAnimator wasn't found.";
+            var gen = CopyController(source, avatar.name);
+            if (gen == null) return "Controller build skipped: couldn't copy the source controller.";
 
-            var gen = CopyController(source, _avatar.name);
-            if (gen == null)
-                return "Controller build skipped: couldn't copy the source controller.";
+            // A clip that animates the humanoid rig (muscles or bones) would pose the whole body when its
+            // layer runs — the "motorbike pose". Never build a layer from such a clip.
+            var bonePaths = HumanoidBonePaths(avatar);
 
             var existing = new HashSet<string>(gen.parameters.Select(p => p.name));
-            int paramsAdded = 0, layersBuilt = 0;
+            int paramsAdded = 0, layersBuilt = 0, posedSkipped = 0;
 
             foreach (var entry in entries)
             {
@@ -196,24 +113,29 @@ namespace CVRFury.Builder.Convert
                     var onClip = Reflect.GetField(toggle, CckNames.Toggle_AnimationClip) as AnimationClip;
                     var offClip = Reflect.GetField(toggle, CckNames.Toggle_OffAnimationClip) as AnimationClip;
                     bool defOn = Reflect.GetField(toggle, CckNames.Setting_DefaultBool) is bool b && b;
-                    if (onClip != null || offClip != null)
+
+                    bool posesBody = HumanoidCurves.PosesHumanoid(onClip, bonePaths) ||
+                                     HumanoidCurves.PosesHumanoid(offClip, bonePaths);
+                    if ((onClip != null || offClip != null) && !posesBody)
                     {
                         AnimatorUtil.AddBoolToggleLayer(gen, "CVRFury: " + Leaf(machine), machine, offClip, onClip, defOn);
                         layersBuilt++;
                     }
-                    else AnimatorUtil.EnsureBoolParam(gen, machine, defOn);
+                    else
+                    {
+                        AnimatorUtil.EnsureBoolParam(gen, machine, defOn); // param only (no body-posing layer)
+                        if (posesBody) posedSkipped++;
+                    }
                     paramsAdded++;
                 }
                 else if (slider != null)
                 {
-                    float dv = ToFloat(Reflect.GetField(slider, CckNames.Setting_DefaultFloat));
-                    AnimatorUtil.EnsureFloatParam(gen, machine, dv);
+                    AnimatorUtil.EnsureFloatParam(gen, machine, ToFloat(Reflect.GetField(slider, CckNames.Setting_DefaultFloat)));
                     paramsAdded++;
                 }
                 else if (dropdown != null)
                 {
-                    int dv = ToInt(Reflect.GetField(dropdown, CckNames.Setting_DefaultInt));
-                    AnimatorUtil.EnsureIntParam(gen, machine, dv);
+                    AnimatorUtil.EnsureIntParam(gen, machine, ToInt(Reflect.GetField(dropdown, CckNames.Setting_DefaultInt)));
                     paramsAdded++;
                 }
                 existing.Add(machine);
@@ -224,10 +146,23 @@ namespace CVRFury.Builder.Convert
             cvr.AttachGeneratedController(gen);
             AssetDatabase.SaveAssets();
 
-            return $"Built and attached controller '{gen.name}':\n  {paramsAdded} parameter(s) added " +
-                   $"({layersBuilt} with a clip-driven toggle layer).\n  Saved to {AssetDatabase.GetAssetPath(gen)}.\n" +
-                   "The red ❗ should now be gone (every entry's parameter exists in the controller), and " +
-                   "toggles with clips will play them. No need to click Create Controller.";
+            return $"Built & attached '{gen.name}': {paramsAdded} parameter(s), {layersBuilt} clip-driven layer(s)" +
+                   (posedSkipped > 0 ? $", {posedSkipped} skipped (clip poses the body — would cause the motorbike pose)" : "") +
+                   $".\nSaved to {AssetDatabase.GetAssetPath(gen)}.\nThe red ❗ should be gone — no Create Controller needed.";
+        }
+
+        private static HashSet<string> HumanoidBonePaths(GameObject avatar)
+        {
+            var set = new HashSet<string>();
+            var animator = avatar.GetComponent<Animator>();
+            if (animator == null || !animator.isHuman) return set;
+            foreach (HumanBodyBones bone in System.Enum.GetValues(typeof(HumanBodyBones)))
+            {
+                if (bone == HumanBodyBones.LastBone) continue;
+                var t = animator.GetBoneTransform(bone);
+                if (t != null) set.Add(AnimationUtility.CalculateTransformPath(t, avatar.transform));
+            }
+            return set;
         }
 
         private static AnimatorController FindCvrAvatarAnimator()
@@ -278,19 +213,10 @@ namespace CVRFury.Builder.Convert
             string.IsNullOrEmpty(machine) ? machine
                 : (machine.Contains('/') ? machine.Substring(machine.LastIndexOf('/') + 1) : machine);
 
-        private static string Norm(string s)
-        {
-            if (string.IsNullOrEmpty(s)) return "";
-            return new string(s.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
-        }
+        private static string Norm(string s) =>
+            string.IsNullOrEmpty(s) ? "" : new string(s.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
 
         private static float ToFloat(object o) { try { return o == null ? 0f : System.Convert.ToSingle(o); } catch { return 0f; } }
         private static int ToInt(object o) { try { return o == null ? 0 : System.Convert.ToInt32(o); } catch { return 0; } }
-
-        private static void Reselect(GameObject target)
-        {
-            Selection.activeObject = null;
-            EditorApplication.delayCall += () => { if (target != null) Selection.activeObject = target; };
-        }
     }
 }
