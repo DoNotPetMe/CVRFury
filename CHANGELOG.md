@@ -4,6 +4,20 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.9] - 2026-06-15
+
+**New: one-click "Link CCK Parameters from VRChat Menu" — for when you've already made your own
+controller.** Adds `Tools ▸ CVRFury ▸ Link CCK Parameters from VRChat Menu (keep my controller)`. It
+walks the avatar's VRChat Expressions Menu (following submenus), and for every control creates a
+matching ChilloutVR Advanced Avatar Setting with its **Machine Name set to the exact VRChat parameter
+name** and the default value carried over (Toggle for bool params, Slider for radial/float). It then
+marks the AAS container initialized and refreshes the inspector.
+
+It deliberately does **not** create, merge, generate or attach any animator controller — it leaves a
+hand-made/attached controller untouched, and simply wires the menu parameters to it. Because it walks
+the menu rather than the raw parameter list, VRCFury-internal parameters (which never appear in the
+menu) are skipped automatically. Re-running clears and rebuilds the AAS list so it can't duplicate.
+
 ## [0.9.8] - 2026-06-14
 
 **The stuck "measure" pose: drop VRChat body-pose layers that move humanoid *bones*, not just muscles.**
