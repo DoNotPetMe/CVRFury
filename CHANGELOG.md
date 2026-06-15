@@ -4,6 +4,21 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.10] - 2026-06-15
+
+**"Link CCK Parameters" now auto-assigns GameObject targets.** The red "parameter not present in the
+animator's parameters" warnings appear because the Base Controller (CVR's stock `AvatarAnimator`) doesn't
+contain the toggle parameters — in CVR those are generated from the AAS entries. For avatars whose
+clothing items are separate GameObjects, the linker now wires each toggle as a **CVR-native GameObject
+toggle**: it matches the toggle's parameter (e.g. `Toggle/Witch Outfit/Corset`) to a GameObject in the
+hierarchy (a "Corset" object), preferring one whose ancestor path contains the parameter's category
+segment when names collide, and writes it into the entry's `gameObjectTargets` (onState = visible-when-on).
+
+After running, one click of the CCK's **Create Controller** generates a parameter per entry (clearing the
+red warnings) and the toggles directly show/hide their objects — no animation clips or custom controller
+needed. Toggles it can't confidently match (presets, idle/animation toggles) are listed in the summary so
+they can be assigned by hand. Added `CckAvatar.AddGameObjectToggle`.
+
 ## [0.9.9] - 2026-06-15
 
 **New: one-click "Link CCK Parameters from VRChat Menu" — for when you've already made your own

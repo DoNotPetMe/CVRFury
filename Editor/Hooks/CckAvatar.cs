@@ -160,6 +160,47 @@ namespace CVRFury.Builder
                 });
         }
 
+        /// <summary>Register a GameObject toggle: an on/off menu control that directly shows/hides one
+        /// or more GameObjects (CVR-native — no animation clip needed). Each target is stored with its
+        /// tree path and an <c>onState</c> of true (object visible when the toggle is on). Encoded Bool.</summary>
+        public bool AddGameObjectToggle(string displayName, string machineName, bool defaultOn,
+                                        System.Collections.Generic.List<(GameObject go, string path)> targets)
+        {
+            return AddEntry(
+                displayName, machineName,
+                CckNames.SettingsType_Toggle, CckNames.Entry_ToggleSettings, CckNames.SettingToggleType,
+                setting =>
+                {
+                    Reflect.SetField(setting, CckNames.Setting_DefaultBool, defaultOn);
+                    Reflect.SetEnumFieldByName(setting, CckNames.Setting_UsedType, CckNames.ParameterType_Bool);
+                    if (targets == null || targets.Count == 0) return;
+
+                    var targetType = Reflect.FindType(CckNames.TargetEntryType);
+                    if (targetType == null) return;
+
+                    var list = Reflect.AsList(Reflect.GetField(setting, CckNames.Setting_GameObjectTargets));
+                    if (list == null)
+                    {
+                        var listType = typeof(System.Collections.Generic.List<>).MakeGenericType(targetType);
+                        var newList = Reflect.New(listType);
+                        if (newList == null) return;
+                        Reflect.SetField(setting, CckNames.Setting_GameObjectTargets, newList);
+                        list = Reflect.AsList(newList);
+                        if (list == null) return;
+                    }
+
+                    foreach (var t in targets)
+                    {
+                        var te = Reflect.New(targetType);
+                        if (te == null) continue;
+                        Reflect.SetField(te, CckNames.Target_GameObject, t.go);
+                        Reflect.SetField(te, CckNames.Target_TreePath, t.path);
+                        Reflect.SetField(te, CckNames.Target_OnState, true);
+                        list.Add(te);
+                    }
+                });
+        }
+
         /// <summary>Register a 0..1 slider (radial) menu control. Sliders are inherently continuous,
         /// so the parameter is encoded as a <c>Float</c>. When min/max clips are supplied, CVR's AAS
         /// generator builds the blend layer from them.</summary>

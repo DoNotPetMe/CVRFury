@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
@@ -7,16 +8,17 @@ namespace CVRFury.Builder.Convert
     /// <summary>
     /// One-click parameter linker. Reads the avatar's VRChat Expressions Menu + Parameters and creates
     /// a matching ChilloutVR Advanced Avatar Settings (AAS) entry for every menu control, with each
-    /// entry's <b>Machine Name set to the exact VRChat parameter name</b> and the default value carried
-    /// over.
+    /// entry's <b>Machine Name set to the exact VRChat parameter name</b> and the default carried over.
     ///
-    /// It deliberately does NOT create, merge, generate or attach any animator controller — it leaves
-    /// the controller you set up completely alone. Use it when you've already built and attached your
-    /// own controller and only need the CCK menu parameters wired to it. The toggle works in-game as
-    /// long as your controller has an animator parameter with that same Machine Name.
+    /// For toggles it also tries to wire the CVR-native <b>GameObject target</b> automatically: it matches
+    /// the toggle's parameter (e.g. <c>Toggle/Witch Outfit/Corset</c>) to a GameObject in the hierarchy
+    /// (here, a "Corset" object), so the toggle directly shows/hides that object — no animation clip and
+    /// no custom controller needed. Anything it can't confidently match is listed so you can assign it by
+    /// hand.
     ///
-    /// VRCFury internal parameters never appear in the VRChat menu, so walking the menu (rather than the
-    /// raw parameter list) naturally skips them — only the human-facing controls are linked.
+    /// It never creates, merges or attaches an animator controller. After running, click the CCK's
+    /// <b>Create Controller</b> once: CVR then generates one parameter per entry (clearing the "parameter
+    /// not present" warnings) and the GameObject toggles work.
     /// </summary>
     public static class AasParameterLinker
     {
@@ -51,6 +53,7 @@ namespace CVRFury.Builder.Convert
                 return;
             }
             var defaults = BuildParamMap(Reflect.GetField(desc, VrcNames.Desc_ExpressionParameters));
+            var index = BuildNameIndex(target);
 
             var cvr = CckAvatar.EnsureOn(target);
             if (cvr == null)
@@ -60,28 +63,37 @@ namespace CVRFury.Builder.Convert
             }
             cvr.EnsureAdvancedSettingsContainer();
 
-            // Rebuild the AAS list cleanly so re-running can't produce duplicates.
             var list = cvr.SettingsList;
             int replaced = list?.Count ?? 0;
             list?.Clear();
 
-            int toggles = 0, sliders = 0;
-            WalkMenu(menu, defaults, cvr, new HashSet<string>(), new HashSet<Object>(), ref toggles, ref sliders);
+            int toggles = 0, sliders = 0, matched = 0;
+            var unmatched = new List<string>();
+            WalkMenu(menu, defaults, cvr, target, index, new HashSet<string>(), new HashSet<Object>(),
+                     ref toggles, ref sliders, ref matched, unmatched);
 
             cvr.Persist();
-            Reselect(target); // rebuild the CCK inspector against the now-populated list
+            Reselect(target);
 
-            Tell($"Linked {toggles + sliders} CCK Advanced Avatar Setting(s) from the VRChat menu " +
-                 $"({toggles} toggle, {sliders} slider)" +
-                 (replaced > 0 ? $", replacing {replaced} existing entr(y/ies)" : "") + ".\n\n" +
-                 "Every entry's Machine Name now equals its VRChat parameter name, and your animator controller " +
-                 "was NOT touched.\n\nFinish up in the CVRAvatar ▸ Advanced Settings: make sure the Base Controller " +
-                 "is your working controller. A toggle drives whatever animator parameter shares its Machine Name — " +
-                 "so this only does something in-game if your controller actually has those parameters.");
+            var msg = $"Linked {toggles + sliders} CCK setting(s) ({toggles} toggle, {sliders} slider)" +
+                      (replaced > 0 ? $", replacing {replaced} existing" : "") + ".\n\n" +
+                      $"GameObject targets auto-assigned: {matched}/{toggles} toggles.\n";
+            if (unmatched.Count > 0)
+            {
+                msg += $"\nCouldn't match {unmatched.Count} toggle(s) to a GameObject (assign these by hand in " +
+                       "Autogeneration Options — they're usually presets or idle/animation toggles, not single objects):\n  " +
+                       string.Join("\n  ", unmatched.GetRange(0, Math.Min(unmatched.Count, 25)));
+                if (unmatched.Count > 25) msg += $"\n  …and {unmatched.Count - 25} more.";
+            }
+            msg += "\n\nFinal step: click the CCK's Create Controller (then Attach). That generates the " +
+                   "parameters (clearing the red ❗) and the GameObject toggles will work. Your controller is untouched.";
+            Tell(msg);
         }
 
         private static void WalkMenu(object menu, Dictionary<string, (int type, float def)> defaults, CckAvatar cvr,
-                                     HashSet<string> seen, HashSet<Object> visited, ref int toggles, ref int sliders)
+                                     GameObject root, Dictionary<string, List<Transform>> index,
+                                     HashSet<string> seen, HashSet<Object> visited,
+                                     ref int toggles, ref int sliders, ref int matched, List<string> unmatched)
         {
             if (menu == null) return;
             if (menu is Object mo && !visited.Add(mo)) return; // guard against submenu cycles
@@ -102,7 +114,17 @@ namespace CVRFury.Builder.Convert
                         var p = ParamName(control);
                         if (string.IsNullOrEmpty(p) || !seen.Add(p)) break;
                         bool on = defaults.TryGetValue(p, out var d) && d.def != 0f;
-                        if (cvr.AddToggle(name, p, on, false)) toggles++;
+
+                        var targets = new List<(GameObject, string)>();
+                        var tf = FindTarget(index, p, name);
+                        if (tf != null)
+                        {
+                            targets.Add((tf.gameObject, AnimationUtility.CalculateTransformPath(tf, root.transform)));
+                            matched++;
+                        }
+                        else unmatched.Add($"{name}   →   {p}");
+
+                        if (cvr.AddGameObjectToggle(name, p, on, targets)) toggles++;
                         break;
                     }
                     case "RadialPuppet":
@@ -124,11 +146,54 @@ namespace CVRFury.Builder.Convert
                         }
                         break;
                     case "SubMenu":
-                        WalkMenu(Reflect.GetField(control, VrcNames.Control_SubMenu), defaults, cvr,
-                                 seen, visited, ref toggles, ref sliders);
+                        WalkMenu(Reflect.GetField(control, VrcNames.Control_SubMenu), defaults, cvr, root, index,
+                                 seen, visited, ref toggles, ref sliders, ref matched, unmatched);
                         break;
                 }
             }
+        }
+
+        /// <summary>Match a toggle parameter to a GameObject by name. Tries the parameter's last path
+        /// segment (e.g. "Corset" from "Toggle/Witch Outfit/Corset") then the control's display name;
+        /// when several objects share the name, prefers one whose ancestor path contains the parameter's
+        /// category segment (e.g. "Witch Outfit"). Returns null if there's no confident match.</summary>
+        private static Transform FindTarget(Dictionary<string, List<Transform>> index, string param, string displayName)
+        {
+            var segs = param.Split('/');
+            var leaf = segs[segs.Length - 1].Trim();
+            var category = segs.Length >= 2 ? segs[segs.Length - 2].Trim() : null;
+            return Pick(index, leaf, category) ?? Pick(index, displayName?.Trim(), category);
+        }
+
+        private static Transform Pick(Dictionary<string, List<Transform>> index, string name, string category)
+        {
+            if (string.IsNullOrEmpty(name) || !index.TryGetValue(name, out var matches) || matches.Count == 0)
+                return null;
+            if (matches.Count == 1) return matches[0];
+            if (!string.IsNullOrEmpty(category))
+                foreach (var m in matches)
+                    if (AncestorPathContains(m, category)) return m;
+            return matches[0];
+        }
+
+        private static bool AncestorPathContains(Transform t, string name)
+        {
+            for (var p = t.parent; p != null; p = p.parent)
+                if (string.Equals(p.name.Trim(), name, StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        }
+
+        private static Dictionary<string, List<Transform>> BuildNameIndex(GameObject root)
+        {
+            var index = new Dictionary<string, List<Transform>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var t in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (t == root.transform) continue;
+                var key = t.name.Trim();
+                if (!index.TryGetValue(key, out var l)) index[key] = l = new List<Transform>();
+                l.Add(t);
+            }
+            return index;
         }
 
         private static Dictionary<string, (int type, float def)> BuildParamMap(object prms)
