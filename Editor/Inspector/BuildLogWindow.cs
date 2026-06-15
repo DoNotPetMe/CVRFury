@@ -17,6 +17,16 @@ namespace CVRFury.Builder
                 ShowWindow();
         }
 
+        /// <summary>Mirrors a block of text (already shown in the CVRFury window's own log area) into
+        /// the persistent "Show Last Build Log" view, so the menu item is never empty after a run.</summary>
+        public static void PublishText(string text, bool isError)
+        {
+            var log = new BuildLog();
+            log.Record(isError ? BuildLog.Level.Error : BuildLog.Level.Info,
+                       string.IsNullOrEmpty(text) ? "(no output)" : text);
+            _last = log;
+        }
+
         [MenuItem("Tools/CVRFury/Show Last Build Log")]
         public static void ShowWindow()
         {

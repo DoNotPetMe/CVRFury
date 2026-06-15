@@ -28,6 +28,15 @@ namespace CVRFury.Builder
             Add(Level.Error, m);
         }
 
+        /// <summary>Records a message WITHOUT echoing it to the console. Used when mirroring text
+        /// that has already been surfaced elsewhere (e.g. the CVRFury window's own log area) into the
+        /// persistent "Show Last Build Log" view, so we don't double-spam the console.</summary>
+        public void Record(Level level, string message)
+        {
+            if (level == Level.Error) HasErrors = true;
+            Entries.Add(new Entry(level, message));
+        }
+
         private void Add(Level level, string message)
         {
             Entries.Add(new Entry(level, message));

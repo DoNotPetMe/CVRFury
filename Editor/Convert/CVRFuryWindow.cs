@@ -359,6 +359,9 @@ namespace CVRFury.Builder.Convert
             try { result = action(); }
             catch (System.Exception ex) { result = "Error: " + ex.Message; Debug.LogException(ex); }
             _log = result ?? "";
+            // Mirror this run's output into the persistent "Show Last Build Log" view so the menu
+            // item is never empty after a workflow step.
+            BuildLogWindow.PublishText(_log, _log.StartsWith("Error:"));
             // Rebuild the CCK inspector against the now-populated list (deselect/reselect).
             var target = _avatar;
             Selection.activeObject = null;

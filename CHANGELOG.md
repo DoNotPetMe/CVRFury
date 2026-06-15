@@ -4,6 +4,15 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.17] - 2026-06-15
+
+### Fixed
+- **"Show Last Build Log" is no longer empty after using the CVRFury window.** Every workflow step
+  (parameters, clips, build & attach, PhysBones, Magica, emotes, strip) now mirrors its output into the
+  persistent build log surfaced by **Tools ▸ CVRFury ▸ Show Last Build Log**, not just the window's own
+  log area. Previously the menu only showed logs produced by the upload-time CCK hook, which stays empty
+  when the conversion is done ahead of time in the window — so the log always read as empty.
+
 ## [0.9.16] - 2026-06-15
 
 ### Added
