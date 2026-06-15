@@ -85,6 +85,32 @@ namespace CVRFury.Builder
         /// <summary>The AAS container object (CVRAdvancedAvatarSettings), or null.</summary>
         public object AdvancedSettings => Reflect.GetField(Component, CckNames.Avatar_AdvancedSettings);
 
+        /// <summary>Wire a ready-built controller as the avatar's Advanced Avatar Settings controller: set
+        /// it as the base + generated animator, build an override controller from it, and run it on the
+        /// avatar's Animator. This is the automatic equivalent of the CCK's "Create Controller + Attach".
+        /// Because the controller already contains a parameter per AAS entry, the "parameter not present"
+        /// warnings clear and the entries drive its layers.</summary>
+        public void AttachGeneratedController(AnimatorController controller)
+        {
+            if (controller == null) return;
+            EnsureAdvancedSettingsContainer();
+            var aas = AdvancedSettings;
+            if (aas != null)
+            {
+                Reflect.SetField(aas, CckNames.AdvancedSettings_BaseController, controller);
+                Reflect.SetField(aas, CckNames.AdvancedSettings_Animator, controller);
+                Reflect.SetField(aas, CckNames.AdvancedSettings_Initialized, true);
+
+                var aoc = new AnimatorOverrideController(controller) { name = controller.name + " (Override)" };
+                AssetDatabase.AddObjectToAsset(aoc, controller);
+                Reflect.SetField(aas, CckNames.AdvancedSettings_Overrides, aoc);
+                Overrides = aoc;
+            }
+
+            var animator = Root.GetComponent<Animator>();
+            if (animator != null) animator.runtimeAnimatorController = controller;
+        }
+
         public void EnableAdvancedSettings() =>
             Reflect.SetField(Component, CckNames.Avatar_UsesAdvancedSettings, true);
 

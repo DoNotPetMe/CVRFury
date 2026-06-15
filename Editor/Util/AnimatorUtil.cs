@@ -196,6 +196,39 @@ namespace CVRFury.Builder
             sm.defaultState = state;
         }
 
+        /// <summary>Add a two-state toggle layer driven by a <b>Bool</b> parameter (CVR's synced toggle
+        /// encoding): Off plays <paramref name="offClip"/>, On plays <paramref name="onClip"/>, switched by
+        /// If/IfNot on the bool. Used to build a working clip-driven layer for a CCK toggle so the avatar's
+        /// controller actually carries the parameter and animates.</summary>
+        public static void AddBoolToggleLayer(AnimatorController c, string layerName, string param,
+                                              AnimationClip offClip, AnimationClip onClip, bool defaultOn)
+        {
+            EnsureBoolParam(c, param, defaultOn);
+
+            var name = UniqueLayerName(c, layerName);
+            c.AddLayer(name);
+            var layers = c.layers;
+            var idx = layers.Length - 1;
+            layers[idx].defaultWeight = 1f;
+            c.layers = layers;
+
+            var sm = c.layers[idx].stateMachine;
+            var off = sm.AddState("Off");
+            off.motion = offClip;
+            off.writeDefaultValues = false;
+            var on = sm.AddState("On");
+            on.motion = onClip;
+            on.writeDefaultValues = false;
+            sm.defaultState = defaultOn ? on : off;
+
+            var toOn = off.AddTransition(on);
+            ConfigureTransition(toOn, 0f);
+            toOn.AddCondition(AnimatorConditionMode.If, 0f, param);
+            var toOff = on.AddTransition(off);
+            ConfigureTransition(toOff, 0f);
+            toOff.AddCondition(AnimatorConditionMode.IfNot, 0f, param);
+        }
+
         private static void ConfigureTransition(AnimatorStateTransition t, float seconds)
         {
             t.hasExitTime = false;

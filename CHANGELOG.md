@@ -4,6 +4,19 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.13] - 2026-06-15
+
+### Added
+- **Toggle Clip Linker can now build & attach the controller** (the part that clears the red "parameter
+  not present" warnings). New options in `Tools ▸ CVRFury ▸ Link Toggle Animations from Folder`: an
+  optional **Controller** slot and a **Build & attach a controller** checkbox. When enabled it copies the
+  given controller (or CVR's stock `AvatarAnimator` if left empty, so locomotion is preserved) — never
+  modifying the original — adds a parameter for every AAS entry (Bool/Float/Int by type) plus a clean
+  clip-driven two-state layer for each toggle that has on/off clips, then attaches the copy as the avatar's
+  AAS controller (base + override + animator). Because the controller now contains every machine-name
+  parameter, the CCK's red warnings clear and toggles with clips animate — no manual Create Controller
+  needed. Adds `AnimatorUtil.AddBoolToggleLayer` and `CckAvatar.AttachGeneratedController`.
+
 ## [0.9.12] - 2026-06-15
 
 ### Fixed
