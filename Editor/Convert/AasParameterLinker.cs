@@ -69,7 +69,7 @@ namespace CVRFury.Builder.Convert
 
             int toggles = 0, sliders = 0, matched = 0;
             var unmatched = new List<string>();
-            WalkMenu(menu, defaults, cvr, target, index, new HashSet<string>(), new HashSet<Object>(),
+            WalkMenu(menu, defaults, cvr, target, index, new HashSet<string>(), new HashSet<UnityEngine.Object>(),
                      ref toggles, ref sliders, ref matched, unmatched);
 
             cvr.Persist();
@@ -92,11 +92,11 @@ namespace CVRFury.Builder.Convert
 
         private static void WalkMenu(object menu, Dictionary<string, (int type, float def)> defaults, CckAvatar cvr,
                                      GameObject root, Dictionary<string, List<Transform>> index,
-                                     HashSet<string> seen, HashSet<Object> visited,
+                                     HashSet<string> seen, HashSet<UnityEngine.Object> visited,
                                      ref int toggles, ref int sliders, ref int matched, List<string> unmatched)
         {
             if (menu == null) return;
-            if (menu is Object mo && !visited.Add(mo)) return; // guard against submenu cycles
+            if (menu is UnityEngine.Object mo && !visited.Add(mo)) return; // guard against submenu cycles
 
             var controls = Reflect.AsList(Reflect.GetField(menu, VrcNames.Menu_Controls));
             if (controls == null) return;

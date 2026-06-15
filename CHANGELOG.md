@@ -4,6 +4,12 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.11] - 2026-06-15
+
+### Fixed
+- Compile error in `AasParameterLinker` (`CS0104: 'Object' is an ambiguous reference`): qualified the
+  submenu-cycle guard's `UnityEngine.Object` uses now that the file imports `System`.
+
 ## [0.9.10] - 2026-06-15
 
 **"Link CCK Parameters" now auto-assigns GameObject targets.** The red "parameter not present in the
