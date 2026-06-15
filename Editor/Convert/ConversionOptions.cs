@@ -17,6 +17,15 @@ namespace CVRFury.Builder.Convert
         // --- Harder / approximate (auto when toggled) ---
         public bool physBones = false;        // VRCPhysBone → DynamicBone
         public bool physBoneColliders = false;// VRCPhysBoneCollider → DynamicBoneCollider
+
+        // --- PhysBone tuning (DynamicBone has no 1:1 mapping, so these scale the approximation) ---
+        public float pbDamping = 0.1f;         // DynamicBone Damping
+        public float pbElasticityScale = 1f;   // multiplies VRChat 'pull' → DynamicBone Elasticity
+        public float pbStiffnessScale = 1f;    // multiplies VRChat 'stiffness' → DynamicBone Stiffness
+        public float pbRadiusScale = 1f;       // multiplies collision radius
+        public float pbGravityScale = 1f;      // multiplies downward gravity
+        public bool removeOriginalPhysBones = false; // delete the VRChat PhysBone/Collider after converting
+
         public bool expressions = false;      // ExpressionParameters + ExpressionsMenu → CVR AAS
         public bool mergePlayableLayers = false; // FX controller → CVR animator (FX only by default)
         public bool mergeGestureLayer = false;   // also merge the Gesture layer (can conflict with CVR gestures)

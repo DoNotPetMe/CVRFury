@@ -64,16 +64,19 @@ namespace CVRFury.Builder.Convert
                     var rootT = Reflect.GetField(pb, VrcNames.PB_Root) as Transform ?? go.transform;
                     Reflect.SetField(db, VrcNames.DB_Root, rootT);
 
-                    CopyFloat(pb, VrcNames.PB_Radius, db, VrcNames.DB_Radius);
+                    var o = ctx.Options;
+                    Reflect.SetField(db, VrcNames.DB_Radius, GetFloat(pb, VrcNames.PB_Radius, 0.05f) * o.pbRadiusScale);
 
-                    // Approximate physics mapping.
-                    Reflect.SetField(db, VrcNames.DB_Stiffness, GetFloat(pb, VrcNames.PB_Stiffness, 0.1f));
-                    Reflect.SetField(db, VrcNames.DB_Elasticity, GetFloat(pb, VrcNames.PB_Spring, 0.1f));
+                    // Approximate physics mapping, scaled by the tuning options.
+                    // Elasticity ≈ how strongly the bone returns to rest: VRChat 'pull' (fallback 'spring').
+                    var pull = GetFloat(pb, VrcNames.PB_Pull, GetFloat(pb, VrcNames.PB_Spring, 0.2f));
+                    Reflect.SetField(db, VrcNames.DB_Elasticity, Mathf.Clamp01(pull * o.pbElasticityScale));
+                    Reflect.SetField(db, VrcNames.DB_Stiffness, Mathf.Clamp01(GetFloat(pb, VrcNames.PB_Stiffness, 0.2f) * o.pbStiffnessScale));
                     Reflect.SetField(db, VrcNames.DB_Inert, GetFloat(pb, VrcNames.PB_Immobile, 0f));
-                    Reflect.SetField(db, VrcNames.DB_Damping, 0.1f);
+                    Reflect.SetField(db, VrcNames.DB_Damping, Mathf.Clamp01(o.pbDamping));
 
                     // VRChat gravity is a scalar pulling down; DynamicBone gravity is a vector.
-                    var g = GetFloat(pb, VrcNames.PB_Gravity, 0f);
+                    var g = GetFloat(pb, VrcNames.PB_Gravity, 0f) * o.pbGravityScale;
                     Reflect.SetField(db, VrcNames.DB_Gravity, new Vector3(0f, -g, 0f));
 
                     CopyTransformList(pb, VrcNames.PB_IgnoreTransforms, db, VrcNames.DB_Exclusions);
@@ -81,6 +84,24 @@ namespace CVRFury.Builder.Convert
                     converted++;
                 }
                 ctx.Log.Info($"Converted {converted} PhysBone(s) (physics values are approximate — tune as needed).");
+            }
+
+            // Optionally delete the original VRChat PhysBone/Collider components (colliders were already
+            // copied to the DynamicBones, so their references survive the removal).
+            if (ctx.Options.removeOriginalPhysBones)
+            {
+                int removed = 0;
+                foreach (var typeName in new[] { VrcNames.PhysBoneType, VrcNames.PhysBoneColliderType })
+                {
+                    var t = Reflect.FindType(typeName);
+                    if (t == null) continue;
+                    foreach (var c in root.GetComponentsInChildren(t, true))
+                    {
+                        UnityEngine.Object.DestroyImmediate(c);
+                        removed++;
+                    }
+                }
+                if (removed > 0) ctx.Log.Info($"Removed {removed} original VRChat PhysBone/Collider component(s).");
             }
         }
 

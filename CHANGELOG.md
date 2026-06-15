@@ -4,6 +4,24 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.15] - 2026-06-15
+
+### Added
+- **PhysBones — tunable & more accurate.** Step 3 now exposes Damping, Elasticity ×, Stiffness ×,
+  Radius × and Gravity × sliders, and maps VRChat `pull` → DynamicBone Elasticity (with `spring`
+  fallback) for a closer feel. Plus **"Remove the VRChat PhysBones after converting."**
+- **Magica Cloth 2 wiring (step 4).** When Magica is installed, converts each VRCPhysBone to a
+  MagicaCloth component on its root, with a **cloth-type option** (BoneCloth / BoneSpring), assigns the
+  root bone, and an option to remove the originals. (Magica's solver is configured at its Build step, so
+  open each and press Build / enter Play, then tune.)
+- **Avatar basics (step 0)** and **Strip VRChat + broken components (step 5)** are now in the unified
+  window, so the whole workflow lives in one place.
+
+### Removed
+- The standalone **"VRChat → ChilloutVR Converter"** window — its workflow now lives entirely in the
+  single `Tools ▸ CVRFury ▸ CVRFury` window. The menu is down to that one window plus utilities
+  (Clean Missing Scripts, Diagnose, Show Last Build Log, Verbose Logging).
+
 ## [0.9.14] - 2026-06-15
 
 ### Added

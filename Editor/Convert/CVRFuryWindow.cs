@@ -24,10 +24,19 @@ namespace CVRFury.Builder.Convert
         private bool _buildController = true;
         private AnimatorController _controller;
 
-        // Step 3 (physbones)
+        // PhysBones
         private bool _pbColliders = true;
+        private float _pbDamping = 0.1f, _pbElasticity = 1f, _pbStiffness = 1f, _pbRadiusScale = 1f, _pbGravityScale = 1f;
+        private bool _pbRemoveOriginal = true;
 
-        private bool _s1 = true, _s2 = true, _s3, _s4;
+        // Magica
+        private int _magicaType; // 0 = BoneCloth, 1 = BoneSpring
+        private bool _magicaRemoveOriginal = true;
+
+        // Strip
+        private bool _removeFinalIK = true;
+
+        private bool _s0, _s1 = true, _s2 = true, _s3, _s4, _s5;
 
         [MenuItem("Tools/CVRFury/CVRFury", false, 0)]
         public static void Open()
@@ -52,10 +61,12 @@ namespace CVRFury.Builder.Convert
                 "Avatar", _avatar != null ? _avatar : Selection.activeGameObject, typeof(GameObject), true);
 
             EditorGUILayout.Space();
+            Step0Basics();
             Step1Parameters();
             Step2Clips();
             Step3PhysBones();
             Step4Magica();
+            Step5Strip();
 
             if (!string.IsNullOrEmpty(_log))
             {
@@ -124,11 +135,17 @@ namespace CVRFury.Builder.Convert
                 var dbPresent = Reflect.FindType(VrcNames.DynamicBoneType) != null;
                 EditorGUILayout.HelpBox(
                     dbPresent
-                        ? "Converts VRCPhysBone/Collider to DynamicBone/Collider (approximate — tune stiffness/" +
-                          "elasticity after). Colliders convert first so bones can reference them."
+                        ? "Converts VRCPhysBone/Collider to DynamicBone/Collider. The physics models differ, so " +
+                          "tune the sliders below; defaults are a reasonable starting point. Colliders convert first."
                         : "DynamicBone isn't in this project. Import it (the CCK bundles it) to enable this.",
                     dbPresent ? MessageType.None : MessageType.Warning);
                 _pbColliders = EditorGUILayout.ToggleLeft("Also convert PhysBone colliders", _pbColliders);
+                _pbDamping = EditorGUILayout.Slider("Damping", _pbDamping, 0f, 1f);
+                _pbElasticity = EditorGUILayout.Slider("Elasticity ×", _pbElasticity, 0f, 3f);
+                _pbStiffness = EditorGUILayout.Slider("Stiffness ×", _pbStiffness, 0f, 3f);
+                _pbRadiusScale = EditorGUILayout.Slider("Radius ×", _pbRadiusScale, 0.1f, 3f);
+                _pbGravityScale = EditorGUILayout.Slider("Gravity ×", _pbGravityScale, 0f, 3f);
+                _pbRemoveOriginal = EditorGUILayout.ToggleLeft("Remove the VRChat PhysBones after converting", _pbRemoveOriginal);
                 using (new EditorGUI.DisabledScope(_avatar == null || !dbPresent))
                     if (GUILayout.Button("Convert PhysBones"))
                         RunAndRefresh(ConvertPhysBones);
@@ -141,29 +158,126 @@ namespace CVRFury.Builder.Convert
             if (!_s4) return;
             using (new EditorGUI.IndentLevelScope())
             {
-                var magica = Reflect.FindType("MagicaCloth2.MagicaCloth") ?? Reflect.FindType("MagicaCloth.MagicaCloth");
-                if (magica == null)
+                if (MagicaType() == null)
                 {
-                    EditorGUILayout.HelpBox("Magica Cloth is not installed in this project — this step is skipped. " +
-                                            "Install Magica Cloth 2 to enable it.", MessageType.None);
+                    EditorGUILayout.HelpBox("Magica Cloth 2 is not installed — this step is skipped. Install it to enable.",
+                                            MessageType.None);
                     return;
                 }
                 EditorGUILayout.HelpBox(
-                    "Magica Cloth 2 detected. PhysBone → Magica conversion with options is the next feature being " +
-                    "built. For now, use step 3 (DynamicBones) for chains. This section will gain Magica options shortly.",
+                    "Magica Cloth 2 detected. Adds a MagicaCloth component to each PhysBone root, sets the cloth type " +
+                    "and assigns the root bone. After running, open each MagicaCloth and press its Build button (or " +
+                    "enter Play) and tune — Magica's solver is configured at build time.",
                     MessageType.Info);
+                _magicaType = EditorGUILayout.Popup("Cloth type", _magicaType, new[] { "BoneCloth", "BoneSpring" });
+                _magicaRemoveOriginal = EditorGUILayout.ToggleLeft("Remove the VRChat PhysBones after converting", _magicaRemoveOriginal);
+                using (new EditorGUI.DisabledScope(_avatar == null))
+                    if (GUILayout.Button("Convert PhysBones → Magica Cloth"))
+                        RunAndRefresh(ConvertMagica);
             }
         }
 
         private string ConvertPhysBones()
         {
             var assets = AssetSaver.CreatePersistent(_avatar.name);
-            var opts = new ConversionOptions { physBones = true, physBoneColliders = _pbColliders };
+            var opts = new ConversionOptions
+            {
+                physBones = true, physBoneColliders = _pbColliders,
+                pbDamping = _pbDamping, pbElasticityScale = _pbElasticity, pbStiffnessScale = _pbStiffness,
+                pbRadiusScale = _pbRadiusScale, pbGravityScale = _pbGravityScale,
+                removeOriginalPhysBones = _pbRemoveOriginal,
+            };
             var ctx = new ConversionContext(_avatar, opts, assets);
             new PhysBoneConverter().Run(ctx);
             EditorUtility.SetDirty(_avatar);
-            var lines = ctx.Log.Entries.Select(e => e.Message);
-            return string.Join("\n", lines);
+            return string.Join("\n", ctx.Log.Entries.Select(e => e.Message));
+        }
+
+        private static System.Type MagicaType() =>
+            Reflect.FindType("MagicaCloth2.MagicaCloth") ?? Reflect.FindType("MagicaCloth.MagicaCloth");
+
+        private string ConvertMagica()
+        {
+            var magicaType = MagicaType();
+            if (magicaType == null) return "Magica Cloth 2 is not installed.";
+            var pbType = Reflect.FindType(VrcNames.PhysBoneType);
+            if (pbType == null) return "VRChat SDK / PhysBones not found in this project.";
+
+            var clothTypeName = _magicaType == 1 ? "BoneSpring" : "BoneCloth";
+            int made = 0;
+            foreach (var pb in _avatar.GetComponentsInChildren(pbType, true))
+            {
+                var go = ((Component)pb).gameObject;
+                var rootT = Reflect.GetField(pb, VrcNames.PB_Root) as Transform ?? go.transform;
+                var comp = go.GetComponent(magicaType) ?? go.AddComponent(magicaType);
+                var sd = Reflect.GetProperty(comp, "SerializeData") ?? Reflect.GetField(comp, "serializeData");
+                if (sd != null)
+                {
+                    Reflect.SetEnumFieldByName(sd, "clothType", clothTypeName);
+                    var roots = Reflect.AsList(Reflect.GetField(sd, "rootBones"));
+                    if (roots != null && !roots.Contains(rootT)) roots.Add(rootT);
+                }
+                made++;
+            }
+
+            int removed = 0;
+            if (_magicaRemoveOriginal)
+                foreach (var typeName in new[] { VrcNames.PhysBoneType, VrcNames.PhysBoneColliderType })
+                {
+                    var t = Reflect.FindType(typeName);
+                    if (t == null) continue;
+                    foreach (var c in _avatar.GetComponentsInChildren(t, true)) { DestroyImmediate(c); removed++; }
+                }
+
+            EditorUtility.SetDirty(_avatar);
+            return $"Added/updated {made} MagicaCloth component(s) (type {clothTypeName}); assigned each PhysBone root." +
+                   (removed > 0 ? $" Removed {removed} VRChat PhysBone/Collider(s)." : "") +
+                   "\nNext: open each MagicaCloth and press Build (or enter Play), then tune the cloth.";
+        }
+
+        private void Step0Basics()
+        {
+            _s0 = Foldout(_s0, "0 — Avatar basics (viewpoint / visemes / blink / eyes)");
+            if (!_s0) return;
+            using (new EditorGUI.IndentLevelScope())
+            {
+                EditorGUILayout.HelpBox("Copies the VRChat viewpoint, visemes, blink and eye-look settings onto the CVRAvatar.",
+                                        MessageType.None);
+                using (new EditorGUI.DisabledScope(_avatar == null))
+                    if (GUILayout.Button("Apply avatar basics"))
+                        RunAndRefresh(() => RunConverter(new AvatarBasicsConverter(), new ConversionOptions { avatarBasics = true }, true));
+            }
+        }
+
+        private void Step5Strip()
+        {
+            _s5 = Foldout(_s5, "5 — Strip VRChat + broken components (do last)");
+            if (!_s5) return;
+            using (new EditorGUI.IndentLevelScope())
+            {
+                EditorGUILayout.HelpBox("Removes leftover VRChat components and missing scripts once you're happy. " +
+                                        "Do this last — afterwards you can remove the VRChat SDK.", MessageType.Warning);
+                _removeFinalIK = EditorGUILayout.ToggleLeft("Also remove FinalIK / VRIK (CVR has its own IK)", _removeFinalIK);
+                using (new EditorGUI.DisabledScope(_avatar == null))
+                    if (GUILayout.Button("Strip VRChat + broken components"))
+                        RunAndRefresh(() => RunConverter(new FinalCleanupConverter(),
+                            new ConversionOptions { stripVrcAndBroken = true, removeFinalIK = _removeFinalIK }, true));
+            }
+        }
+
+        private string RunConverter(IConverter step, ConversionOptions opts, bool needsDescriptor)
+        {
+            var assets = AssetSaver.CreatePersistent(_avatar.name);
+            var ctx = new ConversionContext(_avatar, opts, assets);
+            if (needsDescriptor)
+            {
+                var descType = Reflect.FindType(VrcNames.AvatarDescriptorType);
+                if (descType != null) ctx.VrcDescriptor = _avatar.GetComponent(descType);
+            }
+            ctx.Cvr = CckAvatar.EnsureOn(_avatar);
+            step.Run(ctx);
+            EditorUtility.SetDirty(_avatar);
+            return string.Join("\n", ctx.Log.Entries.Select(e => e.Message));
         }
 
         // --- helpers ---
