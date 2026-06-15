@@ -4,6 +4,21 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.12] - 2026-06-15
+
+### Fixed
+- **"Link CCK Parameters" is now non-destructive.** It previously cleared the AAS list before rebuilding,
+  which wiped on/off clips you'd assigned by hand. It now keeps every existing entry (and its clips) and
+  only adds parameters that aren't already present, so re-running is safe.
+
+### Added
+- **`Tools ▸ CVRFury ▸ Link Toggle Animations from Folder`** — a clip scanner. Point it at a folder, tell
+  it the word ON clips end with (e.g. `toggled`) and OFF clips end with (e.g. `default`); it pairs clips
+  by base name, matches each base to an existing toggle entry (by menu name or machine-name leaf,
+  normalised so spacing/case/punctuation don't matter), and assigns the on/off clips onto that entry.
+  Strictly non-destructive — only fills clip fields, never clears entries or edits the controller. Reports
+  toggles with no matching clip and clip pairs with no matching toggle. Adds `CckAvatar.SetToggleClips`.
+
 ## [0.9.11] - 2026-06-15
 
 ### Fixed

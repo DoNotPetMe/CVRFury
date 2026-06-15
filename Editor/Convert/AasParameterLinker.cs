@@ -63,20 +63,29 @@ namespace CVRFury.Builder.Convert
             }
             cvr.EnsureAdvancedSettingsContainer();
 
+            // Non-destructive: keep every existing entry (and any clips you set on them), and only add
+            // parameters that aren't already present. Seeding 'seen' with existing machine names is what
+            // makes re-running safe — it can never clear your work again.
+            var seen = new HashSet<string>();
             var list = cvr.SettingsList;
-            int replaced = list?.Count ?? 0;
-            list?.Clear();
+            if (list != null)
+                foreach (var e in list)
+                {
+                    var mn = CckAvatar.EntryMachineName(e);
+                    if (!string.IsNullOrEmpty(mn)) seen.Add(mn);
+                }
+            int existing = seen.Count;
 
             int toggles = 0, sliders = 0, matched = 0;
             var unmatched = new List<string>();
-            WalkMenu(menu, defaults, cvr, target, index, new HashSet<string>(), new HashSet<UnityEngine.Object>(),
+            WalkMenu(menu, defaults, cvr, target, index, seen, new HashSet<UnityEngine.Object>(),
                      ref toggles, ref sliders, ref matched, unmatched);
 
             cvr.Persist();
             Reselect(target);
 
-            var msg = $"Linked {toggles + sliders} CCK setting(s) ({toggles} toggle, {sliders} slider)" +
-                      (replaced > 0 ? $", replacing {replaced} existing" : "") + ".\n\n" +
+            var msg = $"Added {toggles + sliders} new CCK setting(s) ({toggles} toggle, {sliders} slider)" +
+                      (existing > 0 ? $"; {existing} already existed and were left untouched" : "") + ".\n\n" +
                       $"GameObject targets auto-assigned: {matched}/{toggles} toggles.\n";
             if (unmatched.Count > 0)
             {

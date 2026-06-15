@@ -201,6 +201,26 @@ namespace CVRFury.Builder
                 });
         }
 
+        /// <summary>Display name of an AAS entry (the menu label).</summary>
+        public static string EntryName(object entry) => Reflect.GetField(entry, CckNames.Entry_Name) as string;
+
+        /// <summary>Machine name (synced animator parameter) of an AAS entry.</summary>
+        public static string EntryMachineName(object entry) => Reflect.GetField(entry, CckNames.Entry_MachineName) as string;
+
+        /// <summary>Assign on/off animation clips to an EXISTING toggle entry (non-destructive — it only
+        /// sets the clip fields, leaving everything else, and the rest of the list, untouched). Returns
+        /// false if the entry isn't a toggle. ChilloutVR builds the working toggle layer from these clips
+        /// when you press Create Controller.</summary>
+        public bool SetToggleClips(object entry, AnimationClip onClip, AnimationClip offClip)
+        {
+            var setting = Reflect.GetField(entry, CckNames.Entry_ToggleSettings);
+            if (setting == null) return false; // not a GameObject/animation toggle entry
+            Reflect.SetField(setting, CckNames.Setting_UseAnimationClip, true);
+            if (onClip != null) Reflect.SetField(setting, CckNames.Toggle_AnimationClip, onClip);
+            if (offClip != null) Reflect.SetField(setting, CckNames.Toggle_OffAnimationClip, offClip);
+            return true;
+        }
+
         /// <summary>Register a 0..1 slider (radial) menu control. Sliders are inherently continuous,
         /// so the parameter is encoded as a <c>Float</c>. When min/max clips are supplied, CVR's AAS
         /// generator builds the blend layer from them.</summary>
