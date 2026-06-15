@@ -4,6 +4,16 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.16] - 2026-06-15
+
+### Added
+- **Emotes / Poses section** in the CVRFury window: point it at a folder of full-body animation clips
+  (sit, dance, GoGoLoco-style poses) and it adds a menu **toggle per clip**. Each toggle plays its clip
+  while ON and returns to normal CVR movement when OFF — the Override layer's Off state is empty, so it
+  only poses the body while toggled on and never breaks locomotion. Built onto the existing AAS
+  controller (run step 2 first); intentionally allows humanoid-posing clips (unlike clothing toggles).
+  Toggle one at a time.
+
 ## [0.9.15] - 2026-06-15
 
 ### Added

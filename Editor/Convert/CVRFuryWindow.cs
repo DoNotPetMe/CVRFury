@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEditor.Animations;
@@ -33,10 +34,13 @@ namespace CVRFury.Builder.Convert
         private int _magicaType; // 0 = BoneCloth, 1 = BoneSpring
         private bool _magicaRemoveOriginal = true;
 
+        // Emotes / poses
+        private DefaultAsset _emoteFolder;
+
         // Strip
         private bool _removeFinalIK = true;
 
-        private bool _s0, _s1 = true, _s2 = true, _s3, _s4, _s5;
+        private bool _s0, _s1 = true, _s2 = true, _se, _s3, _s4, _s5;
 
         [MenuItem("Tools/CVRFury/CVRFury", false, 0)]
         public static void Open()
@@ -64,6 +68,7 @@ namespace CVRFury.Builder.Convert
             Step0Basics();
             Step1Parameters();
             Step2Clips();
+            StepEmotes();
             Step3PhysBones();
             Step4Magica();
             Step5Strip();
@@ -278,6 +283,73 @@ namespace CVRFury.Builder.Convert
             step.Run(ctx);
             EditorUtility.SetDirty(_avatar);
             return string.Join("\n", ctx.Log.Entries.Select(e => e.Message));
+        }
+
+        private void StepEmotes()
+        {
+            _se = Foldout(_se, "Emotes / Poses — toggle full-body animations (sit, dance, …)");
+            if (!_se) return;
+            using (new EditorGUI.IndentLevelScope())
+            {
+                EditorGUILayout.HelpBox(
+                    "Adds a menu toggle for each animation clip in a folder. While the toggle is ON the clip plays " +
+                    "(sit / dance / pose); when OFF the avatar returns to normal CVR movement — the layer only poses " +
+                    "the body while toggled on, so it doesn't break locomotion. Point this at a folder of full-body " +
+                    "clips (e.g. GoGoLoco's emotes, or any sit/dance animations).\n\n" +
+                    "Run step 2 first so a controller exists; emotes are added onto it.",
+                    MessageType.Info);
+                _emoteFolder = (DefaultAsset)EditorGUILayout.ObjectField("Emote/Pose clips folder", _emoteFolder, typeof(DefaultAsset), false);
+                using (new EditorGUI.DisabledScope(_avatar == null || _emoteFolder == null))
+                    if (GUILayout.Button("Add emote toggles"))
+                        RunAndRefresh(AddEmotes);
+            }
+        }
+
+        private string AddEmotes()
+        {
+            var folderPath = AssetDatabase.GetAssetPath(_emoteFolder);
+            if (string.IsNullOrEmpty(folderPath) || !AssetDatabase.IsValidFolder(folderPath))
+                return "Pick a folder of emote/pose animation clips.";
+
+            var cvr = CckAvatar.FindOn(_avatar);
+            if (cvr == null) return "No CVRAvatar — run steps 1–2 first.";
+            var controller = Reflect.GetField(cvr.AdvancedSettings, CckNames.AdvancedSettings_Animator) as AnimatorController;
+            if (controller == null)
+                return "No AAS controller attached yet — run step 2 (Build & attach a controller) first, then add emotes.";
+
+            var existingParams = new HashSet<string>(controller.parameters.Select(p => p.name));
+            var existingMachines = new HashSet<string>();
+            foreach (var e in cvr.SettingsList)
+            {
+                var m = CckAvatar.EntryMachineName(e);
+                if (!string.IsNullOrEmpty(m)) existingMachines.Add(m);
+            }
+
+            int added = 0;
+            foreach (var guid in AssetDatabase.FindAssets("t:AnimationClip", new[] { folderPath }))
+            {
+                var clip = AssetDatabase.LoadAssetAtPath<AnimationClip>(AssetDatabase.GUIDToAssetPath(guid));
+                if (clip == null) continue;
+                var name = clip.name;
+                var machine = "Emote/" + name;
+                if (!existingMachines.Contains(machine)) { cvr.AddToggle(name, machine, false, false); existingMachines.Add(machine); }
+                if (!existingParams.Contains(machine))
+                {
+                    // Off state empty (lets CVR locomotion show), On state = the emote clip. Override layer,
+                    // Bool-driven — so it only poses while toggled on. (Bypasses the clothing motorbike guard
+                    // on purpose: posing the body is exactly what an emote should do, but only when on.)
+                    AnimatorUtil.AddBoolToggleLayer(controller, "CVRFury Emote: " + name, machine, null, clip, false);
+                    existingParams.Add(machine);
+                    added++;
+                }
+            }
+
+            EditorUtility.SetDirty(controller);
+            AssetDatabase.SaveAssets();
+            cvr.Persist();
+            return $"Added {added} emote toggle(s). Each plays its clip while toggled ON and returns to normal " +
+                   "movement when OFF. Toggle one at a time (two emotes on at once will fight). The red ❗ clears " +
+                   "because the parameters now exist in the controller.";
         }
 
         // --- helpers ---
