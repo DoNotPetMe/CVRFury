@@ -85,11 +85,28 @@ namespace CVRFury.Builder.Convert
         private static string BuildAndAttach(CckAvatar cvr, GameObject avatar, System.Collections.IList entries,
                                              AnimatorController provided)
         {
-            var source = provided != null ? provided : FindCvrAvatarAnimator();
+            // CVR's movement (walk / run / jump / crouch / fly / swim) lives in the stock CCK
+            // AvatarAnimator's locomotion layers. We FORCE that as the foundation: the generated AAS
+            // controller is always based on a controller that carries CVR locomotion, so the converted
+            // avatar always moves. A supplied controller is only used as the base when it already
+            // contains that locomotion; otherwise basing on it would strip movement.
+            var stock = FindCvrAvatarAnimator();
+            AnimatorController source;
+            string baseNote;
+            if (provided != null && HasCvrLocomotion(provided))
+            { source = provided; baseNote = "based on the supplied controller (it already has CVR locomotion)"; }
+            else if (provided != null && stock != null)
+            { source = stock; baseNote = "supplied controller has no CVR locomotion — used CVR's stock AvatarAnimator instead so movement works"; }
+            else { source = stock; baseNote = "based on CVR's stock AvatarAnimator (CCK movement)"; }
+
             if (source == null)
-                return "Controller build skipped: no controller given and CVR's stock AvatarAnimator wasn't found.";
+                return "Controller build skipped: CVR's stock AvatarAnimator wasn't found, and no supplied " +
+                       "controller carries CVR locomotion. Make sure the CCK is imported, or leave the Controller field empty.";
             var gen = CopyController(source, avatar.name);
             if (gen == null) return "Controller build skipped: couldn't copy the source controller.";
+            if (!HasCvrLocomotion(gen))
+                return "Controller build aborted: the base controller has no CVR locomotion, so the avatar " +
+                       "wouldn't move. Leave the Controller field empty to use CVR's stock AvatarAnimator.";
 
             // A clip that animates the humanoid rig (muscles or bones) would pose the whole body when its
             // layer runs — the "motorbike pose". Never build a layer from such a clip.
@@ -153,7 +170,18 @@ namespace CVRFury.Builder.Convert
 
             return $"Built & attached '{gen.name}': {paramsAdded} parameter(s), {layersBuilt} clip-driven layer(s)" +
                    (posedSkipped > 0 ? $", {posedSkipped} skipped (clip poses the body — would cause the motorbike pose)" : "") +
-                   $".\nSaved to {AssetDatabase.GetAssetPath(gen)}.\nThe red ❗ should be gone — no Create Controller needed.";
+                   $".\nMovement: {baseNote}.\nSaved to {AssetDatabase.GetAssetPath(gen)}.\nThe red ❗ should be gone — no Create Controller needed.";
+        }
+
+        /// <summary>True if a controller carries CVR's locomotion driver parameters, i.e. it can move the
+        /// avatar. ChilloutVR feeds MovementX / MovementY / Grounded into the AAS animator at runtime; a
+        /// controller missing them yields a static, non-moving avatar — which is why we never let one
+        /// become the base.</summary>
+        private static bool HasCvrLocomotion(AnimatorController c)
+        {
+            if (c == null) return false;
+            var names = new HashSet<string>(c.parameters.Select(p => p.name));
+            return names.Contains("MovementX") && names.Contains("MovementY") && names.Contains("Grounded");
         }
 
         private static HashSet<string> HumanoidBonePaths(GameObject avatar)

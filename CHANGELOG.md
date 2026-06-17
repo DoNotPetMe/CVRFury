@@ -4,6 +4,17 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.19] - 2026-06-16
+
+### Changed
+- **CVR (CCK) movement is now always forced as the foundation of the built controller.** The generated
+  AAS controller is always based on a controller that carries CVR locomotion (MovementX / MovementY /
+  Grounded). If the optional Controller field is empty, CVR's stock AvatarAnimator is used (as before). If
+  a controller is supplied, it is used as the base only when it already contains CVR locomotion; otherwise
+  the tool falls back to the stock AvatarAnimator so the avatar can still walk/run/jump — and says so in
+  the log ("Movement: …"). The build aborts with a clear message rather than producing a motionless avatar
+  if no CVR locomotion can be found at all.
+
 ## [0.9.18] - 2026-06-16
 
 ### Fixed
