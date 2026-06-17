@@ -4,6 +4,18 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.18] - 2026-06-16
+
+### Fixed
+- **Motorbike pose, structurally.** Every CVRFury clip-toggle layer in the built controller now carries an
+  AvatarMask with all humanoid body parts (muscles + IK goals) disabled. Per-clip detection of body-posing
+  clips could miss cases (a clip posing the rig through bone transforms or muscle channels the detector
+  didn't match), and any such clip on an always-weighted toggle layer posed the whole avatar — the
+  recurring motorbike pose. With the mask, a clothing/accessory toggle layer physically cannot move the
+  skeleton; it can only toggle GameObjects/blendshapes. The existing skip guard is kept as a first line of
+  defense. **Note:** this only affects newly built controllers — delete the old `CVRFury Generated`
+  controller and re-run Step 2 ("Build & attach"), then re-upload.
+
 ## [0.9.17] - 2026-06-15
 
 ### Fixed

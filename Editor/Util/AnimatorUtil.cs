@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using UnityEditor;
 using UnityEditor.Animations;
 using UnityEngine;
 
@@ -201,7 +202,8 @@ namespace CVRFury.Builder
         /// If/IfNot on the bool. Used to build a working clip-driven layer for a CCK toggle so the avatar's
         /// controller actually carries the parameter and animates.</summary>
         public static void AddBoolToggleLayer(AnimatorController c, string layerName, string param,
-                                              AnimationClip offClip, AnimationClip onClip, bool defaultOn)
+                                              AnimationClip offClip, AnimationClip onClip, bool defaultOn,
+                                              AvatarMask mask = null)
         {
             EnsureBoolParam(c, param, defaultOn);
 
@@ -210,6 +212,11 @@ namespace CVRFury.Builder
             var layers = c.layers;
             var idx = layers.Length - 1;
             layers[idx].defaultWeight = 1f;
+            // A mask with every humanoid body part disabled makes it impossible for this layer to drive
+            // the rig's muscles/IK — so even a clip that (accidentally) animates the body can only ever
+            // toggle GameObjects/blendshapes, never pose the avatar. This is the structural cure for the
+            // "motorbike pose": clothing/accessory toggles must not be able to move the skeleton.
+            if (mask != null) layers[idx].avatarMask = mask;
             c.layers = layers;
 
             var sm = c.layers[idx].stateMachine;
@@ -227,6 +234,20 @@ namespace CVRFury.Builder
             var toOff = on.AddTransition(off);
             ConfigureTransition(toOff, 0f);
             toOff.AddCondition(AnimatorConditionMode.IfNot, 0f, param);
+        }
+
+        /// <summary>Create an AvatarMask that disables every humanoid body part (muscles + IK goals),
+        /// leaving the Transform section empty so generic transform/GameObject curves still apply. Assigned
+        /// to CVRFury's clip-toggle layers so they can never pose the humanoid rig (the "motorbike pose").
+        /// The mask is stored as a sub-asset of the controller so it ships with it.</summary>
+        public static AvatarMask CreateNoHumanoidMask(AnimatorController c)
+        {
+            var mask = new AvatarMask { name = "CVRFury No-Humanoid Mask" };
+            for (AvatarMaskBodyPart part = 0; part < AvatarMaskBodyPart.LastBodyPart; part++)
+                mask.SetHumanoidBodyPartActive(part, false);
+            if (AssetDatabase.Contains(c))
+                AssetDatabase.AddObjectToAsset(mask, c);
+            return mask;
         }
 
         private static void ConfigureTransition(AnimatorStateTransition t, float seconds)

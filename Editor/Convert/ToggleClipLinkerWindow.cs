@@ -95,6 +95,11 @@ namespace CVRFury.Builder.Convert
             // layer runs — the "motorbike pose". Never build a layer from such a clip.
             var bonePaths = HumanoidBonePaths(avatar);
 
+            // Belt-and-suspenders: even if a body-posing clip slips past detection, every toggle layer gets
+            // a mask that disables all humanoid muscles/IK, so a clothing/accessory toggle can physically
+            // never move the skeleton. This is the structural cure for the recurring motorbike pose.
+            var noHumanoidMask = AnimatorUtil.CreateNoHumanoidMask(gen);
+
             var existing = new HashSet<string>(gen.parameters.Select(p => p.name));
             int paramsAdded = 0, layersBuilt = 0, posedSkipped = 0;
 
@@ -118,7 +123,7 @@ namespace CVRFury.Builder.Convert
                                      HumanoidCurves.PosesHumanoid(offClip, bonePaths);
                     if ((onClip != null || offClip != null) && !posesBody)
                     {
-                        AnimatorUtil.AddBoolToggleLayer(gen, "CVRFury: " + Leaf(machine), machine, offClip, onClip, defOn);
+                        AnimatorUtil.AddBoolToggleLayer(gen, "CVRFury: " + Leaf(machine), machine, offClip, onClip, defOn, noHumanoidMask);
                         layersBuilt++;
                     }
                     else
