@@ -247,6 +247,19 @@ namespace CVRFury.Builder
             return true;
         }
 
+        /// <summary>Assign the min (value 0) and max (value 1) animation clips onto a Slider entry, so a
+        /// radial/slider control (hue shift, blendshape sliders, hair-on-a-radial, …) actually animates.
+        /// Returns false if the entry isn't a slider.</summary>
+        public bool SetSliderClips(object entry, AnimationClip minClip, AnimationClip maxClip)
+        {
+            var setting = Reflect.GetField(entry, CckNames.Entry_SliderSettings);
+            if (setting == null) return false;
+            Reflect.SetField(setting, CckNames.Setting_UseAnimationClip, true);
+            if (minClip != null) Reflect.SetField(setting, CckNames.Slider_MinAnimationClip, minClip);
+            if (maxClip != null) Reflect.SetField(setting, CckNames.Slider_MaxAnimationClip, maxClip);
+            return true;
+        }
+
         /// <summary>Register a 0..1 slider (radial) menu control. Sliders are inherently continuous,
         /// so the parameter is encoded as a <c>Float</c>. When min/max clips are supplied, CVR's AAS
         /// generator builds the blend layer from them.</summary>

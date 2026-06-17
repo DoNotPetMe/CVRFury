@@ -4,6 +4,19 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.20] - 2026-06-16
+
+### Fixed
+- **Sliders / radials now actually animate** (hue-shift sliders, blendshape sliders, and the common
+  VRChat habit of putting a hair/clothing toggle on a radial instead of a real toggle). Previously the
+  build step created the synced Float *parameter* for a slider but never built an animator layer or linked
+  its clips, so moving the slider did nothing. Now:
+  - The clip-pairing step links a slider's matched clips as **min (value 0) = the "default"/off clip** and
+    **max (value 1) = the "toggled"/on clip**, mirroring how toggles get on/off clips.
+  - The controller build adds a **1D blend-tree layer** (min→max driven by the synced Float) for each
+    slider, with the same no-humanoid mask the toggle layers use, so the slider drives its property
+    without ever posing the body. Body-posing slider clips are skipped like body-posing toggle clips.
+
 ## [0.9.19] - 2026-06-16
 
 ### Changed

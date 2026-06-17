@@ -60,7 +60,11 @@ namespace CVRFury.Builder.Convert
                 string hitKey = pairs.ContainsKey(keyName) ? keyName : (pairs.ContainsKey(keyLeaf) ? keyLeaf : null);
                 if (hitKey == null) { if (!string.IsNullOrEmpty(name)) noClip.Add(name); continue; }
                 var p = pairs[hitKey];
-                if (cvr.SetToggleClips(entry, p.onClip, p.offClip)) { linked++; usedBases.Add(hitKey); }
+                // Toggle: on/off clips. Slider/radial: the "off"/default clip is value 0 (min), the
+                // "on"/toggled clip is value 1 (max) — so hue-shift radials and hair-on-a-slider animate.
+                bool didLink = cvr.SetToggleClips(entry, p.onClip, p.offClip)
+                            || cvr.SetSliderClips(entry, p.offClip, p.onClip);
+                if (didLink) { linked++; usedBases.Add(hitKey); }
             }
 
             string buildReport = build ? BuildAndAttach(cvr, avatar, entries, controller) : "";
@@ -152,7 +156,25 @@ namespace CVRFury.Builder.Convert
                 }
                 else if (slider != null)
                 {
-                    AnimatorUtil.EnsureFloatParam(gen, machine, ToFloat(Reflect.GetField(slider, CckNames.Setting_DefaultFloat)));
+                    var minClip = Reflect.GetField(slider, CckNames.Slider_MinAnimationClip) as AnimationClip;
+                    var maxClip = Reflect.GetField(slider, CckNames.Slider_MaxAnimationClip) as AnimationClip;
+                    float def = ToFloat(Reflect.GetField(slider, CckNames.Setting_DefaultFloat));
+
+                    bool posesBody = HumanoidCurves.PosesHumanoid(minClip, bonePaths) ||
+                                     HumanoidCurves.PosesHumanoid(maxClip, bonePaths);
+                    if ((minClip != null || maxClip != null) && !posesBody)
+                    {
+                        // A 1D blend tree from min (0) → max (1) driven by the synced Float — the animator
+                        // side of a radial/slider. This is what makes hue-shift sliders and slider-derived
+                        // toggles (hair on a radial, etc.) actually move in CVR.
+                        AnimatorUtil.AddBlendTreeLayer(gen, "CVRFury: " + Leaf(machine), machine, minClip, maxClip, def, noHumanoidMask);
+                        layersBuilt++;
+                    }
+                    else
+                    {
+                        AnimatorUtil.EnsureFloatParam(gen, machine, def); // param only (no clips / body-posing)
+                        if (posesBody) posedSkipped++;
+                    }
                     paramsAdded++;
                 }
                 else if (dropdown != null)

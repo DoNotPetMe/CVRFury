@@ -197,6 +197,44 @@ namespace CVRFury.Builder
             sm.defaultState = state;
         }
 
+        /// <summary>Always-on 1D blend tree (min→max across a synced Float), the animator side of a CCK
+        /// slider / radial. The blend tree is stored as a sub-asset of the controller directly (no
+        /// AssetSaver needed), and an optional <paramref name="mask"/> keeps the layer off the humanoid
+        /// rig. Either clip may be null (a null end leaves the property at the avatar's default there).</summary>
+        public static void AddBlendTreeLayer(AnimatorController c, string layerName, string param,
+                                             AnimationClip zeroClip, AnimationClip oneClip,
+                                             float defaultValue, AvatarMask mask)
+        {
+            EnsureFloatParam(c, param, defaultValue);
+
+            var name = UniqueLayerName(c, layerName);
+            c.AddLayer(name);
+            var layers = c.layers;
+            var idx = layers.Length - 1;
+            layers[idx].defaultWeight = 1f;
+            if (mask != null) layers[idx].avatarMask = mask;
+            c.layers = layers;
+
+            var sm = c.layers[idx].stateMachine;
+            var tree = new BlendTree
+            {
+                name = layerName,
+                blendType = BlendTreeType.Simple1D,
+                blendParameter = param,
+                useAutomaticThresholds = false,
+                minThreshold = 0f,
+                maxThreshold = 1f,
+            };
+            UnityEditor.AssetDatabase.AddObjectToAsset(tree, c);
+            tree.AddChild(zeroClip, 0f);
+            tree.AddChild(oneClip, 1f);
+
+            var state = sm.AddState(layerName);
+            state.motion = tree;
+            state.writeDefaultValues = false;
+            sm.defaultState = state;
+        }
+
         /// <summary>Add a two-state toggle layer driven by a <b>Bool</b> parameter (CVR's synced toggle
         /// encoding): Off plays <paramref name="offClip"/>, On plays <paramref name="onClip"/>, switched by
         /// If/IfNot on the bool. Used to build a working clip-driven layer for a CCK toggle so the avatar's
