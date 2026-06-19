@@ -4,6 +4,30 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.42] - 2026-06-19
+
+### Added
+- **Avatar size slider.** New "Avatar size slider" section adds a native in-game menu slider that scales the
+  whole avatar between a min and max factor (default 0.5×–2×, loading at normal size). Works in CVR with no
+  contacts or special shaders.
+- **DPS orifices are now opt-in toggles.** Every baked orifice starts disabled with its own menu toggle (OFF
+  by default), so nothing deforms until the wearer turns it on. Uncheck the option in Step 2 to skip it.
+- **Distinct DPS scene icon.** Baked orifices get a magenta ring icon in the Scene/Hierarchy (no runtime
+  component added) so you can find them instead of hunting plain Unity light icons.
+- **Menu Path label picker + Step 3 plug auto-fill.** The Menu Path field has a ▾ dropdown to fill the label
+  from the object name or a label already used on the avatar; Step 3 can auto-fill the plug mesh from detection.
+
+### Changed
+- **Menu Path clarified.** CVR's Advanced Settings is a single flat list, so "Menu Path" is just the display
+  label (the builder only used the last path segment). Fixed the misleading "slashes create submenus" tooltip;
+  the field now reads "Menu Label". Multiple parts (male + female) bake in one pass.
+
+### Fixed
+- **Motorbike pose with custom emotes.** Emote layers now build with WriteDefaults on, so the Off state hands
+  the body back to the locomotion layer instead of freezing it. The "Fix motorbike pose" check now requires a
+  real locomotion blend tree (not just the parameter names), so it no longer reports a broken/regenerated
+  controller as healthy.
+
 ## [0.9.37] - 2026-06-16
 
 ### Changed

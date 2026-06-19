@@ -47,7 +47,9 @@ namespace CVRFury.Builder.Convert
         // Strip
         private bool _removeFinalIK = true;
 
-        private bool _s0, _s1 = true, _s2 = true, _se, _s3, _s4, _s5, _sSps, _sCredits;
+        private bool _s0, _s1 = true, _s2 = true, _se, _s3, _s4, _s5, _sSps, _sResize, _sCredits;
+        private float _resizeMin = 0.5f, _resizeMax = 2f;
+        private string _resizeStatus = "";
         private double _bounceA = -100, _bounceB = -100; // last click time per name (bounce decays from it)
 
         // SPS / DPS (experimental)
@@ -88,6 +90,7 @@ namespace CVRFury.Builder.Convert
             Step3PhysBones();
             Step4Magica();
             StepSps();
+            StepResize();
             Step5Strip();
 
             if (!string.IsNullOrEmpty(_log))
@@ -319,6 +322,29 @@ namespace CVRFury.Builder.Convert
             var r = new Rect(area.x, area.y + area.height - 22f - amp, area.width, 22f);
             EditorGUIUtility.AddCursorRect(r, MouseCursor.Link);
             return GUI.Button(r, label, style);
+        }
+
+        private void StepResize()
+        {
+            _sResize = Foldout(_sResize, "Avatar size slider (in-game resize)");
+            if (!_sResize) return;
+            using (new EditorGUI.IndentLevelScope())
+            {
+                EditorGUILayout.LabelField("Adds a menu slider that scales your whole avatar at runtime. " +
+                    "Works natively in CVR — no contacts or shaders.", EditorStyles.wordWrappedMiniLabel);
+                _resizeMin = EditorGUILayout.Slider("Smallest (×)", _resizeMin, 0.1f, 1f);
+                _resizeMax = EditorGUILayout.Slider("Largest (×)", _resizeMax, 1f, 5f);
+                using (new EditorGUI.DisabledScope(_avatar == null))
+                    if (GUILayout.Button("Add avatar size slider"))
+                    {
+                        try { _resizeStatus = AvatarSizeSlider.Add(_avatar, _resizeMin, _resizeMax); }
+                        catch (System.Exception ex) { _resizeStatus = "Error: " + ex.Message; Debug.LogException(ex); }
+                        Repaint();
+                    }
+                if (!string.IsNullOrEmpty(_resizeStatus))
+                    EditorGUILayout.HelpBox(_resizeStatus,
+                        _resizeStatus.StartsWith("Error") ? MessageType.Error : MessageType.Info);
+            }
         }
 
         private void StepSps()
