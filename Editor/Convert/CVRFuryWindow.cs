@@ -53,6 +53,8 @@ namespace CVRFury.Builder.Convert
         // SPS / DPS (experimental)
         private Transform _spsSocket;
         private Transform _spsTemplate;
+        private string _spsStatus = "";   // inline result of the last SPS action
+        private bool _spsCloneOpen;        // "I already have a working DPS avatar" sub-section
 
         [MenuItem("Tools/CVRFury/CVRFury", false, 0)]
         public static void Open()
@@ -323,65 +325,65 @@ namespace CVRFury.Builder.Convert
             if (!_sSps) return;
             using (new EditorGUI.IndentLevelScope())
             {
-                EditorGUILayout.HelpBox(
-                    "WHY: SPS won't deform in CVR — it locates sockets through VRChat Contacts, which CVR " +
-                    "doesn't have. DPS does work in CVR, because it bends the mesh with marker LIGHTS read by " +
-                    "the plug's shader, and lights + shaders render the same in CVR. So the fix is SPS → DPS.\n\n" +
-                    "IF YOUR AVATAR ONLY HAS SPS, do these in order:\n" +
-                    "  1. Detect markers — confirm what's on the avatar.\n" +
-                    "  2. Bake DPS orifice lights at your socket(s) — buttons below (no template needed).\n" +
-                    "  3. On the PLUG's material, turn on light-based deformation: Poiyomi → enable " +
-                    "\"Penetration Deformation\" (DPS/Orifice mode), or assign the Raliv DPS penetrator shader. " +
-                    "This shader swap is the one manual step — SPS's own deform is contact-driven and can't be " +
-                    "reused.\n" +
-                    "  4. Test in CVR: the plug should bend toward the baked orifice.",
-                    MessageType.Info);
+                EditorGUILayout.LabelField(
+                    "SPS can't deform in CVR; DPS can (it's light-based). Convert SPS → DPS in 3 steps.",
+                    EditorStyles.wordWrappedMiniLabel);
 
-                using (new EditorGUI.DisabledScope(_avatar == null))
-                    if (GUILayout.Button("1 · Detect SPS / DPS markers"))
-                        RunAndRefresh(() => SpsConverter.DetectReport(_avatar));
-
+                // Step 1 — Detect
                 EditorGUILayout.Space(4);
-                EditorGUILayout.LabelField("2 · Bake DPS orifice lights (SPS-only avatars start here)", EditorStyles.miniBoldLabel);
-                EditorGUILayout.HelpBox("Generates Raliv-DPS orifice marker lights from scratch — no working " +
-                    "orifice needed. Bake at every socket the detector found, or pick one socket transform and " +
-                    "bake just that. EXPERIMENTAL: if it doesn't deform in CVR, tell me a working orifice's " +
-                    "light Range/Intensity and I'll calibrate the codes.", MessageType.None);
+                EditorGUILayout.LabelField("Step 1 — Find the parts", EditorStyles.boldLabel);
                 using (new EditorGUI.DisabledScope(_avatar == null))
-                    if (GUILayout.Button("Auto-bake DPS orifices at ALL detected sockets"))
-                        RunAndRefresh(() => SpsConverter.AutoBake(_avatar));
+                    if (GUILayout.Button("Detect plugs & sockets"))
+                        _spsStatus = RunAndRefresh(() => SpsConverter.DetectReport(_avatar));
 
-                _spsSocket = (Transform)EditorGUILayout.ObjectField(new GUIContent("…or bake at one socket",
-                    "Pick the transform where you want a single orifice; the DPS light rig is placed here."),
+                // Step 2 — Bake orifice lights
+                EditorGUILayout.Space(6);
+                EditorGUILayout.LabelField("Step 2 — Add the DPS orifice lights", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField("Creates the marker lights the plug bends toward.", EditorStyles.wordWrappedMiniLabel);
+                using (new EditorGUI.DisabledScope(_avatar == null))
+                    if (GUILayout.Button("Add to every socket found"))
+                        _spsStatus = RunAndRefresh(() => SpsConverter.AutoBake(_avatar));
+                _spsSocket = (Transform)EditorGUILayout.ObjectField(new GUIContent("Or one spot",
+                    "Pick the transform where you want a single orifice; the DPS lights are placed here."),
                     _spsSocket, typeof(Transform), true);
                 using (new EditorGUI.DisabledScope(_spsSocket == null))
-                    if (GUILayout.Button("Bake DPS orifice at the picked socket"))
-                        RunAndRefresh(() =>
+                    if (GUILayout.Button("Add to this spot"))
+                        _spsStatus = RunAndRefresh(() =>
                         {
                             SpsConverter.GenerateDpsOrifice(_spsSocket);
-                            return $"Baked a DPS orifice rig at '{_spsSocket.name}' " +
-                                   $"(Range={SpsConverter.DpsOrificeRange}, Intensity={SpsConverter.DpsOrificeIntensity}). " +
-                                   "Nudge it so the opening faces outward, then do step 3 (plug shader).";
+                            return $"Done — added DPS orifice lights at '{_spsSocket.name}'.\n" +
+                                   "Next: rotate it so the opening faces outward, then do Step 3.";
                         });
 
-                EditorGUILayout.Space(4);
-                EditorGUILayout.LabelField("3 · Plug shader (required for any deformation)", EditorStyles.miniBoldLabel);
-                EditorGUILayout.HelpBox("On the penetrator mesh's material, enable light-based deformation: " +
-                    "Poiyomi → \"Penetration Deformation\", or assign the Raliv DPS penetrator shader. CVRFury " +
-                    "never strips lights or shaders, so once it's set it carries through conversion untouched. " +
-                    "(This is a material edit you do in the Inspector — no button.)", MessageType.None);
+                // Step 3 — Plug shader (manual)
+                EditorGUILayout.Space(6);
+                EditorGUILayout.LabelField("Step 3 — Switch the plug's shader (in the Inspector)", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField("Select the plug mesh → its material → enable Poiyomi \"Penetration " +
+                    "Deformation\", or assign the Raliv DPS shader. No button — CVRFury keeps it through upload.",
+                    EditorStyles.wordWrappedMiniLabel);
 
-                EditorGUILayout.Space(4);
-                EditorGUILayout.LabelField("Alternative · Clone a working DPS orifice (only if you have one)", EditorStyles.miniBoldLabel);
-                EditorGUILayout.HelpBox("If you already have an avatar where DPS works in CVR, copying its " +
-                    "orifice rig is the most reliable option (exact known-good lights). Not for SPS-only " +
-                    "avatars — they have no DPS rig to copy; use step 2 instead.", MessageType.None);
-                _spsTemplate = (Transform)EditorGUILayout.ObjectField(new GUIContent("Working DPS orifice (template)",
-                    "A DPS orifice (with its marker lights) from an avatar where DPS already works in CVR."),
-                    _spsTemplate, typeof(Transform), true);
-                using (new EditorGUI.DisabledScope(_spsTemplate == null || _spsSocket == null))
-                    if (GUILayout.Button("Clone template → picked socket"))
-                        RunAndRefresh(() => SpsConverter.CloneOrifice(_spsTemplate, _spsSocket));
+                // Inline status of the last action + what to do next.
+                if (!string.IsNullOrEmpty(_spsStatus))
+                {
+                    EditorGUILayout.Space(4);
+                    EditorGUILayout.HelpBox(_spsStatus,
+                        _spsStatus.StartsWith("Error") ? MessageType.Error : MessageType.Info);
+                }
+
+                // Optional path for people who already have a working DPS avatar.
+                EditorGUILayout.Space(6);
+                _spsCloneOpen = EditorGUILayout.ToggleLeft(
+                    "I already have an avatar where DPS works — copy its orifice instead", _spsCloneOpen);
+                if (_spsCloneOpen)
+                    using (new EditorGUI.IndentLevelScope())
+                    {
+                        _spsTemplate = (Transform)EditorGUILayout.ObjectField("Working orifice", _spsTemplate, typeof(Transform), true);
+                        EditorGUILayout.LabelField("Copied onto the Step 2 spot. Most reliable — exact known-good lights.",
+                            EditorStyles.wordWrappedMiniLabel);
+                        using (new EditorGUI.DisabledScope(_spsTemplate == null || _spsSocket == null))
+                            if (GUILayout.Button("Copy orifice → chosen spot"))
+                                _spsStatus = RunAndRefresh(() => SpsConverter.CloneOrifice(_spsTemplate, _spsSocket));
+                    }
             }
         }
 
@@ -599,7 +601,7 @@ namespace CVRFury.Builder.Convert
         }
 
         // --- helpers ---
-        private void RunAndRefresh(System.Func<string> action)
+        private string RunAndRefresh(System.Func<string> action)
         {
             string result;
             try { result = action(); }
@@ -612,6 +614,7 @@ namespace CVRFury.Builder.Convert
             var target = _avatar;
             Selection.activeObject = null;
             EditorApplication.delayCall += () => { if (target != null) Selection.activeObject = target; Repaint(); };
+            return _log;
         }
 
         private static bool Foldout(bool state, string label)

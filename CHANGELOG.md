@@ -4,6 +4,15 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.35] - 2026-06-16
+
+### Changed
+- **SPS/DPS tab made intuitive.** Three plainly-labelled steps (Find the parts → Add the orifice lights →
+  Switch the plug's shader) with short one-line descriptions instead of walls of text. Each button now shows
+  an **inline result right in the panel** ("Done — added lights to 2 sockets. Next: Step 3…") so you can tell
+  it worked and what to do next without hunting in the Log box. The clone-from-template path is tucked behind
+  a single toggle for the rare case where you already have a working DPS avatar.
+
 ## [0.9.34] - 2026-06-16
 
 ### Changed

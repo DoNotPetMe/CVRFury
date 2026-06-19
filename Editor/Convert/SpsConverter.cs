@@ -66,18 +66,19 @@ namespace CVRFury.Builder.Convert
         {
             var list = Detect(avatar);
             if (list.Count == 0)
-                return "No SPS / DPS / TPS markers found. If this avatar has them, point me at the plug/socket " +
-                       "transforms manually below.";
+                return "No plugs or sockets found.\n" +
+                       "Next: in Step 2, pick the spot where you want an orifice and add lights there.";
 
             var plugs = list.Where(f => f.kind == "Plug").ToList();
             var sockets = list.Where(f => f.kind == "Socket").ToList();
             var sb = new System.Text.StringBuilder();
             sb.AppendLine($"Found {plugs.Count} plug(s) and {sockets.Count} socket(s):");
             foreach (var f in list.Take(40))
-                sb.AppendLine($"  • {f.kind} — {Path(avatar.transform, f.transform)}   ({f.source})");
+                sb.AppendLine($"  • {f.kind} — {Path(avatar.transform, f.transform)}");
             if (list.Count > 40) sb.AppendLine("  …");
-            sb.AppendLine("\nNote: CVR has no native SPS deformation — only the contact/marker layer converts. " +
-                          "Choose the CVR target (pointer/trigger) to enable conversion.");
+            sb.Append(sockets.Count > 0
+                ? "\nNext: Step 2 — add DPS orifice lights to the socket(s)."
+                : "\nNext: Step 2 — pick where the orifice goes and add lights there.");
             return sb.ToString();
         }
 
@@ -197,27 +198,27 @@ namespace CVRFury.Builder.Convert
             if (avatar == null) return "Select your avatar first.";
             var sockets = Detect(avatar).Where(f => f.kind == "Socket").ToList();
             if (sockets.Count == 0)
-                return "No sockets detected to bake. Use 'Clone DPS orifice' with a working template instead, " +
-                       "or pick a socket transform and bake it directly.";
+                return "No sockets found to add lights to.\n" +
+                       "Next: use the \"Or one spot\" field above to pick where the orifice goes, then \"Add to this spot\".";
 
-            int baked = 0;
+            int baked = 0, skipped = 0;
             foreach (var s in sockets)
             {
                 if (s.transform == null) continue;
                 // Skip if this socket already has DPS marker lights under it.
                 bool hasLights = s.transform.GetComponentsInChildren<Light>(true)
                     .Any(l => l.type == LightType.Point && Mathf.Abs(l.range - DpsOrificeRange) < 0.01f);
-                if (hasLights) continue;
+                if (hasLights) { skipped++; continue; }
                 GenerateDpsOrifice(s.transform);
                 baked++;
             }
 
-            return $"Baked {baked} DPS orifice light-rig(s) onto detected socket(s) " +
-                   $"(Range={DpsOrificeRange}, Intensity={DpsOrificeIntensity}, normal offset={DpsNormalOffset}m).\n" +
-                   "EXPERIMENTAL: these are the canonical Raliv DPS values — verify in CVR against a known-good " +
-                   "orifice. Nudge each rig so it faces outward, and give the penetrator a DPS-capable shader. " +
-                   "If deformation doesn't trigger, tell me the light Range/Intensity from a working orifice and " +
-                   "I'll calibrate the encoding.";
+            if (baked == 0)
+                return $"All {skipped} socket(s) already have DPS lights — nothing to add.\n" +
+                       "Next: Step 3 — switch the plug's shader.";
+            return $"Done — added DPS orifice lights to {baked} socket(s)" +
+                   (skipped > 0 ? $" ({skipped} already had them)" : "") + ".\n" +
+                   "Next: Step 3 — switch the plug's shader, then test in CVR.";
         }
 
         /// <summary>
@@ -230,8 +231,7 @@ namespace CVRFury.Builder.Convert
         public static string CloneOrifice(Transform template, Transform target)
         {
             if (template == null || target == null)
-                return "Assign BOTH a working DPS orifice (template — from an avatar where DPS already works " +
-                       "in CVR) and a target socket location on this avatar.";
+                return "Pick both a working orifice and a Step 2 spot first.";
 
             var copy = Object.Instantiate(template.gameObject);
             copy.name = template.name + " (CVR DPS)";
@@ -243,10 +243,8 @@ namespace CVRFury.Builder.Convert
             UnityEditor.Selection.activeGameObject = copy;
 
             int lights = copy.GetComponentsInChildren<Light>(true).Length;
-            return $"Cloned DPS orifice '{template.name}' onto '{target.name}' ({lights} marker light(s) copied). " +
-                   "It sits at the target's origin — nudge its position/rotation so the opening faces outward, " +
-                   "then test in CVR with a DPS-shader penetrator. Because the marker lights are copied from a " +
-                   "working rig, the deformation should behave just like the source.";
+            return $"Done — copied the orifice onto '{target.name}' ({lights} light(s)).\n" +
+                   "Next: rotate it so the opening faces outward, then Step 3 — switch the plug's shader.";
         }
 
     }
