@@ -403,6 +403,8 @@ namespace CVRFury.Builder.Convert
                 EditorGUILayout.LabelField("Step 3 — Turn on the plug's deformation", EditorStyles.boldLabel);
                 EditorGUILayout.LabelField("Drop the penetrator's mesh object here (the one with its Mesh " +
                     "Renderer + material) — or auto-fill it from Step 1.", EditorStyles.wordWrappedMiniLabel);
+                EditorGUILayout.HelpBox("Use a shader with DPS / light-based deform (Poiyomi works well). This " +
+                    "enables that — not SPS, which needs VRChat contacts and stays inert in CVR.", MessageType.None);
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     _spsPlug = (Transform)EditorGUILayout.ObjectField(new GUIContent("Plug mesh",

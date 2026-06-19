@@ -377,6 +377,7 @@ namespace CVRFury.Builder.Convert
             if (mats.Count == 0) return $"'{plug.name}' has no materials to set up.";
 
             int enabledProps = 0, lockedMats = 0;
+            bool spsOn = false;
             var shaders = new System.Collections.Generic.HashSet<string>();
             var details = new System.Text.StringBuilder();
 
@@ -389,6 +390,10 @@ namespace CVRFury.Builder.Convert
                     continue; // locked/optimised Poiyomi material — properties are baked, can't toggle
                 }
 
+                if (HasEnabledSps(m)) spsOn = true;
+
+                // We enable only DPS/light deform props (penetr/dps/orifice), never SPS — SPS is contact-driven
+                // and dead in CVR, so the light path is the one that actually deforms.
                 var enables = FindDeformEnableProps(m.shader);
                 if (enables.Count == 0) continue;
                 UnityEditor.Undo.RecordObject(m, "Enable plug deformation");
@@ -405,9 +410,13 @@ namespace CVRFury.Builder.Convert
             sb.AppendLine($"Plug '{plug.name}': {mats.Count} material(s), shader(s): {string.Join(", ", shaders)}.");
             if (enabledProps > 0)
             {
-                sb.AppendLine($"Done — enabled deformation on {enabledProps} property(ies):");
+                sb.AppendLine($"Done — enabled DPS/light deformation on {enabledProps} property(ies):");
                 sb.Append(details);
                 sb.Append("Next: test in CVR — the plug should bend toward the orifice lights.");
+                if (spsOn)
+                    sb.Append("\nNote: this material also has SPS turned on. SPS uses VRChat contacts and won't " +
+                              "deform in CVR — the DPS/light path I just enabled is what works here. You can leave " +
+                              "SPS on for VRChat; it's simply inert in CVR.");
             }
             else if (lockedMats > 0)
             {
@@ -422,6 +431,27 @@ namespace CVRFury.Builder.Convert
                           $"Next: send me this exact shader name — \"{string.Join("\", \"", shaders)}\" — and I'll wire it up.");
             }
             return sb.ToString();
+        }
+
+        /// <summary>True if the material has an SPS deform feature switched on (an "_SPS_…enable" style float
+        /// at 1). SPS is contact-driven and does nothing in CVR — we surface it so the user isn't fooled into
+        /// thinking SPS will deform.</summary>
+        private static bool HasEnabledSps(Material m)
+        {
+            var shader = m.shader;
+            int count = UnityEditor.ShaderUtil.GetPropertyCount(shader);
+            for (int i = 0; i < count; i++)
+            {
+                var t = UnityEditor.ShaderUtil.GetPropertyType(shader, i);
+                if (t != UnityEditor.ShaderUtil.ShaderPropertyType.Float &&
+                    t != UnityEditor.ShaderUtil.ShaderPropertyType.Range) continue;
+                var n = UnityEditor.ShaderUtil.GetPropertyName(shader, i);
+                var nl = n.ToLowerInvariant();
+                bool isSps = nl.Contains("sps") &&
+                             (nl.Contains("enable") || nl.Contains("toggle") || nl.EndsWith("_en") || nl.Contains("active"));
+                if (isSps && m.GetFloat(n) > 0.5f) return true;
+            }
+            return false;
         }
 
         /// <summary>Names of float/toggle properties on the shader that look like a penetration-deform

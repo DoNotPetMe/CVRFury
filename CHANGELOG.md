@@ -4,6 +4,14 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.48] - 2026-06-19
+
+### Changed
+- **Step 3 now makes the Poiyomi DPS-vs-SPS choice explicit.** It always enables the DPS / light-based
+  deform path (never SPS, which is contact-driven and inert in CVR), says so in the result, and warns if the
+  material also has SPS turned on so you're not fooled into expecting SPS to deform. Added a one-line note in
+  the panel recommending a DPS/light shader like Poiyomi.
+
 ## [0.9.47] - 2026-06-19
 
 ### Added
