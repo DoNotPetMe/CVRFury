@@ -10,6 +10,52 @@ namespace CVRFury.Builder
     /// expects (synced float/bool parameters driving toggle layers).</summary>
     internal static class AnimatorUtil
     {
+        /// <summary>Returns the WriteDefaults convention the controller already uses (the majority of its
+        /// existing states), so layers we add match it. A WriteDefaults mismatch between our layers and CVR's
+        /// locomotion is what makes an emote look right while moving but wrong when idle.</summary>
+        public static bool DetectWriteDefaults(AnimatorController c)
+        {
+            int on = 0, off = 0;
+            if (c != null)
+                foreach (var layer in c.layers)
+                    CountWriteDefaults(layer.stateMachine, ref on, ref off);
+            return on >= off; // tie or empty → true (CVR's stock animator uses WriteDefaults on)
+        }
+
+        private static void CountWriteDefaults(AnimatorStateMachine sm, ref int on, ref int off)
+        {
+            if (sm == null) return;
+            foreach (var s in sm.states)
+                if (s.state != null) { if (s.state.writeDefaultValues) on++; else off++; }
+            foreach (var sub in sm.stateMachines)
+                CountWriteDefaults(sub.stateMachine, ref on, ref off);
+        }
+
+        /// <summary>Force the WriteDefaults flag on every state of layers whose name starts with
+        /// <paramref name="layerNamePrefix"/>. Used to repair already-built emote layers in place.</summary>
+        public static int SetWriteDefaultsForLayers(AnimatorController c, string layerNamePrefix, bool value)
+        {
+            if (c == null) return 0;
+            int changed = 0;
+            foreach (var layer in c.layers)
+            {
+                if (layer.name == null || !layer.name.StartsWith(layerNamePrefix)) continue;
+                changed += ApplyWriteDefaults(layer.stateMachine, value);
+            }
+            return changed;
+        }
+
+        private static int ApplyWriteDefaults(AnimatorStateMachine sm, bool value)
+        {
+            if (sm == null) return 0;
+            int changed = 0;
+            foreach (var s in sm.states)
+                if (s.state != null && s.state.writeDefaultValues != value) { s.state.writeDefaultValues = value; changed++; }
+            foreach (var sub in sm.stateMachines)
+                changed += ApplyWriteDefaults(sub.stateMachine, value);
+            return changed;
+        }
+
         public static void EnsureFloatParam(AnimatorController c, string name, float def = 0f)
         {
             if (c.parameters.Any(p => p.name == name)) return;

@@ -4,6 +4,14 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.50] - 2026-06-19
+
+### Fixed
+- **Emotes looked wrong when idle but snapped right when moving.** That's a WriteDefaults mismatch: the emote
+  layers were hardcoded WriteDefaults-on while CVR's locomotion may run WriteDefaults-off, so the default pose
+  bled through at rest. Emote layers now detect and **match the controller's existing WriteDefaults**
+  convention, and re-running "Add emote toggles" repairs already-built emote layers in place.
+
 ## [0.9.49] - 2026-06-19
 
 ### Changed

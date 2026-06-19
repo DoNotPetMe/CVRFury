@@ -621,6 +621,11 @@ namespace CVRFury.Builder.Convert
 
             int added = 0;
             var skipped = new List<string>();
+            // Match the controller's existing WriteDefaults convention. A mismatch is what makes an emote
+            // look right while moving but wrong (default/bind pose bleeding through) when idle.
+            bool wd = AnimatorUtil.DetectWriteDefaults(controller);
+            // Repair any emote layers already built with the wrong WriteDefaults from an earlier run.
+            int repaired = AnimatorUtil.SetWriteDefaultsForLayers(controller, "CVRFury Emote:", wd);
             // GoGoLoco (and similar) ship locomotion/system clips in the same folder as their emotes —
             // idle, AFK, stand, walk/run, jump, crouch, prone, fly, swim, sit/stand transitions. Added as
             // always-present override layers these pose the body at rest (the "motorbike" look), so skip
@@ -647,7 +652,7 @@ namespace CVRFury.Builder.Convert
                     // Bool-driven — so it only poses while toggled on. (Bypasses the clothing motorbike guard
                     // on purpose: posing the body is exactly what an emote should do, but only when on.)
                     AnimatorUtil.AddBoolToggleLayer(controller, "CVRFury Emote: " + name, machine, null, clip,
-                                                    defaultOn: false, mask: null, writeDefaults: true);
+                                                    defaultOn: false, mask: null, writeDefaults: wd);
                     existingParams.Add(machine);
                     added++;
                 }
@@ -656,8 +661,12 @@ namespace CVRFury.Builder.Convert
             EditorUtility.SetDirty(controller);
             AssetDatabase.SaveAssets();
             cvr.Persist();
-            var msg = $"Added {added} emote toggle(s). Each plays its clip while toggled ON and returns to normal " +
-                   "movement when OFF. Toggle one at a time (two emotes on at once will fight).";
+            var msg = $"Added {added} emote toggle(s) (WriteDefaults {(wd ? "on" : "off")}, matching this " +
+                   "controller). Each plays its clip while toggled ON and returns to normal movement when OFF. " +
+                   "Toggle one at a time (two emotes on at once will fight).";
+            if (repaired > 0)
+                msg += $"\nFixed WriteDefaults on {repaired} existing emote state(s) — that's the cause of an " +
+                       "emote looking wrong when idle but snapping right when you move.";
             if (skipped.Count > 0)
                 msg += $"\nSkipped {skipped.Count} locomotion/system clip(s) that would pose the body at rest " +
                        $"(the motorbike pose): {string.Join(", ", skipped.Take(20))}{(skipped.Count > 20 ? " …" : "")}." +
