@@ -4,6 +4,15 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.47] - 2026-06-19
+
+### Added
+- **Pre-upload shader-compile check.** A shader on the avatar that fails to compile (e.g. an old
+  XSToon/DPS orifice shader on current Unity) makes ChilloutVR abort with a cryptic "Build asset failed
+  content validation" error. The bake now scans the avatar's materials and reports the failing shader and
+  its compile error in plain language — with the stopgap that turning a deform option back off lets it
+  upload meanwhile.
+
 ## [0.9.46] - 2026-06-19
 
 ### Changed

@@ -69,6 +69,7 @@ namespace CVRFury.Builder
             FinalizeAnimators(ctx);
             AutomaticFixes.Run(ctx);
             CheckParameterBudget(ctx);
+            CheckShaderErrors(avatarRoot, ctx.Log);
             StripComponents(avatarRoot);
             assets.Flush();
 
@@ -122,6 +123,34 @@ namespace CVRFury.Builder
                                 $"({list.Count} settings) — getting close. Consider localising (#) unused ones.");
             else
                 ctx.Log.Info($"Synced settings: {list.Count} (~{bits} of {Cap} synced bits).");
+        }
+
+        /// <summary>ChilloutVR aborts the upload with a cryptic "content validation" error if ANY shader on
+        /// the avatar fails to compile (e.g. an old XSToon/DPS shader that doesn't build on this Unity). Scan
+        /// the materials' shaders for compile errors and report them in plain language before that happens.</summary>
+        private static void CheckShaderErrors(GameObject root, BuildLog log)
+        {
+            var seen = new HashSet<Shader>();
+            var bad = new List<string>();
+            foreach (var r in root.GetComponentsInChildren<Renderer>(true))
+                foreach (var m in r.sharedMaterials)
+                {
+                    if (m == null || m.shader == null || !seen.Add(m.shader)) continue;
+                    foreach (var msg in UnityEditor.ShaderUtil.GetShaderMessages(m.shader))
+                        if (msg.severity == UnityEditor.Rendering.ShaderCompilerMessageSeverity.Error)
+                        {
+                            bad.Add($"'{m.shader.name}': {msg.message} " +
+                                    $"({System.IO.Path.GetFileName(msg.file)}:{msg.line})");
+                            break; // one line per shader is enough to identify it
+                        }
+                }
+            if (bad.Count == 0) return;
+            log.Error("Shader(s) on this avatar fail to compile — ChilloutVR will abort the upload with a " +
+                      "\"content validation\" error until these are fixed:\n  • " +
+                      string.Join("\n  • ", bad.Distinct()) +
+                      "\nUpdate or patch the shader, or switch that material to a maintained one (e.g. Poiyomi). " +
+                      "If it's an orifice/penetration deform shader, turning the deform option back off also " +
+                      "lets the avatar upload (without deformation) as a stopgap.");
         }
 
         private static List<CVRFuryComponent> CollectFeatures(GameObject root)
