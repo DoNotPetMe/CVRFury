@@ -4,6 +4,14 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.45] - 2026-06-19
+
+### Added
+- **"Remove CVRFury-baked orifices" button.** One click deletes every orifice (and its menu toggle) that
+  CVRFury baked, so a bulk "Add to every socket" that picked up wrong spots is fully reversible — then re-bake
+  or place them by hand. Only removes CVRFury-made rigs (matched by marker-light name), never the avatar's own
+  DPS. Clarified that "Add to this spot" is repeatable for as many manual orifices as you want.
+
 ## [0.9.43] - 2026-06-19
 
 ### Fixed

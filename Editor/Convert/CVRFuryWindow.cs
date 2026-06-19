@@ -376,8 +376,8 @@ namespace CVRFury.Builder.Convert
                 using (new EditorGUI.DisabledScope(_avatar == null))
                     if (GUILayout.Button("Add to every socket found"))
                         RunSps(() => SpsConverter.AutoBake(_avatar, _spsAddToggle));
-                EditorGUILayout.LabelField("Or place just one: drag the spot where the orifice should go (a " +
-                    "bone or empty), then click below.", EditorStyles.wordWrappedMiniLabel);
+                EditorGUILayout.LabelField("Or place them by hand: drag a spot (bone/empty) and click — repeat " +
+                    "for as many orifices as you want.", EditorStyles.wordWrappedMiniLabel);
                 _spsSocket = (Transform)EditorGUILayout.ObjectField(new GUIContent("Or one spot",
                     "Pick the transform where you want a single orifice; the DPS lights are placed here."),
                     _spsSocket, typeof(Transform), true);
@@ -390,6 +390,13 @@ namespace CVRFury.Builder.Convert
                                    (_spsAddToggle ? " (OFF by default, with a menu toggle)" : "") + ".\n" +
                                    "Next: rotate it so the opening faces outward, then Step 3 — enable the plug's deformation.";
                         });
+
+                EditorGUILayout.Space(2);
+                EditorGUILayout.LabelField("Made a mess? Undo just the orifices CVRFury baked (not your own DPS):",
+                    EditorStyles.wordWrappedMiniLabel);
+                using (new EditorGUI.DisabledScope(_avatar == null))
+                    if (GUILayout.Button("Remove CVRFury-baked orifices"))
+                        RunSps(() => SpsConverter.RemoveBaked(_avatar));
 
                 // Step 3 — Turn on deformation on the plug
                 EditorGUILayout.Space(6);

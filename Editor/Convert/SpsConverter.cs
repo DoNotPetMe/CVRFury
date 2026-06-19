@@ -283,6 +283,35 @@ namespace CVRFury.Builder.Convert
                    "Next: Step 3 — pick the plug mesh and click \"Enable deformation\".";
         }
 
+        /// <summary>Delete every orifice CVRFury baked (and its menu toggle), so a bulk bake that picked up
+        /// wrong spots is one click to undo — then you can re-bake or add the right ones manually. Only
+        /// touches CVRFury-made rigs (identified by our marker-light names), never the avatar's own DPS.</summary>
+        public static string RemoveBaked(GameObject avatar)
+        {
+            if (avatar == null) return "Select your avatar first.";
+
+            var roots = new HashSet<GameObject>();
+            foreach (var l in avatar.GetComponentsInChildren<Light>(true))
+                if (l.name == "DPS_Light_Normal" && l.transform.parent != null) // our orientation marker
+                    roots.Add(l.transform.parent.gameObject);
+            if (roots.Count == 0)
+                return "No CVRFury-baked orifices found. (This only removes ones CVRFury made, not the " +
+                       "avatar's own DPS.)";
+
+            int toggles = 0;
+            foreach (var t in avatar.GetComponentsInChildren<CVRFuryToggle>(true))
+            {
+                bool ours = t.state?.actions?.Any(a => a.type == FuryAction.ActionType.ObjectToggle &&
+                                                       a.targetObject != null && roots.Contains(a.targetObject)) ?? false;
+                if (ours) { UnityEditor.Undo.DestroyObjectImmediate(t); toggles++; }
+            }
+
+            int n = roots.Count;
+            foreach (var r in roots) UnityEditor.Undo.DestroyObjectImmediate(r);
+            return $"Removed {n} baked orifice(s) and {toggles} menu toggle(s). " +
+                   "Re-bake, or use \"Or one spot\" to place the right ones by hand.";
+        }
+
         /// <summary>
         /// Transplant a known-working DPS orifice light-rig onto a new socket location. DPS deformation is
         /// driven entirely by marker point-lights read by the penetrator's shader, and those render in CVR
