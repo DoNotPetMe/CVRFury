@@ -56,6 +56,26 @@ namespace CVRFury.Builder
             return changed;
         }
 
+        /// <summary>Remove every layer whose name starts with <paramref name="prefix"/>. Returns the count.</summary>
+        public static int RemoveLayers(AnimatorController c, string prefix)
+        {
+            if (c == null) return 0;
+            int removed = 0;
+            for (int i = c.layers.Length - 1; i >= 0; i--)
+                if (c.layers[i].name != null && c.layers[i].name.StartsWith(prefix)) { c.RemoveLayer(i); removed++; }
+            return removed;
+        }
+
+        /// <summary>Remove every parameter whose name starts with <paramref name="prefix"/>. Returns the count.</summary>
+        public static int RemoveParameters(AnimatorController c, string prefix)
+        {
+            if (c == null) return 0;
+            int removed = 0;
+            for (int i = c.parameters.Length - 1; i >= 0; i--)
+                if (c.parameters[i].name != null && c.parameters[i].name.StartsWith(prefix)) { c.RemoveParameter(i); removed++; }
+            return removed;
+        }
+
         public static void EnsureFloatParam(AnimatorController c, string name, float def = 0f)
         {
             if (c.parameters.Any(p => p.name == name)) return;

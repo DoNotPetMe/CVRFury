@@ -596,7 +596,40 @@ namespace CVRFury.Builder.Convert
                 using (new EditorGUI.DisabledScope(_avatar == null || _emoteFolder == null))
                     if (GUILayout.Button("Add emote toggles"))
                         RunAndRefresh(AddEmotes);
+
+                EditorGUILayout.LabelField("Posing wrong / motorbike? Remove all emotes to get a clean avatar, " +
+                    "then tell me if it still poses badly.", EditorStyles.wordWrappedMiniLabel);
+                using (new EditorGUI.DisabledScope(_avatar == null))
+                    if (GUILayout.Button("Remove emote toggles"))
+                        RunAndRefresh(RemoveEmotes);
             }
+        }
+
+        private string RemoveEmotes()
+        {
+            var cvr = CckAvatar.FindOn(_avatar);
+            if (cvr == null) return "No CVRAvatar found.";
+            var controller = Reflect.GetField(cvr.AdvancedSettings, CckNames.AdvancedSettings_Animator) as AnimatorController;
+
+            int layers = AnimatorUtil.RemoveLayers(controller, "CVRFury Emote:");
+            int parms = AnimatorUtil.RemoveParameters(controller, "Emote/");
+
+            int entries = 0;
+            var list = cvr.SettingsList;
+            if (list != null)
+                for (int i = list.Count - 1; i >= 0; i--)
+                {
+                    var m = CckAvatar.EntryMachineName(list[i]);
+                    if (!string.IsNullOrEmpty(m) && m.StartsWith("Emote/")) { list.RemoveAt(i); entries++; }
+                }
+
+            if (controller != null) { EditorUtility.SetDirty(controller); AssetDatabase.SaveAssets(); }
+            cvr.Persist();
+            if (layers + parms + entries == 0)
+                return "No CVRFury emotes found to remove.";
+            return $"Removed all CVRFury emotes ({entries} menu entr(ies), {layers} animator layer(s), {parms} " +
+                   "parameter(s)). If the avatar STILL motorbikes now, the cause is the base controller, not the " +
+                   "emotes — use \"Fix motorbike pose\", or re-run Step 2 to rebuild locomotion.";
         }
 
         private string AddEmotes()

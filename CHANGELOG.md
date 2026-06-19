@@ -4,6 +4,14 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.51] - 2026-06-19
+
+### Added
+- **"Remove emote toggles" button.** One click strips every CVRFury emote (menu entries + animator layers +
+  parameters), so a posing/motorbike problem caused by emotes is instantly reversible — and it isolates the
+  cause: if the avatar still poses wrong with all emotes removed, the issue is the base controller, not the
+  emotes.
+
 ## [0.9.50] - 2026-06-19
 
 ### Fixed
