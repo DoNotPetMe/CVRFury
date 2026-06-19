@@ -100,18 +100,28 @@ namespace CVRFury.Builder
             return true;
         }
 
-        /// <summary>ChilloutVR syncs a limited budget of bits across all players. Warn loudly if a
-        /// build registers an unusually large number of synced settings.</summary>
+        /// <summary>ChilloutVR syncs a limited budget of bits across all players (~3200). Report the real
+        /// estimated bit cost and warn loudly when a build is over it — otherwise the only symptom is the
+        /// CCK's cryptic "Build asset failed content validation" abort at upload.</summary>
         private static void CheckParameterBudget(BuildContext ctx)
         {
             var list = ctx.Avatar?.SettingsList;
             if (list == null) return;
-            const int SoftLimit = 64;
-            if (list.Count > SoftLimit)
-                ctx.Log.Warning($"This avatar now has {list.Count} synced Advanced Avatar Settings. " +
-                                $"That is a lot — check your synced-bit budget in the CVRAvatar inspector.");
+
+            const int Cap = 3200;
+            int bits = ctx.Avatar.EstimateSyncedBits();
+            if (bits > Cap)
+                ctx.Log.Error($"This avatar's synced settings need ~{bits} bits — OVER ChilloutVR's {Cap}-bit " +
+                              $"limit ({list.Count} synced settings). The upload fails content validation because " +
+                              "of this. Reduce it: delete menu parameters you don't actually use in-game, and set " +
+                              "rarely-changed ones to local-only by starting their Machine Name with '#' (CVR " +
+                              "doesn't sync '#' parameters). On/off controls should be Bool, not Float, in the " +
+                              "CVRAvatar Advanced Settings list.");
+            else if (bits > Cap * 3 / 4)
+                ctx.Log.Warning($"Synced settings use ~{bits} of ChilloutVR's {Cap}-bit budget " +
+                                $"({list.Count} settings) — getting close. Consider localising (#) unused ones.");
             else
-                ctx.Log.Info($"Synced Advanced Avatar Settings on this avatar: {list.Count}.");
+                ctx.Log.Info($"Synced settings: {list.Count} (~{bits} of {Cap} synced bits).");
         }
 
         private static List<CVRFuryComponent> CollectFeatures(GameObject root)

@@ -353,6 +353,30 @@ namespace CVRFury.Builder
                    "so localising (#) the merged FX parameters is what actually clears the limit.";
         }
 
+        /// <summary>Estimated synced-bit total of the AAS list (Bool≈1, Int≈8, Float≈32; #-local and
+        /// unset→Float). Compare against ChilloutVR's ~3200-bit cap.</summary>
+        public int EstimateSyncedBits()
+        {
+            var list = SettingsList;
+            if (list == null) return 0;
+            int est = 0;
+            foreach (var entry in list)
+            {
+                if (entry == null) continue;
+                var machine = Reflect.GetField(entry, CckNames.Entry_MachineName) as string;
+                if (!string.IsNullOrEmpty(machine) && machine[0] == '#') continue; // not synced
+                var setting =
+                    Reflect.GetField(entry, CckNames.Entry_ToggleSettings) ??
+                    Reflect.GetField(entry, CckNames.Entry_SliderSettings) ??
+                    Reflect.GetField(entry, CckNames.Entry_DropdownSettings);
+                var used = setting == null ? null : Reflect.GetField(setting, CckNames.Setting_UsedType)?.ToString();
+                est += used == CckNames.ParameterType_Bool ? 1
+                     : used == CckNames.ParameterType_Int ? 8
+                     : 32; // Float or unset
+            }
+            return est;
+        }
+
         // ------------------------------------------------------------------ spatial / face
 
         public void SetViewPosition(Vector3 v) => Reflect.SetField(Component, CckNames.Avatar_ViewPosition, v);

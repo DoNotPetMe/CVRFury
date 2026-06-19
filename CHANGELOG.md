@@ -4,6 +4,15 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.46] - 2026-06-19
+
+### Changed
+- **Synced-bit budget check now reports real numbers and fails clearly.** Instead of a vague "that's a lot"
+  warning at 64 settings, the bake now estimates the actual synced-bit cost and compares it to ChilloutVR's
+  ~3200-bit cap: an explicit error when over (the cause of the CCK's cryptic "Build asset failed content
+  validation" upload abort), a heads-up at 75%, and a quiet info otherwise — with concrete advice (delete
+  unused menu params, prefix Machine Names with '#' to make them local, keep on/off controls as Bool).
+
 ## [0.9.45] - 2026-06-19
 
 ### Added
