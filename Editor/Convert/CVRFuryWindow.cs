@@ -56,6 +56,7 @@ namespace CVRFury.Builder.Convert
         private Transform _spsTemplate;
         private string _spsStatus = "";   // inline result of the last SPS action
         private bool _spsCloneOpen;        // "I already have a working DPS avatar" sub-section
+        private bool _spsAddToggle = true; // wrap each baked orifice in a default-off menu toggle
 
         [MenuItem("Tools/CVRFury/CVRFury", false, 0)]
         public static void Open()
@@ -340,10 +341,15 @@ namespace CVRFury.Builder.Convert
                 // Step 2 — Bake orifice lights
                 EditorGUILayout.Space(6);
                 EditorGUILayout.LabelField("Step 2 — Add the DPS orifice lights", EditorStyles.boldLabel);
-                EditorGUILayout.LabelField("Creates the marker lights the plug bends toward.", EditorStyles.wordWrappedMiniLabel);
+                EditorGUILayout.LabelField("Creates the marker lights the plug bends toward. Handles multiple " +
+                    "spots — male + female, several orifices — in one pass.", EditorStyles.wordWrappedMiniLabel);
+                _spsAddToggle = EditorGUILayout.ToggleLeft(new GUIContent(
+                    "Add a menu toggle, OFF by default (recommended)",
+                    "Each orifice starts disabled and gets its own in-game toggle, so nothing deforms until the " +
+                    "wearer turns it on."), _spsAddToggle);
                 using (new EditorGUI.DisabledScope(_avatar == null))
                     if (GUILayout.Button("Add to every socket found"))
-                        RunSps(() => SpsConverter.AutoBake(_avatar));
+                        RunSps(() => SpsConverter.AutoBake(_avatar, _spsAddToggle));
                 _spsSocket = (Transform)EditorGUILayout.ObjectField(new GUIContent("Or one spot",
                     "Pick the transform where you want a single orifice; the DPS lights are placed here."),
                     _spsSocket, typeof(Transform), true);
@@ -351,8 +357,9 @@ namespace CVRFury.Builder.Convert
                     if (GUILayout.Button("Add to this spot"))
                         RunSps(() =>
                         {
-                            SpsConverter.GenerateDpsOrifice(_spsSocket);
-                            return $"Done — added DPS orifice lights at '{_spsSocket.name}'.\n" +
+                            SpsConverter.GenerateDpsOrifice(_spsSocket, addToggle: _spsAddToggle);
+                            return $"Done — added DPS orifice lights at '{_spsSocket.name}'" +
+                                   (_spsAddToggle ? " (OFF by default, with a menu toggle)" : "") + ".\n" +
                                    "Next: rotate it so the opening faces outward, then Step 3 — enable the plug's deformation.";
                         });
 

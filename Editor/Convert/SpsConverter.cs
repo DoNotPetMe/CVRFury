@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using CVRFury.Components;
 
 namespace CVRFury.Builder.Convert
 {
@@ -163,7 +164,8 @@ namespace CVRFury.Builder.Convert
         /// <summary>Create a Raliv-DPS orifice marker (the light rig) at <paramref name="target"/> so a
         /// DPS-shader penetrator deforms toward it in CVR. Experimental: the light codes are the documented
         /// canonical values and may need calibration against a working orifice.</summary>
-        public static GameObject GenerateDpsOrifice(Transform target, string name = "DPS Orifice (CVRFury)")
+        public static GameObject GenerateDpsOrifice(Transform target, string name = "DPS Orifice (CVRFury)",
+                                                    bool addToggle = true)
         {
             if (target == null) return null;
             var root = new GameObject(name);
@@ -174,7 +176,53 @@ namespace CVRFury.Builder.Convert
 
             MakeMarkerLight(root.transform, "DPS_Light", Vector3.zero);
             MakeMarkerLight(root.transform, "DPS_Light_Normal", new Vector3(0f, 0f, DpsNormalOffset));
+            AssignOrificeIcon(root);                 // distinct scene/hierarchy icon (not the plain light icon)
+            if (addToggle) AddDefaultOffToggle(root); // menu toggle, OFF by default
             return root;
+        }
+
+        /// <summary>Make the orifice start disabled and add a CVRFury menu toggle (default OFF) that enables
+        /// it. So every DPS location is opt-in: no deformation until the wearer turns it on in the menu.</summary>
+        private static void AddDefaultOffToggle(GameObject orifice)
+        {
+            var host = orifice.transform.root.gameObject; // keep the toggle on an ACTIVE object so it bakes
+            var toggle = UnityEditor.Undo.AddComponent<CVRFuryToggle>(host);
+            toggle.menuPath = orifice.name;
+            toggle.defaultOn = false;
+            toggle.saved = true;
+            toggle.state.actions.Add(new FuryAction
+            {
+                type = FuryAction.ActionType.ObjectToggle,
+                targetObject = orifice,
+                targetState = true,
+            });
+            orifice.SetActive(false); // OFF by default
+        }
+
+        // A distinct icon so DPS orifices are obvious in the scene/hierarchy (the lights alone just show
+        // Unity's generic light icon). Stored per-object in the scene; no runtime component is added.
+        private static Texture2D _orificeIcon;
+        private static void AssignOrificeIcon(GameObject go)
+        {
+            if (_orificeIcon == null) _orificeIcon = BuildOrificeIcon();
+            UnityEditor.EditorGUIUtility.SetIconForObject(go, _orificeIcon);
+        }
+
+        private static Texture2D BuildOrificeIcon()
+        {
+            const int size = 32;
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave };
+            var ring = new Color(0.93f, 0.23f, 0.66f, 1f);   // magenta ring
+            float c = (size - 1) / 2f, rOut = 14f, rIn = 8f;
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float d = Mathf.Sqrt((x - c) * (x - c) + (y - c) * (y - c));
+                    float a = (d <= rOut && d >= rIn) ? 1f : 0f; // a ring shape
+                    tex.SetPixel(x, y, new Color(ring.r, ring.g, ring.b, a));
+                }
+            tex.Apply();
+            return tex;
         }
 
         private static void MakeMarkerLight(Transform parent, string name, Vector3 localPos)
@@ -193,7 +241,7 @@ namespace CVRFury.Builder.Convert
 
         /// <summary>Bake DPS orifice lights for sockets that don't already have a DPS light rig nearby.
         /// Returns a human-readable report.</summary>
-        public static string AutoBake(GameObject avatar)
+        public static string AutoBake(GameObject avatar, bool addToggle = true)
         {
             if (avatar == null) return "Select your avatar first.";
             var sockets = Detect(avatar).Where(f => f.kind == "Socket").ToList();
@@ -209,15 +257,18 @@ namespace CVRFury.Builder.Convert
                 bool hasLights = s.transform.GetComponentsInChildren<Light>(true)
                     .Any(l => l.type == LightType.Point && Mathf.Abs(l.range - DpsOrificeRange) < 0.01f);
                 if (hasLights) { skipped++; continue; }
-                GenerateDpsOrifice(s.transform);
+                GenerateDpsOrifice(s.transform, addToggle: addToggle);
                 baked++;
             }
 
             if (baked == 0)
                 return $"All {skipped} socket(s) already have DPS lights — nothing to add.\n" +
                        "Next: Step 3 — pick the plug mesh and click \"Enable deformation\".";
+            var toggleNote = addToggle
+                ? " Each is OFF by default with its own menu toggle, so no deformation until the wearer turns it on."
+                : "";
             return $"Done — added DPS orifice lights to {baked} socket(s)" +
-                   (skipped > 0 ? $" ({skipped} already had them)" : "") + ".\n" +
+                   (skipped > 0 ? $" ({skipped} already had them)" : "") + "." + toggleNote + "\n" +
                    "Next: Step 3 — pick the plug mesh and click \"Enable deformation\".";
         }
 
