@@ -16,8 +16,9 @@ namespace CVRFury.Components
     {
         public override string FeatureTitle => "Toggle";
 
-        [Tooltip("Where the control appears in the in-game Advanced Settings menu, e.g. \"Clothing/Hat\". " +
-                 "Slashes create submenus.")]
+        [Tooltip("The label this control shows under ChilloutVR's Advanced Settings. CVR's menu is a single " +
+                 "flat list (no real submenus), so this is just the display name. Leave blank to use this " +
+                 "GameObject's name.")]
         public string menuPath = "";
 
         [Tooltip("Optional. The synced parameter (machine) name. Leave blank to auto-generate a unique one.")]
