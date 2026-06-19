@@ -4,6 +4,15 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.21] - 2026-06-16
+
+### Added
+- **Auto viseme mapping in Step 0 (Avatar basics).** CVRFury now copies VRChat's 15 viseme blendshapes
+  straight onto the CVRAvatar, so lip sync is fully set up without touching the CCK's "Auto Select
+  Visemes" button. This matters because clicking that button *after* the controller is built can make the
+  CCK regenerate the AAS animator and drop CVRFury's toggle/slider layers — the cause of "I added visemes
+  and the toggles stopped working." Do visemes via Step 0 and build the controller (Step 2) last.
+
 ## [0.9.20] - 2026-06-16
 
 ### Fixed

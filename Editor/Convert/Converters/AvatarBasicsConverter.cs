@@ -26,7 +26,17 @@ namespace CVRFury.Builder.Convert
             {
                 ctx.Cvr.SetFaceMesh(faceMesh);
                 ctx.Cvr.SetUseVisemes(true);
-                ctx.Log.Info("Viseme face mesh assigned; CVR will auto-map visemes from it.");
+
+                // Auto-map the 15 viseme blendshapes from VRChat's descriptor so the user never has to click
+                // the CCK's "Auto Select Visemes" button — doing that after the controller is built can make
+                // the CCK regenerate the AAS animator and drop CVRFury's toggle/slider layers.
+                var vrcVisemes = Reflect.GetField(d, VrcNames.Desc_VisemeBlendShapes) as string[];
+                int n = ctx.Cvr.SetVisemeBlendshapes(vrcVisemes);
+                if (n > 0)
+                    ctx.Log.Info($"Viseme face mesh assigned and {n} viseme blendshape(s) auto-mapped from VRChat.");
+                else
+                    ctx.Log.Info("Viseme face mesh assigned. Could not auto-map viseme blendshapes " +
+                                 "(VRChat descriptor had none, or the CCK field differs) — set them in the CVRAvatar inspector if visemes look wrong.");
             }
 
             var eye = Reflect.GetField(d, VrcNames.Desc_EyeLook);

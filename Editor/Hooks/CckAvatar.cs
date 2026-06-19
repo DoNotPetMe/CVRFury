@@ -358,6 +358,22 @@ namespace CVRFury.Builder
         public void SetViewPosition(Vector3 v) => Reflect.SetField(Component, CckNames.Avatar_ViewPosition, v);
         public void SetVoicePosition(Vector3 v) => Reflect.SetField(Component, CckNames.Avatar_VoicePosition, v);
         public void SetFaceMesh(SkinnedMeshRenderer m) => Reflect.SetField(Component, CckNames.Avatar_FaceMesh, m);
+
+        /// <summary>Populate CVR's 15 viseme blendshape slots from VRChat's <c>VisemeBlendShapes</c> array.
+        /// Both use the same canonical 15-viseme order (sil, PP, FF, TH, DD, kk, CH, SS, nn, RR, aa, E, ih,
+        /// oh, ou), so we copy 1:1. This replaces the CCK's "Auto Select Visemes" button, which — clicked
+        /// after the controller was built — could regenerate the AAS animator and drop CVRFury's toggle
+        /// layers. Returns the number of slots written, or -1 if the CVRAvatar has no such field.</summary>
+        public int SetVisemeBlendshapes(string[] vrcVisemes)
+        {
+            if (vrcVisemes == null || vrcVisemes.Length == 0) return 0;
+            var current = Reflect.GetField(Component, CckNames.Avatar_VisemeBlendshapes) as string[];
+            // Preserve CVR's array length (15) if it exists; otherwise mirror VRChat's.
+            int len = current != null && current.Length > 0 ? current.Length : vrcVisemes.Length;
+            var dst = new string[len];
+            for (int i = 0; i < len; i++) dst[i] = i < vrcVisemes.Length ? vrcVisemes[i] : "";
+            return Reflect.SetField(Component, CckNames.Avatar_VisemeBlendshapes, dst) ? len : -1;
+        }
         public void SetUseBlink(bool b) => Reflect.SetField(Component, CckNames.Avatar_UseBlinkBlendshapes, b);
         public void SetUseVisemes(bool b) => Reflect.SetField(Component, CckNames.Avatar_UseVisemeLipsync, b);
         public void SetUseEyeMovement(bool b) => Reflect.SetField(Component, CckNames.Avatar_UseEyeMovement, b);

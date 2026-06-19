@@ -20,7 +20,7 @@ namespace CVRFury.Builder
         /// <summary>CVRFury package version, surfaced in the conversion/build log so you can confirm at
         /// a glance which build actually ran (a stale recompile is the usual cause of "same issue").
         /// Keep in sync with package.json.</summary>
-        public const string CvrFuryVersion = "0.9.20";
+        public const string CvrFuryVersion = "0.9.21";
 
         // --- Build pipeline (editor) ---
         // Static UnityEvent&lt;GameObject&gt; fields that the CCK fires immediately before it
@@ -128,6 +128,7 @@ namespace CVRFury.Builder
         public const string Avatar_ViewPosition = "viewPosition";   // Vector3
         public const string Avatar_VoicePosition = "voicePosition"; // Vector3
         public const string Avatar_FaceMesh = "bodyMesh";           // SkinnedMeshRenderer used for visemes/blink
+        public const string Avatar_VisemeBlendshapes = "visemeBlendshapes"; // string[15] — viseme blendshape names, canonical order
         public const string Avatar_UseBlinkBlendshapes = "useBlinkBlendshapes"; // bool
         public const string Avatar_UseVisemeLipsync = "useVisemeLipsync";       // bool
         public const string Avatar_UseEyeMovement = "useEyeMovement";           // bool
