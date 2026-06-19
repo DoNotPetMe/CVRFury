@@ -29,6 +29,7 @@ namespace CVRFury.Builder.Convert
         private bool _reviewMatches;
         private List<ToggleClipLinker.Assignment> _reviewRows;
         private string _rowSearch = "";
+        private int _rowFilter; // 0 All · 1 Found · 2 Guessed · 3 None · 4 Changed
         private Vector2 _rowScroll;
 
         // PhysBones
@@ -175,21 +176,40 @@ namespace CVRFury.Builder.Convert
 
         private void DrawReviewList()
         {
-            int matched = 0, guessed = 0, none = 0;
-            foreach (var r in _reviewRows) { if (r.state == 0) matched++; else if (r.state == 1) guessed++; else none++; }
-            EditorGUILayout.LabelField($"{matched} matched · {guessed} guessed · {none} no clip", EditorStyles.miniBoldLabel);
+            int matched = 0, guessed = 0, none = 0, changed = 0;
+            foreach (var r in _reviewRows)
+            {
+                if (r.state == 0) matched++; else if (r.state == 1) guessed++; else none++;
+                if (r.changed) changed++;
+            }
+            EditorGUILayout.LabelField($"{matched} matched · {guessed} guessed · {none} no clip · {changed} changed", EditorStyles.miniBoldLabel);
             EditorGUILayout.HelpBox("✔ exact match   ? best guess (check it!)   ✘ none found. Use the ⊙ picker or " +
                                     "drag a clip into a box to change it. ON = shown/enabled, OFF = hidden.", MessageType.None);
+
+            // Quick filter buttons.
+            _rowFilter = GUILayout.Toolbar(_rowFilter, new[]
+            {
+                $"All ({_reviewRows.Count})", $"Found ({matched})", $"Guessed ({guessed})",
+                $"None ({none})", $"Changed ({changed})"
+            });
             _rowSearch = EditorGUILayout.TextField("Search", _rowSearch);
             string q = (_rowSearch ?? "").Trim().ToLowerInvariant();
 
+            int shown = 0;
             _rowScroll = EditorGUILayout.BeginScrollView(_rowScroll, GUILayout.MinHeight(160), GUILayout.MaxHeight(340));
             for (int i = 0; i < _reviewRows.Count; i++)
             {
                 var row = _reviewRows[i];
+                // Category filter.
+                if (_rowFilter == 1 && row.state != 0) continue;
+                if (_rowFilter == 2 && row.state != 1) continue;
+                if (_rowFilter == 3 && row.state != 2) continue;
+                if (_rowFilter == 4 && !row.changed) continue;
+
                 var label = string.IsNullOrEmpty(row.display) ? row.machine : row.display;
                 if (q.Length > 0 && !(label ?? "").ToLowerInvariant().Contains(q) &&
                     !(row.machine ?? "").ToLowerInvariant().Contains(q)) continue;
+                shown++;
 
                 string mark = row.state == 0 ? "✔" : row.state == 1 ? "?" : "✘";
                 EditorGUILayout.LabelField($"{mark} {label}" + (row.isSlider ? "   (slider)" : ""), EditorStyles.boldLabel);
@@ -201,10 +221,13 @@ namespace CVRFury.Builder.Convert
                     {
                         row.on = newOn; row.off = newOff;
                         row.state = (newOn != null || newOff != null) ? 0 : 2; // a manual pick counts as resolved
+                        row.changed = true;
                         _reviewRows[i] = row;
                     }
                 }
             }
+            if (shown == 0)
+                EditorGUILayout.LabelField("Nothing matches this filter/search.", EditorStyles.centeredGreyMiniLabel);
             EditorGUILayout.EndScrollView();
 
             using (new EditorGUI.DisabledScope(_avatar == null))

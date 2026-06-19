@@ -1,7 +1,7 @@
 {
   "name": "com.donotpetme.cvrfury",
   "displayName": "CVRFury",
-  "version": "0.9.26",
+  "version": "0.9.27",
   "unity": "2021.3",
   "description": "Non-destructive avatar tooling for ChilloutVR. CVRFury brings VRCFury-style features (Toggles, Full Controller merging, Armature Link, Blendshape Link, Object State, and more) to the ChilloutVR Content Creation Kit (CCK). Configure features as components on your avatar; CVRFury bakes them into the avatar's Advanced Avatar Settings and animators automatically at build/upload time, leaving your source scene untouched.",
   "author": {

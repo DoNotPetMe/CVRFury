@@ -273,6 +273,7 @@ namespace CVRFury.Builder.Convert
             public string machine;
             public bool isSlider;
             public int state;
+            public bool changed;
             public AnimationClip on;
             public AnimationClip off;
         }
