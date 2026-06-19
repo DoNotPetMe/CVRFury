@@ -48,7 +48,7 @@ namespace CVRFury.Builder.Convert
         private bool _removeFinalIK = true;
 
         private bool _s0, _s1 = true, _s2 = true, _se, _s3, _s4, _s5, _sSps, _sCredits;
-        private bool _creditsBounce = true;
+        private double _bounceA = -100, _bounceB = -100; // last click time per name (bounce decays from it)
 
         // SPS / DPS (experimental)
         private Transform _spsPlug;
@@ -272,6 +272,8 @@ namespace CVRFury.Builder.Convert
             }
         }
 
+        private const float BounceDuration = 1.6f; // seconds a name bounces after being clicked
+
         private void StepCredits()
         {
             EditorGUILayout.Space(6);
@@ -279,36 +281,41 @@ namespace CVRFury.Builder.Convert
             if (!_sCredits) return;
             using (new EditorGUI.IndentLevelScope())
             {
-                EditorGUILayout.LabelField("Made in ChilloutVR by", EditorStyles.centeredGreyMiniLabel);
+                EditorGUILayout.LabelField("Made by  (click a name to make it bounce)", EditorStyles.centeredGreyMiniLabel);
 
+                var style = new GUIStyle(EditorStyles.boldLabel) { alignment = TextAnchor.MiddleCenter, fontSize = 14 };
                 var row = GUILayoutUtility.GetRect(0, 36, GUILayout.ExpandWidth(true));
-                float amp = _creditsBounce ? 9f : 0f;
-                float phase = (float)EditorApplication.timeSinceStartup * 6f;
-                var style = new GUIStyle(EditorStyles.boldLabel)
-                {
-                    alignment = TextAnchor.MiddleCenter,
-                    fontSize = 14,
-                    richText = true,
-                };
-
+                double now = EditorApplication.timeSinceStartup;
                 float half = row.width * 0.5f;
-                DrawBouncyName(new Rect(row.x, row.y, half, row.height), "DoNotPetMe", phase, amp, style);
-                DrawBouncyName(new Rect(row.x + half, row.y, half, row.height), "--Stardust--", phase + 1.3f, amp, style);
+                bool animating = false;
 
-                EditorGUILayout.LabelField(
-                    _creditsBounce ? "(click a name to stop the bounce)" : "thanks for using CVRFury ♥",
-                    EditorStyles.centeredGreyMiniLabel);
+                if (DrawBouncyName(new Rect(row.x, row.y, half, row.height), "DoNotPetMe", now, _bounceA, style, ref animating))
+                    _bounceA = now;
+                if (DrawBouncyName(new Rect(row.x + half, row.y, half, row.height), "--Stardust--", now, _bounceB, style, ref animating))
+                    _bounceB = now;
 
-                if (_creditsBounce) Repaint(); // keep the bounce animating until a name is clicked
+                EditorGUILayout.LabelField("--Stardust-- in CVR", EditorStyles.centeredGreyMiniLabel);
+
+                if (animating) Repaint(); // only redraw while a name is mid-bounce; idle otherwise
             }
         }
 
-        private void DrawBouncyName(Rect area, string label, float phase, float amp, GUIStyle style)
+        /// <summary>Draws a name that sits still until clicked, then bounces with a decaying amplitude and
+        /// settles on its own. Returns true the frame it's clicked; sets <paramref name="animating"/> while
+        /// it's still moving.</summary>
+        private bool DrawBouncyName(Rect area, string label, double now, double clickTime, GUIStyle style, ref bool animating)
         {
-            float yOff = Mathf.Abs(Mathf.Sin(phase)) * amp;
-            var r = new Rect(area.x, area.y + area.height - 22f - yOff, area.width, 22f);
+            float elapsed = (float)(now - clickTime);
+            float amp = 0f;
+            if (elapsed >= 0f && elapsed < BounceDuration)
+            {
+                float decay = 1f - elapsed / BounceDuration;            // ease out to rest
+                amp = Mathf.Abs(Mathf.Sin(elapsed * 14f)) * 11f * decay; // a few quick hops, shrinking
+                animating = true;
+            }
+            var r = new Rect(area.x, area.y + area.height - 22f - amp, area.width, 22f);
             EditorGUIUtility.AddCursorRect(r, MouseCursor.Link);
-            if (GUI.Button(r, label, style)) _creditsBounce = false;
+            return GUI.Button(r, label, style);
         }
 
         private void StepSps()

@@ -4,11 +4,17 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.33] - 2026-06-16
+
+### Changed
+- **Credits footer corrected.** Now reads "Made by **DoNotPetMe** / **--Stardust--**" with "--Stardust-- in
+  CVR" underneath. The bounce is now click-triggered: names sit still until you click one, then that name
+  bounces with a decaying amplitude and settles on its own (no more constant bouncing).
+
 ## [0.9.32] - 2026-06-16
 
 ### Added
-- **♥ Credits footer** at the bottom of the CVRFury window: "Made in ChilloutVR by **DoNotPetMe** /
-  **--Stardust--**", with both names doing a little bounce. Clicking either name stops the bounce.
+- **♥ Credits footer** at the bottom of the CVRFury window.
 
 ## [0.9.31] - 2026-06-16
 
