@@ -4,6 +4,16 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.34] - 2026-06-16
+
+### Changed
+- **SPS/DPS section rewritten as a clear ordered walkthrough.** It now spells out the SPS-only path: (1)
+  detect, (2) bake DPS orifice lights at your socket(s) — no template needed, (3) enable light-based
+  deformation on the plug's material (Poiyomi "Penetration Deformation" or the Raliv DPS shader), (4) test
+  in CVR. The "clone a working orifice" option is now clearly marked as an alternative for avatars that
+  already have a DPS rig, not the starting point. Removed the leftover plug-tip picker from the old
+  contact-conversion idea.
+
 ## [0.9.33] - 2026-06-16
 
 ### Changed
