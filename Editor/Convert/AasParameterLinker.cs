@@ -106,7 +106,6 @@ namespace CVRFury.Builder.Convert
                     {
                         var p = ParamName(control);
                         if (string.IsNullOrEmpty(p) || !seen.Add(p)) break;
-                        bool on = defaults.TryGetValue(p, out var d) && d.def != 0f;
 
                         var targets = new List<(GameObject, string)>();
                         var tf = FindTarget(index, p, name);
@@ -116,6 +115,12 @@ namespace CVRFury.Builder.Convert
                             matched++;
                         }
                         else unmatched.Add($"{name}   →   {p}");
+
+                        // Match the Unity scene: when we found the object this toggle controls, default it
+                        // to that object's current active state, so clothing/accessories enabled in the scene
+                        // load enabled in CVR (instead of always reverting to the VRChat parameter default).
+                        bool paramDef = defaults.TryGetValue(p, out var d) && d.def != 0f;
+                        bool on = tf != null ? tf.gameObject.activeSelf : paramDef;
 
                         if (cvr.AddGameObjectToggle(name, p, on, targets)) toggles++;
                         break;

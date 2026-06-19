@@ -4,6 +4,16 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.22] - 2026-06-16
+
+### Changed
+- **Toggle defaults now follow the Unity scene** where possible. When the parameter linker finds the
+  GameObject a toggle controls, the toggle's Default Value is taken from that object's current active
+  state in the scene (so clothing/accessories you have enabled in Unity load enabled in CVR), instead of
+  always using the VRChat parameter default. Toggles whose target object isn't found (e.g. clip-only
+  toggles on packed meshes) still fall back to the VRChat default — use the upcoming manual override to
+  fix any of those by hand.
+
 ## [0.9.21] - 2026-06-16
 
 ### Added
