@@ -24,7 +24,31 @@ namespace CVRFury.Builder
         {
             if (c == null) return false;
             var names = new HashSet<string>(c.parameters.Select(p => p.name));
-            return names.Contains("MovementX") && names.Contains("MovementY") && names.Contains("Grounded");
+            if (!(names.Contains("MovementX") && names.Contains("MovementY") && names.Contains("Grounded")))
+                return false;
+            // Parameters alone aren't enough: the avatar still motorbikes if nothing actually consumes them
+            // (e.g. the locomotion blend tree was dropped when the animator was regenerated). Require a real
+            // locomotion blend tree so the "Fix" button stops reporting a broken controller as healthy.
+            return c.layers.Any(l => l.stateMachine != null && StateMachineDrivesLocomotion(l.stateMachine));
+        }
+
+        private static bool StateMachineDrivesLocomotion(AnimatorStateMachine sm)
+        {
+            foreach (var cs in sm.states)
+                if (cs.state.motion is BlendTree bt && BlendTreeDrivesLocomotion(bt)) return true;
+            foreach (var sub in sm.stateMachines)
+                if (sub.stateMachine != null && StateMachineDrivesLocomotion(sub.stateMachine)) return true;
+            return false;
+        }
+
+        private static bool BlendTreeDrivesLocomotion(BlendTree bt)
+        {
+            if (bt.blendParameter == "MovementX" || bt.blendParameter == "MovementY" ||
+                bt.blendParameterY == "MovementX" || bt.blendParameterY == "MovementY")
+                return true;
+            foreach (var ch in bt.children)
+                if (ch.motion is BlendTree child && BlendTreeDrivesLocomotion(child)) return true;
+            return false;
         }
 
         public static void ReassertLocomotion(GameObject root, BuildLog log)

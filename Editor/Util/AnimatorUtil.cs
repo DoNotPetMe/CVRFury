@@ -241,7 +241,7 @@ namespace CVRFury.Builder
         /// controller actually carries the parameter and animates.</summary>
         public static void AddBoolToggleLayer(AnimatorController c, string layerName, string param,
                                               AnimationClip offClip, AnimationClip onClip, bool defaultOn,
-                                              AvatarMask mask = null)
+                                              AvatarMask mask = null, bool writeDefaults = false)
         {
             EnsureBoolParam(c, param, defaultOn);
 
@@ -260,10 +260,13 @@ namespace CVRFury.Builder
             var sm = c.layers[idx].stateMachine;
             var off = sm.AddState("Off");
             off.motion = offClip;
-            off.writeDefaultValues = false;
+            // For body-posing layers (emotes) writeDefaults=true lets the Off state release the muscles back
+            // to the locomotion layer instead of leaving this Override layer holding them at the bind pose —
+            // which is the "motorbike" freeze. Clothing toggles keep writeDefaults=false (mask-protected).
+            off.writeDefaultValues = writeDefaults;
             var on = sm.AddState("On");
             on.motion = onClip;
-            on.writeDefaultValues = false;
+            on.writeDefaultValues = writeDefaults;
             sm.defaultState = defaultOn ? on : off;
 
             var toOn = off.AddTransition(on);

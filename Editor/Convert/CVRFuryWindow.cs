@@ -602,7 +602,8 @@ namespace CVRFury.Builder.Convert
                     // Off state empty (lets CVR locomotion show), On state = the emote clip. Override layer,
                     // Bool-driven — so it only poses while toggled on. (Bypasses the clothing motorbike guard
                     // on purpose: posing the body is exactly what an emote should do, but only when on.)
-                    AnimatorUtil.AddBoolToggleLayer(controller, "CVRFury Emote: " + name, machine, null, clip, false);
+                    AnimatorUtil.AddBoolToggleLayer(controller, "CVRFury Emote: " + name, machine, null, clip,
+                                                    defaultOn: false, mask: null, writeDefaults: true);
                     existingParams.Add(machine);
                     added++;
                 }
