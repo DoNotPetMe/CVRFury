@@ -4,6 +4,16 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.52] - 2026-06-19
+
+### Fixed
+- **Emotes now survive CVR's upload regeneration (the "sometimes it uploads different" bug).** At upload CVR
+  rebuilds the AAS animator from the base controller + entries, which was wiping/rebuilding the emote layers
+  inconsistently (often as a motorbike pose). Emote parameters + layers are now written into the **base
+  controller** as well (when it's a safe per-avatar controller), so regeneration copies the correct layer and
+  skips rebuilding it — the upload matches the editor every time. Re-run "Add emote toggles" to apply; it
+  also repairs existing emote layers. (If no per-avatar base is found, it says so and points you to Step 2.)
+
 ## [0.9.51] - 2026-06-19
 
 ### Added

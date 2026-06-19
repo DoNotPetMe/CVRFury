@@ -644,7 +644,17 @@ namespace CVRFury.Builder.Convert
             if (controller == null)
                 return "No AAS controller attached yet — run step 2 (Build & attach a controller) first, then add emotes.";
 
-            var existingParams = new HashSet<string>(controller.parameters.Select(p => p.name));
+            // CVR regenerates the AAS animator at upload by COPYING the base controller and rebuilding a
+            // layer for every entry whose parameter the base does NOT already declare. So an emote layer that
+            // lives only in the generated animator gets wiped/rebuilt (CVR's version motorbikes) on some
+            // uploads but not others — the "sometimes it looks like Unity, sometimes not" bug. The cure is to
+            // put the emote parameter+layer in the BASE controller too: then regeneration copies our correct
+            // layer and SKIPS rebuilding it. We write to both so it's right whether or not CVR regenerates.
+            var baseController = Reflect.GetField(cvr.AdvancedSettings, CckNames.AdvancedSettings_BaseController) as AnimatorController;
+            bool baseUsable = IsWritablePerAvatarController(baseController) && baseController != controller;
+            var targets = new List<AnimatorController> { controller };
+            if (baseUsable) targets.Add(baseController);
+
             var existingMachines = new HashSet<string>();
             foreach (var e in cvr.SettingsList)
             {
@@ -658,7 +668,8 @@ namespace CVRFury.Builder.Convert
             // look right while moving but wrong (default/bind pose bleeding through) when idle.
             bool wd = AnimatorUtil.DetectWriteDefaults(controller);
             // Repair any emote layers already built with the wrong WriteDefaults from an earlier run.
-            int repaired = AnimatorUtil.SetWriteDefaultsForLayers(controller, "CVRFury Emote:", wd);
+            int repaired = 0;
+            foreach (var t in targets) repaired += AnimatorUtil.SetWriteDefaultsForLayers(t, "CVRFury Emote:", wd);
             // GoGoLoco (and similar) ship locomotion/system clips in the same folder as their emotes —
             // idle, AFK, stand, walk/run, jump, crouch, prone, fly, swim, sit/stand transitions. Added as
             // always-present override layers these pose the body at rest (the "motorbike" look), so skip
@@ -675,28 +686,36 @@ namespace CVRFury.Builder.Convert
                 if (System.Array.Exists(systemWords, w => lower.Contains(w))) { skipped.Add(name); continue; }
                 var machine = "Emote/" + name;
                 if (!existingMachines.Contains(machine)) { cvr.AddToggle(name, machine, false, false); existingMachines.Add(machine); }
-                // Keep the AAS entry consistent with the working clothing-toggle path: the entry carries the
-                // clip (on = pose, off = none) so the CCK sees a proper animation toggle, not an empty one.
                 var emoteEntry = cvr.SettingsList.Cast<object>().FirstOrDefault(e => CckAvatar.EntryMachineName(e) == machine);
-                if (emoteEntry != null) cvr.SetToggleClips(emoteEntry, clip, null);
-                if (!existingParams.Contains(machine))
-                {
-                    // Off state empty (lets CVR locomotion show), On state = the emote clip. Override layer,
-                    // Bool-driven — so it only poses while toggled on. (Bypasses the clothing motorbike guard
-                    // on purpose: posing the body is exactly what an emote should do, but only when on.)
-                    AnimatorUtil.AddBoolToggleLayer(controller, "CVRFury Emote: " + name, machine, null, clip,
-                                                    defaultOn: false, mask: null, writeDefaults: wd);
-                    existingParams.Add(machine);
-                    added++;
-                }
+                // If the base carries the layer, CVR skips SetupAnimator for this entry, so its clips are
+                // ignored — leave them off to avoid CVR ever building a competing full-body layer. If we
+                // couldn't use the base, fall back to the entry carrying the clip (old behaviour).
+                if (emoteEntry != null && !baseUsable) cvr.SetToggleClips(emoteEntry, clip, null);
+
+                bool builtAny = false;
+                foreach (var t in targets)
+                    if (!t.parameters.Any(p => p.name == machine))
+                    {
+                        // Off state empty (lets CVR locomotion show), On state = the emote clip. Override
+                        // layer, Bool-driven — poses the body only while toggled on.
+                        AnimatorUtil.AddBoolToggleLayer(t, "CVRFury Emote: " + name, machine, null, clip,
+                                                        defaultOn: false, mask: null, writeDefaults: wd);
+                        builtAny = true;
+                    }
+                if (builtAny) added++;
             }
 
-            EditorUtility.SetDirty(controller);
+            foreach (var t in targets) EditorUtility.SetDirty(t);
             AssetDatabase.SaveAssets();
             cvr.Persist();
             var msg = $"Added {added} emote toggle(s) (WriteDefaults {(wd ? "on" : "off")}, matching this " +
                    "controller). Each plays its clip while toggled ON and returns to normal movement when OFF. " +
                    "Toggle one at a time (two emotes on at once will fight).";
+            msg += baseUsable
+                ? "\nWritten into the base controller too, so it survives CVR's upload regeneration — the upload " +
+                  "should now match what you see in Unity, every time."
+                : "\nNote: couldn't find a per-avatar base controller to harden against CVR's upload " +
+                  "regeneration — re-run Step 2 (Build & attach a controller) so emotes upload consistently.";
             if (repaired > 0)
                 msg += $"\nFixed WriteDefaults on {repaired} existing emote state(s) — that's the cause of an " +
                        "emote looking wrong when idle but snapping right when you move.";
@@ -708,6 +727,19 @@ namespace CVRFury.Builder.Convert
         }
 
         // --- helpers ---
+
+        /// <summary>True if the controller is a project asset we may safely add layers to — i.e. a per-avatar
+        /// controller, not ChilloutVR's shared stock AvatarAnimator (which lives under a CCK/Packages folder
+        /// and must never be edited, since every avatar shares it).</summary>
+        private static bool IsWritablePerAvatarController(AnimatorController c)
+        {
+            if (c == null) return false;
+            var path = AssetDatabase.GetAssetPath(c);
+            if (string.IsNullOrEmpty(path) || !path.StartsWith("Assets/")) return false;
+            var lower = path.ToLowerInvariant();
+            return !lower.Contains("/cck/") && !lower.Contains("cvr.cck") && !lower.Contains("abi.cck");
+        }
+
         private string RunAndRefresh(System.Func<string> action)
         {
             string result;
