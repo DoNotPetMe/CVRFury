@@ -52,6 +52,7 @@ namespace CVRFury.Builder.Convert
         // SPS / DPS (experimental)
         private Transform _spsPlug;
         private Transform _spsSocket;
+        private Transform _spsTemplate;
 
         [MenuItem("Tools/CVRFury/CVRFury", false, 0)]
         public static void Open()
@@ -290,10 +291,28 @@ namespace CVRFury.Builder.Convert
                 _spsPlug = (Transform)EditorGUILayout.ObjectField(new GUIContent("Plug (penetrator) tip",
                     "The transform at the tip of the plug — becomes a CVRPointer when conversion is enabled."),
                     _spsPlug, typeof(Transform), true);
-                _spsSocket = (Transform)EditorGUILayout.ObjectField(new GUIContent("Socket (orifice)",
-                    "The orifice transform — becomes a CVRAdvancedAvatarSettingsTrigger when conversion is enabled."),
+                _spsSocket = (Transform)EditorGUILayout.ObjectField(new GUIContent("Socket (orifice) target",
+                    "Where you want an orifice on THIS avatar — the cloned DPS rig is placed here."),
                     _spsSocket, typeof(Transform), true);
-                EditorGUILayout.HelpBox("Conversion button appears once we lock the CVR target system.", MessageType.None);
+
+                EditorGUILayout.Space(4);
+                EditorGUILayout.LabelField("Get DPS deformation working in CVR (recommended)", EditorStyles.miniBoldLabel);
+                EditorGUILayout.HelpBox(
+                    "DPS bends the mesh via marker LIGHTS read by the penetrator's shader — and those render " +
+                    "in CVR, so DPS deformation works there (SPS doesn't: it finds sockets through VRChat " +
+                    "Contacts, which CVR lacks). The reliable path is to copy a DPS orifice rig that already " +
+                    "works in CVR onto your socket location. Point 'Template' at a working DPS orifice and " +
+                    "'Socket target' at where you want it here, then clone.", MessageType.Info);
+                _spsTemplate = (Transform)EditorGUILayout.ObjectField(new GUIContent("Working DPS orifice (template)",
+                    "A DPS orifice (with its marker lights) from an avatar where DPS already works in CVR."),
+                    _spsTemplate, typeof(Transform), true);
+                using (new EditorGUI.DisabledScope(_spsTemplate == null || _spsSocket == null))
+                    if (GUILayout.Button("Clone DPS orifice → socket target"))
+                        RunAndRefresh(() => SpsConverter.CloneOrifice(_spsTemplate, _spsSocket));
+
+                EditorGUILayout.HelpBox("Plug side: keep the penetrator's DPS-capable shader (Raliv DPS, or " +
+                    "Poiyomi with penetration-deform enabled). CVRFury never strips lights or shaders, so an " +
+                    "existing DPS plug carries over as-is. SPS→DPS auto-bake is the next step.", MessageType.None);
             }
         }
 

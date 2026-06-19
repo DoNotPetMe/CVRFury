@@ -4,6 +4,17 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.30] - 2026-06-16
+
+### Added
+- **SPS/DPS: clone a working DPS orifice onto a socket (gets real deformation working in CVR).** DPS bends
+  the mesh through marker point-lights read by the penetrator's shader, and those render in CVR — which is
+  why DPS works there and SPS (which finds sockets via VRChat Contacts) doesn't. The new "Clone DPS orifice
+  → socket target" button copies a known-working DPS orifice rig (lights and all) onto a chosen socket
+  location, so an SPS-only avatar gets working deformation without hand-encoding Raliv's exact light codes.
+  Confirmed CVRFury's strip step never removes lights or shaders, so existing DPS plugs/orifices carry over
+  untouched. SPS→DPS auto-bake is the next step.
+
 ## [0.9.29] - 2026-06-16
 
 ### Added

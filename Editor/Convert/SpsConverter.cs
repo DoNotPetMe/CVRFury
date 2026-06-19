@@ -146,5 +146,35 @@ namespace CVRFury.Builder.Convert
 
         private static string Path(Transform root, Transform t) =>
             t == null ? "(null)" : UnityEditor.AnimationUtility.CalculateTransformPath(t, root);
+
+        /// <summary>
+        /// Transplant a known-working DPS orifice light-rig onto a new socket location. DPS deformation is
+        /// driven entirely by marker point-lights read by the penetrator's shader, and those render in CVR
+        /// exactly as in VRChat — so copying a rig that already works is the most reliable way to give an
+        /// SPS-only avatar real, working deformation without hand-encoding Raliv's light intensity/range
+        /// codes (which must be exact or the shader won't detect the orifice).
+        /// </summary>
+        public static string CloneOrifice(Transform template, Transform target)
+        {
+            if (template == null || target == null)
+                return "Assign BOTH a working DPS orifice (template — from an avatar where DPS already works " +
+                       "in CVR) and a target socket location on this avatar.";
+
+            var copy = Object.Instantiate(template.gameObject);
+            copy.name = template.name + " (CVR DPS)";
+            copy.transform.SetParent(target, worldPositionStays: false);
+            copy.transform.localPosition = Vector3.zero;
+            copy.transform.localRotation = Quaternion.identity;
+            copy.transform.localScale = Vector3.one;
+            UnityEditor.Undo.RegisterCreatedObjectUndo(copy, "Clone DPS orifice");
+            UnityEditor.Selection.activeGameObject = copy;
+
+            int lights = copy.GetComponentsInChildren<Light>(true).Length;
+            return $"Cloned DPS orifice '{template.name}' onto '{target.name}' ({lights} marker light(s) copied). " +
+                   "It sits at the target's origin — nudge its position/rotation so the opening faces outward, " +
+                   "then test in CVR with a DPS-shader penetrator. Because the marker lights are copied from a " +
+                   "working rig, the deformation should behave just like the source.";
+        }
+
     }
 }
