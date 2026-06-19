@@ -215,10 +215,10 @@ namespace CVRFury.Builder.Convert
 
             if (baked == 0)
                 return $"All {skipped} socket(s) already have DPS lights — nothing to add.\n" +
-                       "Next: Step 3 — switch the plug's shader.";
+                       "Next: Step 3 — pick the plug mesh and click \"Enable deformation\".";
             return $"Done — added DPS orifice lights to {baked} socket(s)" +
                    (skipped > 0 ? $" ({skipped} already had them)" : "") + ".\n" +
-                   "Next: Step 3 — switch the plug's shader, then test in CVR.";
+                   "Next: Step 3 — pick the plug mesh and click \"Enable deformation\".";
         }
 
         /// <summary>
@@ -302,9 +302,10 @@ namespace CVRFury.Builder.Convert
             }
             else
             {
-                sb.Append("No penetration-deform property exists on this shader. Either it's not a DPS/SPS " +
-                          "shader, or (Poiyomi Pro) the \"Penetration Deformation\" module isn't added to the " +
-                          "material yet. Tell me the shader name above and I'll wire it up.");
+                sb.Append($"Couldn't auto-enable: no penetration-deform toggle exists on {string.Join(", ", shaders)}. " +
+                          "Either it's not a DPS/SPS shader, or (Poiyomi Pro) the \"Penetration Deformation\" " +
+                          "module isn't added to this material yet.\n" +
+                          $"Next: send me this exact shader name — \"{string.Join("\", \"", shaders)}\" — and I'll wire it up.");
             }
             return sb.ToString();
         }

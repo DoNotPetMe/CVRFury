@@ -335,7 +335,7 @@ namespace CVRFury.Builder.Convert
                 EditorGUILayout.LabelField("Step 1 — Find the parts", EditorStyles.boldLabel);
                 using (new EditorGUI.DisabledScope(_avatar == null))
                     if (GUILayout.Button("Detect plugs & sockets"))
-                        _spsStatus = RunAndRefresh(() => SpsConverter.DetectReport(_avatar));
+                        RunSps(() => SpsConverter.DetectReport(_avatar));
 
                 // Step 2 — Bake orifice lights
                 EditorGUILayout.Space(6);
@@ -343,17 +343,17 @@ namespace CVRFury.Builder.Convert
                 EditorGUILayout.LabelField("Creates the marker lights the plug bends toward.", EditorStyles.wordWrappedMiniLabel);
                 using (new EditorGUI.DisabledScope(_avatar == null))
                     if (GUILayout.Button("Add to every socket found"))
-                        _spsStatus = RunAndRefresh(() => SpsConverter.AutoBake(_avatar));
+                        RunSps(() => SpsConverter.AutoBake(_avatar));
                 _spsSocket = (Transform)EditorGUILayout.ObjectField(new GUIContent("Or one spot",
                     "Pick the transform where you want a single orifice; the DPS lights are placed here."),
                     _spsSocket, typeof(Transform), true);
                 using (new EditorGUI.DisabledScope(_spsSocket == null))
                     if (GUILayout.Button("Add to this spot"))
-                        _spsStatus = RunAndRefresh(() =>
+                        RunSps(() =>
                         {
                             SpsConverter.GenerateDpsOrifice(_spsSocket);
                             return $"Done — added DPS orifice lights at '{_spsSocket.name}'.\n" +
-                                   "Next: rotate it so the opening faces outward, then do Step 3.";
+                                   "Next: rotate it so the opening faces outward, then Step 3 — enable the plug's deformation.";
                         });
 
                 // Step 3 — Turn on deformation on the plug
@@ -365,7 +365,7 @@ namespace CVRFury.Builder.Convert
                     "The object holding the penetrator's mesh/material."), _spsPlug, typeof(Transform), true);
                 using (new EditorGUI.DisabledScope(_spsPlug == null))
                     if (GUILayout.Button("Enable deformation on this plug"))
-                        _spsStatus = RunAndRefresh(() => SpsConverter.SetupPlugShader(_spsPlug));
+                        RunSps(() => SpsConverter.SetupPlugShader(_spsPlug));
                 EditorGUILayout.LabelField("If the shader has no such toggle, the status tells you what to do.",
                     EditorStyles.wordWrappedMiniLabel);
 
@@ -389,7 +389,7 @@ namespace CVRFury.Builder.Convert
                             EditorStyles.wordWrappedMiniLabel);
                         using (new EditorGUI.DisabledScope(_spsTemplate == null || _spsSocket == null))
                             if (GUILayout.Button("Copy orifice → chosen spot"))
-                                _spsStatus = RunAndRefresh(() => SpsConverter.CloneOrifice(_spsTemplate, _spsSocket));
+                                RunSps(() => SpsConverter.CloneOrifice(_spsTemplate, _spsSocket));
                     }
             }
         }
@@ -622,6 +622,15 @@ namespace CVRFury.Builder.Convert
             Selection.activeObject = null;
             EditorApplication.delayCall += () => { if (target != null) Selection.activeObject = target; Repaint(); };
             return _log;
+        }
+
+        /// <summary>Runs an SPS/DPS action and shows its result ONLY in the section's inline status box —
+        /// it deliberately does not touch the shared Log box at the bottom of the window.</summary>
+        private void RunSps(System.Func<string> action)
+        {
+            try { _spsStatus = action() ?? ""; }
+            catch (System.Exception ex) { _spsStatus = "Error: " + ex.Message; Debug.LogException(ex); }
+            Repaint();
         }
 
         private static bool Foldout(bool state, string label)

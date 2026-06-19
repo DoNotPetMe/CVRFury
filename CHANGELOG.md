@@ -4,6 +4,15 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.37] - 2026-06-16
+
+### Changed
+- **SPS/DPS buttons now use only the clean inline status box** — they no longer also dump into the shared
+  Log box at the bottom, so each action's result shows in one place right under the buttons.
+- **Step 3 result is explicit about the shader.** On success it names the shader and the exact property it
+  toggled ("set _EnablePenetration = 1"); when it can't, it prints the exact shader name to send back for
+  wiring. Fixed stale "Next: switch the plug's shader" text — it now points at the Step 3 button.
+
 ## [0.9.36] - 2026-06-16
 
 ### Added
