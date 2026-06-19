@@ -272,10 +272,20 @@ namespace CVRFury.Builder.Convert
             public string display;
             public string machine;
             public bool isSlider;
+            public bool native;   // CVR drives GameObjects directly — no clip needed (and a clip would break it)
             public int state;
             public bool changed;
             public AnimationClip on;
             public AnimationClip off;
+        }
+
+        /// <summary>True if a toggle's settings already drive GameObjects directly (CVR-native targets).
+        /// Such a toggle works without any clip; assigning one flips it into animation-clip mode and breaks
+        /// the native object toggle.</summary>
+        private static bool HasTargets(object toggleSettings)
+        {
+            var list = Reflect.GetField(toggleSettings, CckNames.Setting_GameObjectTargets) as System.Collections.IList;
+            return list != null && list.Count > 0;
         }
 
         /// <summary>Compute, without changing anything, what clips pair to each toggle/slider. Exact
@@ -300,10 +310,21 @@ namespace CVRFury.Builder.Convert
                 var machine = CckAvatar.EntryMachineName(entry) ?? "";
                 if (string.IsNullOrEmpty(machine)) continue;
                 bool isSlider = Reflect.GetField(entry, CckNames.Entry_SliderSettings) != null;
-                bool isToggle = Reflect.GetField(entry, CckNames.Entry_ToggleSettings) != null;
+                var toggleObj = Reflect.GetField(entry, CckNames.Entry_ToggleSettings);
+                bool isToggle = toggleObj != null;
                 if (!isSlider && !isToggle) continue; // dropdowns etc. aren't clip-paired here
 
                 var name = CckAvatar.EntryName(entry) ?? "";
+
+                // A toggle that already drives GameObjects directly (CVR-native) works without any clip —
+                // assigning one would flip it into animation-clip mode and break it. Mark it native and leave
+                // its clips empty so Apply never touches it (unless the user assigns one by hand).
+                if (isToggle && HasTargets(toggleObj))
+                {
+                    rows.Add(new Assignment { display = name, machine = machine, native = true, state = 0 });
+                    continue;
+                }
+
                 string keyName = Norm(name), keyLeaf = Norm(Leaf(machine));
                 string hit = pairs.ContainsKey(keyName) ? keyName : (pairs.ContainsKey(keyLeaf) ? keyLeaf : null);
                 var a = new Assignment { display = name, machine = machine, isSlider = isSlider, state = 2 };

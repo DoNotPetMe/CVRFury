@@ -4,6 +4,17 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.28] - 2026-06-16
+
+### Fixed
+- **Smart-match review no longer breaks CVR-native object toggles.** Toggles that switch GameObjects
+  directly (CVR's native object toggles — the kind that make the avatar look exactly like the Unity scene)
+  work without any animation clip. The fuzzy matcher was assigning them a guessed clip, and applying a clip
+  flips a toggle into animation-clip mode, which overrode and broke the native toggle ("nothing toggles in
+  game"). The review now detects these, marks them **● object toggle (no clip needed)**, and never
+  auto-assigns a clip to them (you can still drop one in by hand if you really want). They're counted under
+  the "Found" filter.
+
 ## [0.9.27] - 2026-06-16
 
 ### Added

@@ -176,20 +176,21 @@ namespace CVRFury.Builder.Convert
 
         private void DrawReviewList()
         {
-            int matched = 0, guessed = 0, none = 0, changed = 0;
+            int matched = 0, guessed = 0, none = 0, changed = 0, nativeCount = 0;
             foreach (var r in _reviewRows)
             {
-                if (r.state == 0) matched++; else if (r.state == 1) guessed++; else none++;
+                if (r.native) nativeCount++; else if (r.state == 0) matched++; else if (r.state == 1) guessed++; else none++;
                 if (r.changed) changed++;
             }
-            EditorGUILayout.LabelField($"{matched} matched · {guessed} guessed · {none} no clip · {changed} changed", EditorStyles.miniBoldLabel);
-            EditorGUILayout.HelpBox("✔ exact match   ? best guess (check it!)   ✘ none found. Use the ⊙ picker or " +
-                                    "drag a clip into a box to change it. ON = shown/enabled, OFF = hidden.", MessageType.None);
+            EditorGUILayout.LabelField($"{matched} matched · {guessed} guessed · {none} no clip · {nativeCount} object · {changed} changed", EditorStyles.miniBoldLabel);
+            EditorGUILayout.HelpBox("✔ exact match   ? best guess (check it!)   ✘ none found   ● object toggle (CVR " +
+                                    "toggles it directly — no clip needed). Use the ⊙ picker or drag a clip into a box " +
+                                    "to change it. ON = shown/enabled, OFF = hidden.", MessageType.None);
 
-            // Quick filter buttons.
+            // Quick filter buttons. "Found" includes native object toggles (state 0).
             _rowFilter = GUILayout.Toolbar(_rowFilter, new[]
             {
-                $"All ({_reviewRows.Count})", $"Found ({matched})", $"Guessed ({guessed})",
+                $"All ({_reviewRows.Count})", $"Found ({matched + nativeCount})", $"Guessed ({guessed})",
                 $"None ({none})", $"Changed ({changed})"
             });
             _rowSearch = EditorGUILayout.TextField("Search", _rowSearch);
@@ -211,8 +212,9 @@ namespace CVRFury.Builder.Convert
                     !(row.machine ?? "").ToLowerInvariant().Contains(q)) continue;
                 shown++;
 
-                string mark = row.state == 0 ? "✔" : row.state == 1 ? "?" : "✘";
-                EditorGUILayout.LabelField($"{mark} {label}" + (row.isSlider ? "   (slider)" : ""), EditorStyles.boldLabel);
+                string mark = row.native ? "●" : row.state == 0 ? "✔" : row.state == 1 ? "?" : "✘";
+                string tag = row.native ? "   (object toggle — no clip needed)" : row.isSlider ? "   (slider)" : "";
+                EditorGUILayout.LabelField($"{mark} {label}{tag}", EditorStyles.boldLabel);
                 using (new EditorGUI.IndentLevelScope())
                 {
                     var newOn = (AnimationClip)EditorGUILayout.ObjectField(row.isSlider ? "Max (1)" : "ON", row.on, typeof(AnimationClip), false);
