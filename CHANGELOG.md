@@ -4,6 +4,16 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.31] - 2026-06-16
+
+### Added
+- **SPS → DPS auto-bake (experimental).** Generates Raliv-DPS orifice marker lights from scratch — no
+  template needed — using the canonical DPS light encoding (point lights, Range 0.5, Intensity 0, plus a
+  forward "normal" light for orientation). Bake at the picked socket, or auto-bake at every detected socket
+  that doesn't already have a DPS rig. Because DPS deformation is light + shader driven, these render and
+  deform in CVR. The exact light codes are surfaced in the log and easy to calibrate: if deformation
+  doesn't trigger, report a known-good orifice's Range/Intensity and the constants will be tuned.
+
 ## [0.9.30] - 2026-06-16
 
 ### Added

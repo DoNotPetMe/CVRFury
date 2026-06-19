@@ -310,9 +310,27 @@ namespace CVRFury.Builder.Convert
                     if (GUILayout.Button("Clone DPS orifice → socket target"))
                         RunAndRefresh(() => SpsConverter.CloneOrifice(_spsTemplate, _spsSocket));
 
+                EditorGUILayout.Space(4);
+                EditorGUILayout.LabelField("Auto-bake (experimental — no template needed)", EditorStyles.miniBoldLabel);
+                EditorGUILayout.HelpBox("Generates Raliv-DPS orifice marker lights from scratch using the " +
+                    "canonical light codes. No template required, but VERIFY in CVR — if it doesn't deform, " +
+                    "tell me a working orifice's light Range/Intensity and I'll calibrate.", MessageType.None);
+                using (new EditorGUI.DisabledScope(_spsSocket == null))
+                    if (GUILayout.Button("Bake DPS orifice at socket target"))
+                        RunAndRefresh(() =>
+                        {
+                            SpsConverter.GenerateDpsOrifice(_spsSocket);
+                            return $"Baked a DPS orifice rig at '{_spsSocket.name}' " +
+                                   $"(Range={SpsConverter.DpsOrificeRange}, Intensity={SpsConverter.DpsOrificeIntensity}). " +
+                                   "Nudge it to face outward and give the plug a DPS shader; verify in CVR.";
+                        });
+                using (new EditorGUI.DisabledScope(_avatar == null))
+                    if (GUILayout.Button("Auto-bake DPS orifices at ALL detected sockets"))
+                        RunAndRefresh(() => SpsConverter.AutoBake(_avatar));
+
                 EditorGUILayout.HelpBox("Plug side: keep the penetrator's DPS-capable shader (Raliv DPS, or " +
                     "Poiyomi with penetration-deform enabled). CVRFury never strips lights or shaders, so an " +
-                    "existing DPS plug carries over as-is. SPS→DPS auto-bake is the next step.", MessageType.None);
+                    "existing DPS plug carries over as-is.", MessageType.None);
             }
         }
 

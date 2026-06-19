@@ -147,6 +147,79 @@ namespace CVRFury.Builder.Convert
         private static string Path(Transform root, Transform t) =>
             t == null ? "(null)" : UnityEditor.AnimationUtility.CalculateTransformPath(t, root);
 
+        // --- SPS → DPS auto-bake -------------------------------------------------------------------
+        // Raliv DPS marks an orifice with point LIGHTS that the penetrator's shader reads to bend the mesh.
+        // The canonical encoding (VERIFY against a known-working orifice and tell me if these differ — they
+        // must be exact or the shader ignores the orifice):
+        //   • Two point lights, Range = 0.5, Intensity = 0, at the orifice opening.
+        //   • The vector from the first light to the second (placed slightly along the orifice's forward)
+        //     gives the orifice orientation/depth direction.
+        // These render in CVR, so a baked orifice deforms a DPS-shader penetrator there just like in VRChat.
+        public const float DpsOrificeRange = 0.5f;
+        public const float DpsOrificeIntensity = 0f;
+        public const float DpsNormalOffset = 0.01f; // metres the direction light sits ahead of the entrance
+
+        /// <summary>Create a Raliv-DPS orifice marker (the light rig) at <paramref name="target"/> so a
+        /// DPS-shader penetrator deforms toward it in CVR. Experimental: the light codes are the documented
+        /// canonical values and may need calibration against a working orifice.</summary>
+        public static GameObject GenerateDpsOrifice(Transform target, string name = "DPS Orifice (CVRFury)")
+        {
+            if (target == null) return null;
+            var root = new GameObject(name);
+            UnityEditor.Undo.RegisterCreatedObjectUndo(root, "Bake DPS orifice");
+            root.transform.SetParent(target, worldPositionStays: false);
+            root.transform.localPosition = Vector3.zero;
+            root.transform.localRotation = Quaternion.identity;
+
+            MakeMarkerLight(root.transform, "DPS_Light", Vector3.zero);
+            MakeMarkerLight(root.transform, "DPS_Light_Normal", new Vector3(0f, 0f, DpsNormalOffset));
+            return root;
+        }
+
+        private static void MakeMarkerLight(Transform parent, string name, Vector3 localPos)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = localPos;
+            var l = go.AddComponent<Light>();
+            l.type = LightType.Point;
+            l.range = DpsOrificeRange;
+            l.intensity = DpsOrificeIntensity;
+            l.color = Color.black;
+            l.renderMode = LightRenderMode.ForceVertex;
+            l.shadows = LightShadows.None;
+        }
+
+        /// <summary>Bake DPS orifice lights for sockets that don't already have a DPS light rig nearby.
+        /// Returns a human-readable report.</summary>
+        public static string AutoBake(GameObject avatar)
+        {
+            if (avatar == null) return "Select your avatar first.";
+            var sockets = Detect(avatar).Where(f => f.kind == "Socket").ToList();
+            if (sockets.Count == 0)
+                return "No sockets detected to bake. Use 'Clone DPS orifice' with a working template instead, " +
+                       "or pick a socket transform and bake it directly.";
+
+            int baked = 0;
+            foreach (var s in sockets)
+            {
+                if (s.transform == null) continue;
+                // Skip if this socket already has DPS marker lights under it.
+                bool hasLights = s.transform.GetComponentsInChildren<Light>(true)
+                    .Any(l => l.type == LightType.Point && Mathf.Abs(l.range - DpsOrificeRange) < 0.01f);
+                if (hasLights) continue;
+                GenerateDpsOrifice(s.transform);
+                baked++;
+            }
+
+            return $"Baked {baked} DPS orifice light-rig(s) onto detected socket(s) " +
+                   $"(Range={DpsOrificeRange}, Intensity={DpsOrificeIntensity}, normal offset={DpsNormalOffset}m).\n" +
+                   "EXPERIMENTAL: these are the canonical Raliv DPS values — verify in CVR against a known-good " +
+                   "orifice. Nudge each rig so it faces outward, and give the penetrator a DPS-capable shader. " +
+                   "If deformation doesn't trigger, tell me the light Range/Intensity from a working orifice and " +
+                   "I'll calibrate the encoding.";
+        }
+
         /// <summary>
         /// Transplant a known-working DPS orifice light-rig onto a new socket location. DPS deformation is
         /// driven entirely by marker point-lights read by the penetrator's shader, and those render in CVR
