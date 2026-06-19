@@ -376,6 +376,8 @@ namespace CVRFury.Builder.Convert
                 using (new EditorGUI.DisabledScope(_avatar == null))
                     if (GUILayout.Button("Add to every socket found"))
                         RunSps(() => SpsConverter.AutoBake(_avatar, _spsAddToggle));
+                EditorGUILayout.LabelField("Or place just one: drag the spot where the orifice should go (a " +
+                    "bone or empty), then click below.", EditorStyles.wordWrappedMiniLabel);
                 _spsSocket = (Transform)EditorGUILayout.ObjectField(new GUIContent("Or one spot",
                     "Pick the transform where you want a single orifice; the DPS lights are placed here."),
                     _spsSocket, typeof(Transform), true);
