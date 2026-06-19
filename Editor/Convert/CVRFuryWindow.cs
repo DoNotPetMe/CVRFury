@@ -330,13 +330,27 @@ namespace CVRFury.Builder.Convert
             }
 
             int added = 0;
+            var skipped = new List<string>();
+            // GoGoLoco (and similar) ship locomotion/system clips in the same folder as their emotes —
+            // idle, AFK, stand, walk/run, jump, crouch, prone, fly, swim, sit/stand transitions. Added as
+            // always-present override layers these pose the body at rest (the "motorbike" look), so skip
+            // anything that looks like a locomotion/system clip and only build layers for real poses/dances.
+            string[] systemWords = { "idle", "afk", "locomotion", "movement", "stand", "walk", "run",
+                                     "jog", "sprint", "jump", "fall", "crouch", "prone", "fly", "flight",
+                                     "swim", "tracking", "calibrat", "tpose", "t-pose", "reset", "base" };
             foreach (var guid in AssetDatabase.FindAssets("t:AnimationClip", new[] { folderPath }))
             {
                 var clip = AssetDatabase.LoadAssetAtPath<AnimationClip>(AssetDatabase.GUIDToAssetPath(guid));
                 if (clip == null) continue;
                 var name = clip.name;
+                var lower = name.ToLowerInvariant();
+                if (System.Array.Exists(systemWords, w => lower.Contains(w))) { skipped.Add(name); continue; }
                 var machine = "Emote/" + name;
                 if (!existingMachines.Contains(machine)) { cvr.AddToggle(name, machine, false, false); existingMachines.Add(machine); }
+                // Keep the AAS entry consistent with the working clothing-toggle path: the entry carries the
+                // clip (on = pose, off = none) so the CCK sees a proper animation toggle, not an empty one.
+                var emoteEntry = cvr.SettingsList.Cast<object>().FirstOrDefault(e => CckAvatar.EntryMachineName(e) == machine);
+                if (emoteEntry != null) cvr.SetToggleClips(emoteEntry, clip, null);
                 if (!existingParams.Contains(machine))
                 {
                     // Off state empty (lets CVR locomotion show), On state = the emote clip. Override layer,
@@ -351,9 +365,13 @@ namespace CVRFury.Builder.Convert
             EditorUtility.SetDirty(controller);
             AssetDatabase.SaveAssets();
             cvr.Persist();
-            return $"Added {added} emote toggle(s). Each plays its clip while toggled ON and returns to normal " +
-                   "movement when OFF. Toggle one at a time (two emotes on at once will fight). The red ❗ clears " +
-                   "because the parameters now exist in the controller.";
+            var msg = $"Added {added} emote toggle(s). Each plays its clip while toggled ON and returns to normal " +
+                   "movement when OFF. Toggle one at a time (two emotes on at once will fight).";
+            if (skipped.Count > 0)
+                msg += $"\nSkipped {skipped.Count} locomotion/system clip(s) that would pose the body at rest " +
+                       $"(the motorbike pose): {string.Join(", ", skipped.Take(20))}{(skipped.Count > 20 ? " …" : "")}." +
+                       "\nIf one of these is actually a pose you want, rename it without the locomotion word and re-run.";
+            return msg;
         }
 
         // --- helpers ---

@@ -4,6 +4,18 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.24] - 2026-06-16
+
+### Fixed
+- **Emotes / Poses no longer cause the motorbike pose when pointed at a GoGoLoco-style folder.** Those
+  folders mix real poses/dances with **locomotion/system clips** (idle, AFK, stand, walk/run, jump,
+  crouch, prone, fly, swim, tracking/calibration, T-pose). Added as always-present override layers, the
+  system clips pose the body at rest — the motorbike look. The Emotes step now **skips clips whose names
+  look like locomotion/system clips** and only builds layers for genuine poses, listing what it skipped.
+  Rename a skipped clip (drop the locomotion word) and re-run if it was actually a pose you wanted.
+- Emote AAS entries now carry their clip (on = pose) like the clothing-toggle path, so the CCK sees a
+  proper animation toggle rather than an empty one.
+
 ## [0.9.23] - 2026-06-16
 
 ### Added
