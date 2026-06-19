@@ -36,7 +36,7 @@ honest about what exists and what's next.
 | Parameters declaration | ✅ | `CVRFuryParameters` declares params + optional menu exposure |
 | Exclusive toggle tags | ⬜ | CVR has no animator parameter drivers; use **Modes** for true exclusivity |
 | Automatic fixes (dedupe / prune) | 🟡 | broken-entry prune + duplicate-param warning done; more to come |
-| SPS (penetration system) | ⬜ | large; CVR has no DPS/SPS equivalent — would be net-new |
+| SPS (penetration system) | 🟡 | detection (VRCFury SPS / VRChat Contacts-TPS / Raliv DPS) + plug/socket location picker in the window; CVR has no native deformation, so only the contact layer (CVRPointer + CVRAdvancedAvatarSettingsTrigger) will convert — target being finalised |
 | Direct Tree / OSC / Advanced | ⬜ | |
 | Remove/strip missing (broken) scripts | ✅ | auto at build + prefab-aware manual tool — key for VRChat imports |
 | VRChat → CVR converter (descriptor/menu/params/physbones/layers) | ✅ | toggle-driven window; reflection-based; physics values approximate |

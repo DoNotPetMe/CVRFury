@@ -4,6 +4,16 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.29] - 2026-06-16
+
+### Added
+- **SPS / DPS section (experimental) — detection + plug/socket location picker.** New window section that
+  detects VRChat penetration markers (VRCFury SPS components, VRChat Contacts / TPS collision tags, Raliv
+  DPS marker lights, and name fallbacks) and reports candidate plugs/sockets, plus VRCFury-style object
+  fields to pick the plug (penetrator) and socket (orifice) transforms by hand. Detection is non-destructive.
+  ChilloutVR has no native SPS deformation, so only the contact layer (plug → `CVRPointer`, socket →
+  `CVRAdvancedAvatarSettingsTrigger`) will convert; the conversion action lands once the CVR target is locked.
+
 ## [0.9.28] - 2026-06-16
 
 ### Fixed

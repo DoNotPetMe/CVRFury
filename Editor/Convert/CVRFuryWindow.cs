@@ -47,7 +47,11 @@ namespace CVRFury.Builder.Convert
         // Strip
         private bool _removeFinalIK = true;
 
-        private bool _s0, _s1 = true, _s2 = true, _se, _s3, _s4, _s5;
+        private bool _s0, _s1 = true, _s2 = true, _se, _s3, _s4, _s5, _sSps;
+
+        // SPS / DPS (experimental)
+        private Transform _spsPlug;
+        private Transform _spsSocket;
 
         [MenuItem("Tools/CVRFury/CVRFury", false, 0)]
         public static void Open()
@@ -78,6 +82,7 @@ namespace CVRFury.Builder.Convert
             StepEmotes();
             Step3PhysBones();
             Step4Magica();
+            StepSps();
             Step5Strip();
 
             if (!string.IsNullOrEmpty(_log))
@@ -260,6 +265,35 @@ namespace CVRFury.Builder.Convert
                 using (new EditorGUI.DisabledScope(_avatar == null || !dbPresent))
                     if (GUILayout.Button("Convert PhysBones"))
                         RunAndRefresh(ConvertPhysBones);
+            }
+        }
+
+        private void StepSps()
+        {
+            _sSps = Foldout(_sSps, "SPS / DPS (NSFW penetration) — experimental");
+            if (!_sSps) return;
+            using (new EditorGUI.IndentLevelScope())
+            {
+                EditorGUILayout.HelpBox(
+                    "Detects VRChat penetration markers (VRCFury SPS, VRChat Contacts/TPS, Raliv DPS). " +
+                    "ChilloutVR has NO native SPS deformation — the shader bending doesn't port. What converts " +
+                    "is the contact layer: a plug tip → CVRPointer, a socket → CVRAdvancedAvatarSettingsTrigger. " +
+                    "Conversion is gated on a design choice (see chat); detection + manual location picking work now.",
+                    MessageType.Warning);
+
+                using (new EditorGUI.DisabledScope(_avatar == null))
+                    if (GUILayout.Button("Detect SPS / DPS markers"))
+                        RunAndRefresh(() => SpsConverter.DetectReport(_avatar));
+
+                EditorGUILayout.Space(2);
+                EditorGUILayout.LabelField("Choose locations (VRCFury-style)", EditorStyles.miniBoldLabel);
+                _spsPlug = (Transform)EditorGUILayout.ObjectField(new GUIContent("Plug (penetrator) tip",
+                    "The transform at the tip of the plug — becomes a CVRPointer when conversion is enabled."),
+                    _spsPlug, typeof(Transform), true);
+                _spsSocket = (Transform)EditorGUILayout.ObjectField(new GUIContent("Socket (orifice)",
+                    "The orifice transform — becomes a CVRAdvancedAvatarSettingsTrigger when conversion is enabled."),
+                    _spsSocket, typeof(Transform), true);
+                EditorGUILayout.HelpBox("Conversion button appears once we lock the CVR target system.", MessageType.None);
             }
         }
 
