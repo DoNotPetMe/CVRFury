@@ -47,7 +47,8 @@ namespace CVRFury.Builder.Convert
         // Strip
         private bool _removeFinalIK = true;
 
-        private bool _s0, _s1 = true, _s2 = true, _se, _s3, _s4, _s5, _sSps;
+        private bool _s0, _s1 = true, _s2 = true, _se, _s3, _s4, _s5, _sSps, _sCredits;
+        private bool _creditsBounce = true;
 
         // SPS / DPS (experimental)
         private Transform _spsPlug;
@@ -92,6 +93,8 @@ namespace CVRFury.Builder.Convert
                 EditorGUILayout.LabelField("Log", EditorStyles.boldLabel);
                 EditorGUILayout.TextArea(_log, GUILayout.MinHeight(120));
             }
+
+            StepCredits();
 
             EditorGUILayout.EndScrollView();
         }
@@ -267,6 +270,45 @@ namespace CVRFury.Builder.Convert
                     if (GUILayout.Button("Convert PhysBones"))
                         RunAndRefresh(ConvertPhysBones);
             }
+        }
+
+        private void StepCredits()
+        {
+            EditorGUILayout.Space(6);
+            _sCredits = Foldout(_sCredits, "♥ Credits");
+            if (!_sCredits) return;
+            using (new EditorGUI.IndentLevelScope())
+            {
+                EditorGUILayout.LabelField("Made in ChilloutVR by", EditorStyles.centeredGreyMiniLabel);
+
+                var row = GUILayoutUtility.GetRect(0, 36, GUILayout.ExpandWidth(true));
+                float amp = _creditsBounce ? 9f : 0f;
+                float phase = (float)EditorApplication.timeSinceStartup * 6f;
+                var style = new GUIStyle(EditorStyles.boldLabel)
+                {
+                    alignment = TextAnchor.MiddleCenter,
+                    fontSize = 14,
+                    richText = true,
+                };
+
+                float half = row.width * 0.5f;
+                DrawBouncyName(new Rect(row.x, row.y, half, row.height), "DoNotPetMe", phase, amp, style);
+                DrawBouncyName(new Rect(row.x + half, row.y, half, row.height), "--Stardust--", phase + 1.3f, amp, style);
+
+                EditorGUILayout.LabelField(
+                    _creditsBounce ? "(click a name to stop the bounce)" : "thanks for using CVRFury ♥",
+                    EditorStyles.centeredGreyMiniLabel);
+
+                if (_creditsBounce) Repaint(); // keep the bounce animating until a name is clicked
+            }
+        }
+
+        private void DrawBouncyName(Rect area, string label, float phase, float amp, GUIStyle style)
+        {
+            float yOff = Mathf.Abs(Mathf.Sin(phase)) * amp;
+            var r = new Rect(area.x, area.y + area.height - 22f - yOff, area.width, 22f);
+            EditorGUIUtility.AddCursorRect(r, MouseCursor.Link);
+            if (GUI.Button(r, label, style)) _creditsBounce = false;
         }
 
         private void StepSps()
