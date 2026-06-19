@@ -25,6 +25,12 @@ namespace CVRFury.Builder.Convert
         private bool _buildController = true;
         private AnimatorController _controller;
 
+        // Step 2 — optional smart-match review
+        private bool _reviewMatches;
+        private List<ToggleClipLinker.Assignment> _reviewRows;
+        private string _rowSearch = "";
+        private Vector2 _rowScroll;
+
         // PhysBones
         private bool _pbColliders = true;
         private float _pbDamping = 0.1f, _pbElasticity = 1f, _pbStiffness = 1f, _pbRadiusScale = 1f, _pbGravityScale = 1f;
@@ -125,13 +131,30 @@ namespace CVRFury.Builder.Convert
                     _controller = (AnimatorController)EditorGUILayout.ObjectField(
                         "Controller (optional)", _controller, typeof(AnimatorController), false);
 
-                using (new EditorGUI.DisabledScope(_avatar == null || _clipFolder == null))
-                    if (GUILayout.Button("Link clips" + (_buildController ? " & build controller" : "")))
-                    {
-                        var folderPath = AssetDatabase.GetAssetPath(_clipFolder);
-                        RunAndRefresh(() => ToggleClipLinker.LinkClips(
-                            _avatar, folderPath, _onSuffix, _offSuffix, _buildController, _controller));
-                    }
+                _reviewMatches = EditorGUILayout.ToggleLeft(new GUIContent(
+                    "Review & fix clip matches before building (smart-guess unmatched)",
+                    "Preview what clip the tool pairs to each toggle. Toggles it couldn't match exactly get a " +
+                    "best-guess clip you can confirm, swap with the ⊙ picker, or drag-and-drop. Your picks are " +
+                    "remembered per-avatar."), _reviewMatches);
+
+                if (!_reviewMatches)
+                {
+                    using (new EditorGUI.DisabledScope(_avatar == null || _clipFolder == null))
+                        if (GUILayout.Button("Link clips" + (_buildController ? " & build controller" : "")))
+                        {
+                            var folderPath = AssetDatabase.GetAssetPath(_clipFolder);
+                            RunAndRefresh(() => ToggleClipLinker.LinkClips(
+                                _avatar, folderPath, _onSuffix, _offSuffix, _buildController, _controller));
+                        }
+                }
+                else
+                {
+                    using (new EditorGUI.DisabledScope(_avatar == null || _clipFolder == null))
+                        if (GUILayout.Button("Preview / refresh matches"))
+                            _reviewRows = ToggleClipLinker.Preview(
+                                _avatar, AssetDatabase.GetAssetPath(_clipFolder), _onSuffix, _offSuffix);
+                    if (_reviewRows != null) DrawReviewList();
+                }
 
                 EditorGUILayout.Space(2);
                 EditorGUILayout.HelpBox("Motorbike pose / no movement after editing the avatar (e.g. visemes) " +
@@ -148,6 +171,45 @@ namespace CVRFury.Builder.Convert
                                 : "Locomotion controller is OK (has CVR movement) — nothing to fix.";
                         });
             }
+        }
+
+        private void DrawReviewList()
+        {
+            int matched = 0, guessed = 0, none = 0;
+            foreach (var r in _reviewRows) { if (r.state == 0) matched++; else if (r.state == 1) guessed++; else none++; }
+            EditorGUILayout.LabelField($"{matched} matched · {guessed} guessed · {none} no clip", EditorStyles.miniBoldLabel);
+            EditorGUILayout.HelpBox("✔ exact match   ? best guess (check it!)   ✘ none found. Use the ⊙ picker or " +
+                                    "drag a clip into a box to change it. ON = shown/enabled, OFF = hidden.", MessageType.None);
+            _rowSearch = EditorGUILayout.TextField("Search", _rowSearch);
+            string q = (_rowSearch ?? "").Trim().ToLowerInvariant();
+
+            _rowScroll = EditorGUILayout.BeginScrollView(_rowScroll, GUILayout.MinHeight(160), GUILayout.MaxHeight(340));
+            for (int i = 0; i < _reviewRows.Count; i++)
+            {
+                var row = _reviewRows[i];
+                var label = string.IsNullOrEmpty(row.display) ? row.machine : row.display;
+                if (q.Length > 0 && !(label ?? "").ToLowerInvariant().Contains(q) &&
+                    !(row.machine ?? "").ToLowerInvariant().Contains(q)) continue;
+
+                string mark = row.state == 0 ? "✔" : row.state == 1 ? "?" : "✘";
+                EditorGUILayout.LabelField($"{mark} {label}" + (row.isSlider ? "   (slider)" : ""), EditorStyles.boldLabel);
+                using (new EditorGUI.IndentLevelScope())
+                {
+                    var newOn = (AnimationClip)EditorGUILayout.ObjectField(row.isSlider ? "Max (1)" : "ON", row.on, typeof(AnimationClip), false);
+                    var newOff = (AnimationClip)EditorGUILayout.ObjectField(row.isSlider ? "Min (0)" : "OFF", row.off, typeof(AnimationClip), false);
+                    if (newOn != row.on || newOff != row.off)
+                    {
+                        row.on = newOn; row.off = newOff;
+                        row.state = (newOn != null || newOff != null) ? 0 : 2; // a manual pick counts as resolved
+                        _reviewRows[i] = row;
+                    }
+                }
+            }
+            EditorGUILayout.EndScrollView();
+
+            using (new EditorGUI.DisabledScope(_avatar == null))
+                if (GUILayout.Button("Apply matches" + (_buildController ? " & build controller" : "")))
+                    RunAndRefresh(() => ToggleClipLinker.ApplyAndBuild(_avatar, _reviewRows, _buildController, _controller));
         }
 
         private void Step3PhysBones()

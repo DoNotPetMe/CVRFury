@@ -4,6 +4,17 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.26] - 2026-06-16
+
+### Added
+- **Smart-match review for clip toggles (optional).** Tick "Review & fix clip matches before building" in
+  Step 2, then "Preview / refresh matches" to see what clip the tool pairs to every toggle/slider before
+  anything is built. Exact matches are marked ✔; toggles with no exact match get a **fuzzy best-guess**
+  clip (containment + edit-distance) marked ?, and ✘ means nothing was found. Each row has editable ON/OFF
+  (or slider Min/Max) clip fields with the ⊙ object picker and drag-and-drop, so you can confirm or correct
+  a guess by hand. A search box filters the list. Your picks are **persisted per-avatar**, and "Apply
+  matches & build controller" uses exactly what's shown.
+
 ## [0.9.25] - 2026-06-16
 
 ### Fixed

@@ -40,16 +40,7 @@ namespace CVRFury.Builder.Convert
                        "alternatives, e.g. ON: \"toggled, on, enabled\"  OFF: \"default, off, disabled\".";
 
             // --- pair clips by base name ---
-            var pairs = new Dictionary<string, (AnimationClip onClip, AnimationClip offClip, string baseName)>();
-            int clipCount = 0;
-            foreach (var guid in AssetDatabase.FindAssets("t:AnimationClip", new[] { folderPath }))
-            {
-                var clip = AssetDatabase.LoadAssetAtPath<AnimationClip>(AssetDatabase.GUIDToAssetPath(guid));
-                if (clip == null) continue;
-                clipCount++;
-                if (TryStripAny(clip.name, onList, out var baseOn)) Put(pairs, baseOn, clip, true);
-                else if (TryStripAny(clip.name, offList, out var baseOff)) Put(pairs, baseOff, clip, false);
-            }
+            var pairs = PairClips(folderPath, onList, offList, out int clipCount);
 
             // --- assign clips onto matching toggle entries (non-destructive) ---
             int linked = 0;
@@ -257,6 +248,190 @@ namespace CVRFury.Builder.Convert
             cur.Item3 = baseName.Trim();
             pairs[key] = cur;
         }
+
+        private static Dictionary<string, (AnimationClip onClip, AnimationClip offClip, string baseName)> PairClips(
+            string folderPath, List<string> onList, List<string> offList, out int clipCount)
+        {
+            var pairs = new Dictionary<string, (AnimationClip onClip, AnimationClip offClip, string baseName)>();
+            clipCount = 0;
+            foreach (var guid in AssetDatabase.FindAssets("t:AnimationClip", new[] { folderPath }))
+            {
+                var clip = AssetDatabase.LoadAssetAtPath<AnimationClip>(AssetDatabase.GUIDToAssetPath(guid));
+                if (clip == null) continue;
+                clipCount++;
+                if (TryStripAny(clip.name, onList, out var baseOn)) Put(pairs, baseOn, clip, true);
+                else if (TryStripAny(clip.name, offList, out var baseOff)) Put(pairs, baseOff, clip, false);
+            }
+            return pairs;
+        }
+
+        /// <summary>One row of the smart-match review: a toggle/slider entry and the clips the tool thinks
+        /// belong to it. <see cref="state"/> is 0 = exact match, 1 = fuzzy guess, 2 = nothing found.</summary>
+        public struct Assignment
+        {
+            public string display;
+            public string machine;
+            public bool isSlider;
+            public int state;
+            public AnimationClip on;
+            public AnimationClip off;
+        }
+
+        /// <summary>Compute, without changing anything, what clips pair to each toggle/slider. Exact
+        /// name matches first; for anything left unmatched, fuzzy-guess from the leftover clip pairs so the
+        /// user can confirm or correct in the review panel. Saved per-avatar manual picks are overlaid on
+        /// top so re-previewing keeps your edits.</summary>
+        public static List<Assignment> Preview(GameObject avatar, string folderPath, string onSuffix, string offSuffix)
+        {
+            var rows = new List<Assignment>();
+            var cvr = CckAvatar.FindOn(avatar);
+            var entries = cvr?.SettingsList;
+            if (entries == null || string.IsNullOrEmpty(folderPath) || !AssetDatabase.IsValidFolder(folderPath))
+                return rows;
+
+            var pairs = PairClips(folderPath, SplitWords(onSuffix), SplitWords(offSuffix), out _);
+            var used = new HashSet<string>();
+
+            // Pass 1: exact match by display name or machine-name leaf.
+            foreach (var entry in entries)
+            {
+                if (entry == null) continue;
+                var machine = CckAvatar.EntryMachineName(entry) ?? "";
+                if (string.IsNullOrEmpty(machine)) continue;
+                bool isSlider = Reflect.GetField(entry, CckNames.Entry_SliderSettings) != null;
+                bool isToggle = Reflect.GetField(entry, CckNames.Entry_ToggleSettings) != null;
+                if (!isSlider && !isToggle) continue; // dropdowns etc. aren't clip-paired here
+
+                var name = CckAvatar.EntryName(entry) ?? "";
+                string keyName = Norm(name), keyLeaf = Norm(Leaf(machine));
+                string hit = pairs.ContainsKey(keyName) ? keyName : (pairs.ContainsKey(keyLeaf) ? keyLeaf : null);
+                var a = new Assignment { display = name, machine = machine, isSlider = isSlider, state = 2 };
+                if (hit != null) { var p = pairs[hit]; a.on = p.onClip; a.off = p.offClip; a.state = 0; used.Add(hit); }
+                rows.Add(a);
+            }
+
+            // Pass 2: fuzzy-guess the unmatched ones from leftover clip pairs.
+            for (int i = 0; i < rows.Count; i++)
+            {
+                var a = rows[i];
+                if (a.state == 0) continue;
+                string target = Norm(a.display.Length > 0 ? a.display : Leaf(a.machine));
+                string bestKey = null; double best = 0;
+                foreach (var kv in pairs)
+                {
+                    if (used.Contains(kv.Key)) continue;
+                    double s = Similarity(target, kv.Key);
+                    if (s > best) { best = s; bestKey = kv.Key; }
+                }
+                if (bestKey != null && best >= 0.45)
+                {
+                    var p = pairs[bestKey]; a.on = p.onClip; a.off = p.offClip; a.state = 1; used.Add(bestKey);
+                    rows[i] = a;
+                }
+            }
+
+            OverlaySaved(avatar, rows);
+            return rows;
+        }
+
+        /// <summary>Apply explicit per-toggle clip assignments from the review panel, then (optionally)
+        /// build &amp; attach the controller. Also saves the assignments per-avatar.</summary>
+        public static string ApplyAndBuild(GameObject avatar, List<Assignment> rows, bool build, AnimatorController controller)
+        {
+            var cvr = CckAvatar.FindOn(avatar);
+            if (cvr == null) return "No CVRAvatar found (run step 1 first).";
+            var entries = cvr.SettingsList;
+            if (entries == null) return "No Advanced Avatar Settings entries — run step 1 first.";
+
+            var byMachine = new Dictionary<string, Assignment>();
+            foreach (var r in rows) if (!string.IsNullOrEmpty(r.machine)) byMachine[r.machine] = r;
+            int linked = 0;
+            foreach (var entry in entries)
+            {
+                var machine = CckAvatar.EntryMachineName(entry) ?? "";
+                if (!byMachine.TryGetValue(machine, out var a)) continue;
+                if (a.on == null && a.off == null) continue;
+                bool ok = a.isSlider ? cvr.SetSliderClips(entry, a.off, a.on)  // slider: off=min(0), on=max(1)
+                                     : cvr.SetToggleClips(entry, a.on, a.off);
+                if (ok) linked++;
+            }
+
+            SaveAssignments(avatar, rows);
+            string report = build ? BuildAndAttach(cvr, avatar, entries, controller) : "";
+            cvr.Persist();
+
+            int still = rows.Count(r => r.on == null && r.off == null);
+            return $"Applied {linked} reviewed clip assignment(s)" +
+                   (still > 0 ? $", {still} toggle(s) still have no clip" : "") + "." +
+                   (string.IsNullOrEmpty(report) ? "" : "\n\n" + report);
+        }
+
+        // --- fuzzy similarity (normalized strings; containment + edit-distance ratio) ---
+        private static double Similarity(string a, string b)
+        {
+            if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b)) return 0;
+            if (a == b) return 1;
+            if (a.Contains(b) || b.Contains(a)) return 0.85;
+            int d = Levenshtein(a, b);
+            return 1.0 - (double)d / Mathf.Max(a.Length, b.Length);
+        }
+
+        private static int Levenshtein(string a, string b)
+        {
+            var dp = new int[b.Length + 1];
+            for (int j = 0; j <= b.Length; j++) dp[j] = j;
+            for (int i = 1; i <= a.Length; i++)
+            {
+                int prev = dp[0]; dp[0] = i;
+                for (int j = 1; j <= b.Length; j++)
+                {
+                    int cur = dp[j];
+                    int cost = a[i - 1] == b[j - 1] ? 0 : 1;
+                    dp[j] = Mathf.Min(Mathf.Min(dp[j] + 1, dp[j - 1] + 1), prev + cost);
+                    prev = cur;
+                }
+            }
+            return dp[b.Length];
+        }
+
+        // --- per-avatar persistence of reviewed/manual clip picks (EditorPrefs JSON) ---
+        [System.Serializable] private class Saved { public List<SavedRow> rows = new List<SavedRow>(); }
+        [System.Serializable] private class SavedRow { public string machine, onGuid, offGuid; }
+
+        private static string PersistKey(GameObject avatar) => "CVRFury.ClipReview." + (avatar != null ? avatar.name : "");
+
+        private static void SaveAssignments(GameObject avatar, List<Assignment> rows)
+        {
+            var s = new Saved();
+            foreach (var r in rows)
+            {
+                if (string.IsNullOrEmpty(r.machine) || (r.on == null && r.off == null)) continue;
+                s.rows.Add(new SavedRow { machine = r.machine, onGuid = GuidOf(r.on), offGuid = GuidOf(r.off) });
+            }
+            EditorPrefs.SetString(PersistKey(avatar), JsonUtility.ToJson(s));
+        }
+
+        private static void OverlaySaved(GameObject avatar, List<Assignment> rows)
+        {
+            var json = EditorPrefs.GetString(PersistKey(avatar), "");
+            if (string.IsNullOrEmpty(json)) return;
+            Saved s; try { s = JsonUtility.FromJson<Saved>(json); } catch { return; }
+            if (s?.rows == null) return;
+            var map = s.rows.Where(r => r != null && r.machine != null).ToDictionary(r => r.machine, r => r);
+            for (int i = 0; i < rows.Count; i++)
+            {
+                var a = rows[i];
+                if (a.machine == null || !map.TryGetValue(a.machine, out var sr)) continue;
+                var on = ClipOf(sr.onGuid); var off = ClipOf(sr.offGuid);
+                if (on != null || off != null) { a.on = on; a.off = off; a.state = 0; rows[i] = a; } // manual pick wins
+            }
+        }
+
+        private static string GuidOf(AnimationClip c) =>
+            c == null ? "" : AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(c));
+        private static AnimationClip ClipOf(string guid) =>
+            string.IsNullOrEmpty(guid) ? null
+                : AssetDatabase.LoadAssetAtPath<AnimationClip>(AssetDatabase.GUIDToAssetPath(guid));
 
         private static bool TryStripSuffix(string name, string suffix, out string baseName)
         {
