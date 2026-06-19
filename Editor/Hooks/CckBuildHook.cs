@@ -97,6 +97,18 @@ namespace CVRFury.Builder
                     $"[CVRFury] Build failed for '{avatarRoot.name}'. The avatar was uploaded " +
                     $"WITHOUT CVRFury changes. Details:\n{e}");
             }
+
+            // Last line of defence against the motorbike pose: if the AAS animator lost CVR locomotion
+            // (e.g. the CCK regenerated it after a viseme/inspector edit), re-assert one that has it so the
+            // uploaded avatar still moves. Runs after the bake and never throws into the CCK.
+            try
+            {
+                ControllerGuard.ReassertLocomotion(avatarRoot, null);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[CVRFury] Locomotion guard skipped for '{avatarRoot.name}': {e.Message}");
+            }
         }
 
         private static void OnPrePropBundle(GameObject propRoot)

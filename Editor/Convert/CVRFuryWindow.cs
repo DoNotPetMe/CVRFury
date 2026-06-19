@@ -132,6 +132,21 @@ namespace CVRFury.Builder.Convert
                         RunAndRefresh(() => ToggleClipLinker.LinkClips(
                             _avatar, folderPath, _onSuffix, _offSuffix, _buildController, _controller));
                     }
+
+                EditorGUILayout.Space(2);
+                EditorGUILayout.HelpBox("Motorbike pose / no movement after editing the avatar (e.g. visemes) " +
+                    "since you built the controller? Click this to re-point the avatar at a controller that has " +
+                    "CVR locomotion. It also runs automatically at upload.", MessageType.None);
+                using (new EditorGUI.DisabledScope(_avatar == null))
+                    if (GUILayout.Button("Fix motorbike pose (re-assert locomotion)"))
+                        RunAndRefresh(() =>
+                        {
+                            var log = new BuildLog();
+                            ControllerGuard.ReassertLocomotion(_avatar, log);
+                            var msgs = log.Entries.Select(e => e.Message).ToList();
+                            return msgs.Count > 0 ? string.Join("\n", msgs)
+                                : "Locomotion controller is OK (has CVR movement) — nothing to fix.";
+                        });
             }
         }
 

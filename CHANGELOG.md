@@ -4,6 +4,21 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.25] - 2026-06-16
+
+### Fixed
+- **Motorbike pose from editing the avatar after building the controller (e.g. assigning visemes).** When
+  the CVRAvatar inspector is changed after Step 2, the CCK can regenerate `avatarSettings.animator` and
+  drop CVRFury's locomotion — an animator with no CVR movement loads as the seated/"motorbike" pose. A new
+  guard now runs **at upload** (and via a button) that detects an AAS animator with no CVR locomotion
+  (MovementX / MovementY / Grounded) and re-points it at a controller that has it — the base controller it
+  was extending, or the generated AAS controller on disk. Order of operations no longer matters: even if
+  something resets the animator, the uploaded avatar still moves.
+
+### Added
+- **"Fix motorbike pose (re-assert locomotion)" button** in Step 2, so you can repair and verify in-editor
+  without uploading. Reports whether the controller was already fine or had to be re-asserted.
+
 ## [0.9.24] - 2026-06-16
 
 ### Fixed
