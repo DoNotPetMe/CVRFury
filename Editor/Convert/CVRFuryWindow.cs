@@ -359,10 +359,23 @@ namespace CVRFury.Builder.Convert
                 // Step 3 — Turn on deformation on the plug
                 EditorGUILayout.Space(6);
                 EditorGUILayout.LabelField("Step 3 — Turn on the plug's deformation", EditorStyles.boldLabel);
-                EditorGUILayout.LabelField("Switches on the penetration-deform toggle in the plug's material.",
-                    EditorStyles.wordWrappedMiniLabel);
-                _spsPlug = (Transform)EditorGUILayout.ObjectField(new GUIContent("Plug mesh",
-                    "The object holding the penetrator's mesh/material."), _spsPlug, typeof(Transform), true);
+                EditorGUILayout.LabelField("Drop the penetrator's mesh object here (the one with its Mesh " +
+                    "Renderer + material) — or auto-fill it from Step 1.", EditorStyles.wordWrappedMiniLabel);
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    _spsPlug = (Transform)EditorGUILayout.ObjectField(new GUIContent("Plug mesh",
+                        "The object holding the penetrator's mesh/material."), _spsPlug, typeof(Transform), true);
+                    using (new EditorGUI.DisabledScope(_avatar == null))
+                        if (GUILayout.Button("Auto-fill", GUILayout.Width(70)))
+                            RunSps(() =>
+                            {
+                                var plug = SpsConverter.FindPlug(_avatar);
+                                _spsPlug = plug;
+                                return plug != null
+                                    ? $"Filled plug mesh: '{plug.name}'. Now click \"Enable deformation\"."
+                                    : "Couldn't find a plug automatically — drop the penetrator mesh object in by hand.";
+                            });
+                }
                 using (new EditorGUI.DisabledScope(_spsPlug == null))
                     if (GUILayout.Button("Enable deformation on this plug"))
                         RunSps(() => SpsConverter.SetupPlugShader(_spsPlug));

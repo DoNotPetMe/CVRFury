@@ -247,6 +247,29 @@ namespace CVRFury.Builder.Convert
                    "Next: rotate it so the opening faces outward, then Step 3 — switch the plug's shader.";
         }
 
+        /// <summary>Best guess at the penetrator mesh object, for the Step 3 auto-fill. Prefers a detected
+        /// plug that actually has a renderer; falls back to the renderer nearest a detected plug.</summary>
+        public static Transform FindPlug(GameObject avatar)
+        {
+            if (avatar == null) return null;
+            var plugs = Detect(avatar).Where(f => f.kind == "Plug" && f.transform != null).ToList();
+
+            // A detected plug that already carries a mesh is the ideal answer.
+            foreach (var p in plugs)
+                if (p.transform.GetComponentInChildren<Renderer>(true) != null)
+                    return p.transform;
+
+            // Otherwise, a child/parent renderer near the first detected plug.
+            if (plugs.Count > 0)
+            {
+                var t = plugs[0].transform;
+                var r = t.GetComponentInChildren<Renderer>(true) ?? t.GetComponentInParent<Renderer>();
+                if (r != null) return r.transform;
+                return t;
+            }
+            return null;
+        }
+
         // --- Step 3: turn on light-based deformation on the plug's material -------------------------
         // We don't hardcode shader property names (they differ per shader/version). Instead we read the
         // material's ACTUAL shader properties and switch on the ones that are clearly a penetration /
