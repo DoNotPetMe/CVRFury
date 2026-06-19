@@ -17,6 +17,7 @@ namespace CVRFury.Builder.Convert
         {
             var removed = 0;
             var finalIk = 0;
+            var sps = 0;
             foreach (var c in ctx.AvatarRoot.GetComponentsInChildren<Component>(true))
             {
                 if (c == null) continue; // missing scripts handled below
@@ -26,6 +27,15 @@ namespace CVRFury.Builder.Convert
                 {
                     Object.DestroyImmediate(c, true);
                     removed++;
+                }
+                else if (fn.StartsWith("VF.") && (fn.Contains("Haptic") || fn.Contains("Sps") || fn.Contains("SPS")))
+                {
+                    // VRCFury SPS/haptic components are VRChat-editor-only and do nothing in CVR (their
+                    // deformation is contact-driven). Once converted to DPS they're dead weight — and become
+                    // missing scripts if VRCFury isn't installed — so drop the component (leaving the mesh,
+                    // its DPS lights and shader intact). The avatar's source copy for VRChat is untouched.
+                    Object.DestroyImmediate(c, true);
+                    sps++;
                 }
                 else if (ctx.Options.removeFinalIK && fn.StartsWith("RootMotion.FinalIK"))
                 {
@@ -38,6 +48,7 @@ namespace CVRFury.Builder.Convert
 
             var missing = MissingScriptCleaner.RemoveInHierarchy(ctx.AvatarRoot);
             ctx.Log.Info($"Removed {removed} VRChat component(s)" +
+                         (sps > 0 ? $", {sps} VRCFury SPS/haptic component(s)" : "") +
                          (finalIk > 0 ? $", {finalIk} FinalIK component(s)" : "") +
                          $" and {missing} broken/missing-script component(s).");
         }

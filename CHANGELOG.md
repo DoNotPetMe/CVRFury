@@ -4,6 +4,14 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.49] - 2026-06-19
+
+### Changed
+- **Strip step now also removes inert VRCFury SPS/haptic components.** After converting to DPS, the VRChat-
+  only SPS components (VF.Model.VRCFuryHaptic*/Sps*) do nothing in CVR and become missing scripts if VRCFury
+  isn't installed, so the "Strip VRChat + broken components" step now drops the component — leaving the mesh,
+  its DPS lights, and the shader intact. (It does not delete anything from a separate VRChat copy.)
+
 ## [0.9.48] - 2026-06-19
 
 ### Changed
