@@ -247,5 +247,87 @@ namespace CVRFury.Builder.Convert
                    "Next: rotate it so the opening faces outward, then Step 3 — switch the plug's shader.";
         }
 
+        // --- Step 3: turn on light-based deformation on the plug's material -------------------------
+        // We don't hardcode shader property names (they differ per shader/version). Instead we read the
+        // material's ACTUAL shader properties and switch on the ones that are clearly a penetration /
+        // DPS deform enable. Safe and reversible; reports exactly what changed (or why it couldn't).
+        public static string SetupPlugShader(Transform plug)
+        {
+            if (plug == null) return "Pick the plug (penetrator) mesh first.";
+            var renderers = plug.GetComponentsInChildren<Renderer>(true);
+            if (renderers.Length == 0)
+                return $"No mesh renderer found under '{plug.name}'. Pick the object that has the plug's mesh.";
+
+            var mats = renderers.SelectMany(r => r.sharedMaterials).Where(m => m != null && m.shader != null)
+                                .Distinct().ToList();
+            if (mats.Count == 0) return $"'{plug.name}' has no materials to set up.";
+
+            int enabledProps = 0, lockedMats = 0;
+            var shaders = new System.Collections.Generic.HashSet<string>();
+            var details = new System.Text.StringBuilder();
+
+            foreach (var m in mats)
+            {
+                shaders.Add(m.shader.name);
+                if (m.shader.name.StartsWith("Hidden/Locked") || m.shader.name.StartsWith("Locked/"))
+                {
+                    lockedMats++;
+                    continue; // locked/optimised Poiyomi material — properties are baked, can't toggle
+                }
+
+                var enables = FindDeformEnableProps(m.shader);
+                if (enables.Count == 0) continue;
+                UnityEditor.Undo.RecordObject(m, "Enable plug deformation");
+                foreach (var p in enables)
+                {
+                    m.SetFloat(p, 1f);
+                    enabledProps++;
+                    details.AppendLine($"  • {m.name}: set {p} = 1");
+                }
+                UnityEditor.EditorUtility.SetDirty(m);
+            }
+
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"Plug '{plug.name}': {mats.Count} material(s), shader(s): {string.Join(", ", shaders)}.");
+            if (enabledProps > 0)
+            {
+                sb.AppendLine($"Done — enabled deformation on {enabledProps} property(ies):");
+                sb.Append(details);
+                sb.Append("Next: test in CVR — the plug should bend toward the orifice lights.");
+            }
+            else if (lockedMats > 0)
+            {
+                sb.Append($"{lockedMats} material(s) are LOCKED/optimised (Poiyomi). Unlock them first " +
+                          "(material header → Unlock), run this again, then re-lock before upload.");
+            }
+            else
+            {
+                sb.Append("No penetration-deform property exists on this shader. Either it's not a DPS/SPS " +
+                          "shader, or (Poiyomi Pro) the \"Penetration Deformation\" module isn't added to the " +
+                          "material yet. Tell me the shader name above and I'll wire it up.");
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>Names of float/toggle properties on the shader that look like a penetration-deform
+        /// ENABLE switch (e.g. "_EnablePenetrationDeformation", "_DPS_Penetrator_Enabled").</summary>
+        private static System.Collections.Generic.List<string> FindDeformEnableProps(Shader shader)
+        {
+            var result = new System.Collections.Generic.List<string>();
+            int count = UnityEditor.ShaderUtil.GetPropertyCount(shader);
+            for (int i = 0; i < count; i++)
+            {
+                var t = UnityEditor.ShaderUtil.GetPropertyType(shader, i);
+                if (t != UnityEditor.ShaderUtil.ShaderPropertyType.Float &&
+                    t != UnityEditor.ShaderUtil.ShaderPropertyType.Range) continue;
+                var name = UnityEditor.ShaderUtil.GetPropertyName(shader, i);
+                var n = name.ToLowerInvariant();
+                bool deform = n.Contains("penetr") || n.Contains("dps") || n.Contains("orifice");
+                bool enable = n.Contains("enable") || n.Contains("toggle") || n.EndsWith("_en") || n.Contains("active");
+                if (deform && enable) result.Add(name);
+            }
+            return result;
+        }
+
     }
 }

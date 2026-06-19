@@ -51,6 +51,7 @@ namespace CVRFury.Builder.Convert
         private double _bounceA = -100, _bounceB = -100; // last click time per name (bounce decays from it)
 
         // SPS / DPS (experimental)
+        private Transform _spsPlug;
         private Transform _spsSocket;
         private Transform _spsTemplate;
         private string _spsStatus = "";   // inline result of the last SPS action
@@ -355,11 +356,17 @@ namespace CVRFury.Builder.Convert
                                    "Next: rotate it so the opening faces outward, then do Step 3.";
                         });
 
-                // Step 3 — Plug shader (manual)
+                // Step 3 — Turn on deformation on the plug
                 EditorGUILayout.Space(6);
-                EditorGUILayout.LabelField("Step 3 — Switch the plug's shader (in the Inspector)", EditorStyles.boldLabel);
-                EditorGUILayout.LabelField("Select the plug mesh → its material → enable Poiyomi \"Penetration " +
-                    "Deformation\", or assign the Raliv DPS shader. No button — CVRFury keeps it through upload.",
+                EditorGUILayout.LabelField("Step 3 — Turn on the plug's deformation", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField("Switches on the penetration-deform toggle in the plug's material.",
+                    EditorStyles.wordWrappedMiniLabel);
+                _spsPlug = (Transform)EditorGUILayout.ObjectField(new GUIContent("Plug mesh",
+                    "The object holding the penetrator's mesh/material."), _spsPlug, typeof(Transform), true);
+                using (new EditorGUI.DisabledScope(_spsPlug == null))
+                    if (GUILayout.Button("Enable deformation on this plug"))
+                        _spsStatus = RunAndRefresh(() => SpsConverter.SetupPlugShader(_spsPlug));
+                EditorGUILayout.LabelField("If the shader has no such toggle, the status tells you what to do.",
                     EditorStyles.wordWrappedMiniLabel);
 
                 // Inline status of the last action + what to do next.

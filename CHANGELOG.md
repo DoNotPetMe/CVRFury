@@ -4,6 +4,15 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.36] - 2026-06-16
+
+### Added
+- **Step 3 is now a button too — auto-enable plug deformation.** Pick the plug mesh and CVRFury reads the
+  material's *actual* shader properties, switches on whichever penetration/DPS deform-enable toggle really
+  exists, and reports exactly what it changed. No hardcoded shader names: it adapts to whatever shader the
+  material uses, flags locked Poiyomi materials (unlock → run → re-lock), and tells you when a shader simply
+  has no such toggle. The whole SPS→DPS flow is now three buttons.
+
 ## [0.9.35] - 2026-06-16
 
 ### Changed
