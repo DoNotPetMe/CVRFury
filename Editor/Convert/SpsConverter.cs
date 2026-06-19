@@ -73,12 +73,14 @@ namespace CVRFury.Builder.Convert
             var plugs = list.Where(f => f.kind == "Plug").ToList();
             var sockets = list.Where(f => f.kind == "Socket").ToList();
             var sb = new System.Text.StringBuilder();
-            sb.AppendLine($"Found {plugs.Count} plug(s) and {sockets.Count} socket(s):");
+            sb.AppendLine($"Found {plugs.Count} plug(s) and {sockets.Count} socket(s) — the source is in [brackets] " +
+                          "so you can judge each (these are heuristics, not all are real orifices):");
             foreach (var f in list.Take(40))
-                sb.AppendLine($"  • {f.kind} — {Path(avatar.transform, f.transform)}");
+                sb.AppendLine($"  • {f.kind} — {Path(avatar.transform, f.transform)}  [{f.source}]");
             if (list.Count > 40) sb.AppendLine("  …");
             sb.Append(sockets.Count > 0
-                ? "\nNext: Step 2 — add DPS orifice lights to the socket(s)."
+                ? "\nNext: Step 2. For a clean result, prefer \"Add to this spot\" on the real orifice(s) rather " +
+                  "than \"every socket\" if any entries above look wrong."
                 : "\nNext: Step 2 — pick where the orifice goes and add lights there.");
             return sb.ToString();
         }
@@ -136,12 +138,21 @@ namespace CVRFury.Builder.Convert
 
         private static void DetectByName(GameObject avatar, List<Found> found)
         {
+            // Contact/PhysBone helper objects (e.g. "Orifice Detector", "Hole Detector") carry orifice-ish
+            // names but are receivers, NOT places to put an orifice — never match those by name.
+            string[] helperWords = { "detector", "sender", "receiver", "collider", "collision" };
             foreach (var tr in avatar.GetComponentsInChildren<Transform>(true))
             {
                 var n = tr.name.ToLowerInvariant();
-                if (n.Contains("penetrator") || n.Contains("dildo") || (n.Contains("sps") && n.Contains("plug")))
-                    found.Add(new Found { transform = tr, kind = "Plug", source = "name" });
-                else if (n.Contains("orifice") || n.Contains("socket") || n.Contains("hole"))
+                if (System.Array.Exists(helperWords, w => n.Contains(w))) continue;
+
+                // Common penetrator names. "shaft" and friends are standard and were previously missed.
+                bool plug = n.Contains("penetrator") || n.Contains("dildo") || n.Contains("shaft") ||
+                            n.Contains("penis") || n.Contains("cock") || n.Contains("phallus") ||
+                            n.Contains("knot") || (n.Contains("sps") && n.Contains("plug"));
+                if (plug) { found.Add(new Found { transform = tr, kind = "Plug", source = "name" }); continue; }
+
+                if (n.Contains("orifice") || n.Contains("socket") || n.Contains("hole"))
                     found.Add(new Found { transform = tr, kind = "Socket", source = "name" });
             }
         }

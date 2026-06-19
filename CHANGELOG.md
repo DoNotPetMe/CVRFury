@@ -4,6 +4,15 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.43] - 2026-06-19
+
+### Fixed
+- **SPS/DPS detection accuracy.** Plug detection now recognises common penetrator names (shaft, penis, cock,
+  phallus, knot, …) that were previously missed — so a "Shaft" no longer reports 0 plugs. Contact/PhysBone
+  helper objects ("Orifice Detector", "Hole Detector", senders/receivers/colliders) are no longer matched as
+  sockets, so "Add to every socket found" won't bake onto them. The detect report now shows the detection
+  source in [brackets] for each entry and recommends "Add to this spot" when results look noisy.
+
 ## [0.9.42] - 2026-06-19
 
 ### Added
