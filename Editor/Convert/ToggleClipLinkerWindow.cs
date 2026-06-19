@@ -31,9 +31,13 @@ namespace CVRFury.Builder.Convert
             if (entries == null || entries.Count == 0)
                 return "No Advanced Avatar Settings entries yet — run step 1 (Link parameters) first.";
 
-            var on = (onSuffix ?? "").Trim();
-            var off = (offSuffix ?? "").Trim();
-            if (on.Length == 0 || off.Length == 0) return "Set both the ON and OFF suffix words.";
+            // ON/OFF suffix inputs accept several comma-separated alternatives (e.g. "toggled, on, enabled"
+            // / "default, off, disabled"), so clips named differently from the rest still pair up.
+            var onList = SplitWords(onSuffix);
+            var offList = SplitWords(offSuffix);
+            if (onList.Count == 0 || offList.Count == 0)
+                return "Set both the ON and OFF suffix words. You can list several comma-separated " +
+                       "alternatives, e.g. ON: \"toggled, on, enabled\"  OFF: \"default, off, disabled\".";
 
             // --- pair clips by base name ---
             var pairs = new Dictionary<string, (AnimationClip onClip, AnimationClip offClip, string baseName)>();
@@ -43,8 +47,8 @@ namespace CVRFury.Builder.Convert
                 var clip = AssetDatabase.LoadAssetAtPath<AnimationClip>(AssetDatabase.GUIDToAssetPath(guid));
                 if (clip == null) continue;
                 clipCount++;
-                if (TryStripSuffix(clip.name, on, out var baseOn)) Put(pairs, baseOn, clip, true);
-                else if (TryStripSuffix(clip.name, off, out var baseOff)) Put(pairs, baseOff, clip, false);
+                if (TryStripAny(clip.name, onList, out var baseOn)) Put(pairs, baseOn, clip, true);
+                else if (TryStripAny(clip.name, offList, out var baseOff)) Put(pairs, baseOff, clip, false);
             }
 
             // --- assign clips onto matching toggle entries (non-destructive) ---
@@ -262,6 +266,21 @@ namespace CVRFury.Builder.Convert
             if (!n.EndsWith(suffix, System.StringComparison.OrdinalIgnoreCase)) return false;
             baseName = n.Substring(0, n.Length - suffix.Length).TrimEnd(' ', '_', '-', '.');
             return baseName.Length > 0;
+        }
+
+        /// <summary>Split a comma-separated suffix field into individual trimmed words (longest first, so
+        /// "toggled on" is tried before "on").</summary>
+        private static List<string> SplitWords(string s) =>
+            (s ?? "").Split(',').Select(w => w.Trim()).Where(w => w.Length > 0)
+                .OrderByDescending(w => w.Length).Distinct().ToList();
+
+        /// <summary>True if the name ends with any of the suffixes; returns the stripped base name.</summary>
+        private static bool TryStripAny(string name, List<string> suffixes, out string baseName)
+        {
+            foreach (var s in suffixes)
+                if (TryStripSuffix(name, s, out baseName)) return true;
+            baseName = null;
+            return false;
         }
 
         private static string Leaf(string machine) =>

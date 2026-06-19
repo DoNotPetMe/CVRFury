@@ -4,6 +4,18 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.23] - 2026-06-16
+
+### Added
+- **Custom / multiple ON-OFF suffix words in Step 2.** The "clip name ends with" fields now accept several
+  comma-separated alternatives (e.g. ON: `toggled, on, enabled` / OFF: `default, off, disabled`), so clips
+  a creator named differently from the rest still pair up. Longer words are matched first so `toggled on`
+  wins over `on`.
+
+### Notes
+- Next: a searchable, per-avatar-persisted manual override editor in Step 2 — see every toggle's matched
+  ON/OFF clip and reassign or swap them by hand (also covers setting defaults for clip-only toggles).
+
 ## [0.9.22] - 2026-06-16
 
 ### Changed

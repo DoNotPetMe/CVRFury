@@ -112,8 +112,12 @@ namespace CVRFury.Builder.Convert
                     "VRChat FX controller here — its hundreds of params blow the synced-bit budget.",
                     MessageType.None);
                 _clipFolder = (DefaultAsset)EditorGUILayout.ObjectField("Animations Folder", _clipFolder, typeof(DefaultAsset), false);
-                _onSuffix = EditorGUILayout.TextField("ON  clip name ends with", _onSuffix);
-                _offSuffix = EditorGUILayout.TextField("OFF clip name ends with", _offSuffix);
+                _onSuffix = EditorGUILayout.TextField(new GUIContent("ON  clip name ends with",
+                    "One or more comma-separated words, e.g. \"toggled, on, enabled\". Used to recognise " +
+                    "the ON clip when a creator named some clips differently from the rest."), _onSuffix);
+                _offSuffix = EditorGUILayout.TextField(new GUIContent("OFF clip name ends with",
+                    "One or more comma-separated words, e.g. \"default, off, disabled\"."), _offSuffix);
+                EditorGUILayout.LabelField(" ", "Tip: list several comma-separated words if clips aren't all named the same.", EditorStyles.miniLabel);
                 _buildController = EditorGUILayout.ToggleLeft(
                     "Build & attach a controller (creates parameters → clears the red ❗)", _buildController);
                 using (new EditorGUI.DisabledScope(!_buildController))
