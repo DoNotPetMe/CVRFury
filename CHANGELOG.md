@@ -4,6 +4,15 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.65] - 2026-06-19
+
+### Added
+- **Sync Dances → CVR dance menu.** Finds a Sync-Dances-style pack's dance clips already in the project
+  (auto-located by folder name, or point it at the folder) and builds a CVR-native **synced dropdown** (Off +
+  one option per dance) driving an exclusive full-body layer. Uses only the dance clips — none of the VRChat
+  controller/menu — and CVR syncs the dropdown so everyone sees the same dance. Written into the base
+  controller too, so it survives upload regeneration.
+
 ## [0.9.64] - 2026-06-19
 
 ### Added

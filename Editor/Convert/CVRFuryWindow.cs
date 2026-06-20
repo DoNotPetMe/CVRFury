@@ -49,12 +49,17 @@ namespace CVRFury.Builder.Convert
         // Strip
         private bool _removeFinalIK = true;
 
-        private bool _s0, _s1 = true, _s2 = true, _se, _sEmoteWheel, _s3, _s4, _s5, _sSps, _sResize, _sCredits;
+        private bool _s0, _s1 = true, _s2 = true, _se, _sEmoteWheel, _sDances, _s3, _s4, _s5, _sSps, _sResize, _sCredits;
 
         // Emote wheel (CVR emote menu) slot overrides
         private sealed class EmoteSlotRow { public int index; public string current; public AnimationClip newClip; public AudioClip audio; }
         private readonly List<EmoteSlotRow> _emoteSlots = new List<EmoteSlotRow>();
         private string _emoteWheelStatus = "";
+
+        // Sync Dances → CVR dance menu
+        private DefaultAsset _dancesFolder;
+        private List<AnimationClip> _dances = new List<AnimationClip>();
+        private string _dancesStatus = "";
         private string _resizeStatus = "";
 
         // Unified slider rows (size / length / hue / emission) — one per control you want.
@@ -108,6 +113,7 @@ namespace CVRFury.Builder.Convert
             Step2Clips();
             StepEmotes();
             StepEmoteWheel();
+            StepDances();
             Step3PhysBones();
             Step4Magica();
             StepSps();
@@ -808,6 +814,50 @@ namespace CVRFury.Builder.Convert
             return $"Removed all CVRFury emotes ({entries} menu entr(ies), {layers} animator layer(s), {parms} " +
                    "parameter(s)). If the avatar STILL motorbikes now, the cause is the base controller, not the " +
                    "emotes — use \"Fix motorbike pose\", or re-run Step 2 to rebuild locomotion.";
+        }
+
+        private void StepDances()
+        {
+            _sDances = Foldout(_sDances, "Sync Dances → CVR dance menu");
+            if (!_sDances) return;
+            using (new EditorGUI.IndentLevelScope())
+            {
+                EditorGUILayout.HelpBox("Turns a Sync-Dances-style pack already in your project into a CVR " +
+                    "dance menu: a synced dropdown (Off + each dance). Leave the folder blank to auto-find it " +
+                    "by name. Uses only the dance clips — none of the VRChat setup.", MessageType.Info);
+                _dancesFolder = (DefaultAsset)EditorGUILayout.ObjectField("Dances folder (optional)", _dancesFolder, typeof(DefaultAsset), false);
+
+                if (GUILayout.Button("Find dances"))
+                {
+                    try
+                    {
+                        var path = _dancesFolder != null ? AssetDatabase.GetAssetPath(_dancesFolder) : null;
+                        _dances = SyncDances.Detect(path, out var used);
+                        _dancesStatus = _dances.Count == 0
+                            ? "No dance clips found. Point the folder field at the pack's animations folder and try again."
+                            : $"Found {_dances.Count} dance(s) in '{used}': " +
+                              string.Join(", ", _dances.Take(12).Select(d => d.name)) + (_dances.Count > 12 ? " …" : "");
+                    }
+                    catch (System.Exception ex) { _dancesStatus = "Error: " + ex.Message; Debug.LogException(ex); }
+                    Repaint();
+                }
+
+                using (new EditorGUI.DisabledScope(_avatar == null || _dances.Count == 0))
+                    if (GUILayout.Button($"Build dance menu ({_dances.Count})"))
+                    {
+                        try
+                        {
+                            var controllers = EmoteControllers(out _);
+                            _dancesStatus = SyncDances.Build(_avatar, CckAvatar.FindOn(_avatar), controllers, _dances);
+                        }
+                        catch (System.Exception ex) { _dancesStatus = "Error: " + ex.Message; Debug.LogException(ex); }
+                        Repaint();
+                    }
+
+                if (!string.IsNullOrEmpty(_dancesStatus))
+                    EditorGUILayout.HelpBox(_dancesStatus,
+                        _dancesStatus.StartsWith("Error") ? MessageType.Error : MessageType.Info);
+            }
         }
 
         private void StepEmoteWheel()
