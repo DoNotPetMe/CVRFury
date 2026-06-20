@@ -48,6 +48,39 @@ namespace CVRFury.Builder.Convert
             return null;
         }
 
+        /// <summary>Add (or replace) a slider named <paramref name="label"/> that drives a material float
+        /// property (e.g. a hue shift or emission strength) on <paramref name="r"/> between min and max. The
+        /// slider loads at min. Returns an error string, or null on success.</summary>
+        public static string AddMaterialSlider(GameObject avatar, Renderer r, string property, float min, float max, string label)
+        {
+            if (avatar == null) return "Select your avatar first.";
+            if (r == null) return $"'{label}': no mesh/renderer set.";
+            if (string.IsNullOrEmpty(property)) return $"'{label}': no shader property set.";
+            if (max <= min) return $"'{label}': max must be larger than min.";
+
+            foreach (var existing in avatar.GetComponents<CVRFurySlider>())
+                if (existing.menuPath == label) Object.DestroyImmediate(existing);
+
+            var slider = Undo.AddComponent<CVRFurySlider>(avatar);
+            slider.menuPath = label;
+            slider.saved = true;
+            slider.minState.actions.Add(MaterialAction(r, property, min));
+            slider.maxState.actions.Add(MaterialAction(r, property, max));
+            slider.defaultValue = 0f; // load at min (e.g. no hue shift)
+
+            EditorUtility.SetDirty(avatar);
+            return null;
+        }
+
+        private static FuryAction MaterialAction(Renderer r, string property, float value) => new FuryAction
+        {
+            type = FuryAction.ActionType.MaterialProperty,
+            propertyRenderer = r,
+            propertyName = property,
+            propertyIsColor = false,
+            propertyValue = value,
+        };
+
         private static FuryAction ScaleAction(Transform target, Vector3 axes, float factor) => new FuryAction
         {
             type = FuryAction.ActionType.ScaleFactor,

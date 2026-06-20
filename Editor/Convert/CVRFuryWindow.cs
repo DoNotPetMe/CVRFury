@@ -22,6 +22,7 @@ namespace CVRFury.Builder.Convert
         private DefaultAsset _clipFolder;
         private string _onSuffix = "toggled";
         private string _offSuffix = "default";
+        private string _renameOn = "1", _renameOff = "0"; // last-resort bulk renamer endings
         private bool _buildController = true;
         private AnimatorController _controller;
 
@@ -50,15 +51,18 @@ namespace CVRFury.Builder.Convert
         private bool _s0, _s1 = true, _s2 = true, _se, _s3, _s4, _s5, _sSps, _sResize, _sCredits;
         private string _resizeStatus = "";
 
-        // Size/length slider rows (one per body part you want a slider for).
-        private sealed class ScaleRow
+        // Unified slider rows (size / length / hue / emission) — one per control you want.
+        private enum SliderKind { Size, Length, Hue, Emission }
+        private sealed class SliderRow
         {
-            public Transform target;
-            public bool size = true;  public float sizeMin = 0.5f, sizeMax = 2f;
-            public bool length = false; public int axis = 2 /*Z*/; public float lenMin = 0.5f, lenMax = 2f;
+            public SliderKind kind = SliderKind.Size;
+            public Transform target;     // Size / Length
+            public Renderer renderer;    // Hue / Emission
+            public string property = ""; // Hue / Emission shader property
+            public int axis = 2;         // Length (X/Y/Z)
+            public float min = 0.5f, max = 2f;
         }
-        private readonly System.Collections.Generic.List<ScaleRow> _scaleRows = new System.Collections.Generic.List<ScaleRow>();
-        private Transform _scaleAdd;
+        private readonly System.Collections.Generic.List<SliderRow> _scaleRows = new System.Collections.Generic.List<SliderRow>();
         private double _bounceA = -100, _bounceB = -100; // last click time per name (bounce decays from it)
 
         // SPS / DPS (experimental)
@@ -195,6 +199,27 @@ namespace CVRFury.Builder.Convert
                             return msgs.Count > 0 ? string.Join("\n", msgs)
                                 : "Locomotion controller is OK (has CVR movement) — nothing to fix.";
                         });
+
+                EditorGUILayout.Space(4);
+                EditorGUILayout.HelpBox("LAST RESORT: if the clip names are all over the place and matching keeps " +
+                    "failing, this scans every clip in the folder above, guesses on/off from words at the end of " +
+                    "each name (show/hide, enable/disable…), and renames them to end with your markers below. It " +
+                    "edits the actual asset files (can break references), can mis-guess, and may take a while — " +
+                    "back up first.", MessageType.Warning);
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    _renameOn = EditorGUILayout.TextField("ON ending", _renameOn);
+                    _renameOff = EditorGUILayout.TextField("OFF ending", _renameOff);
+                }
+                using (new EditorGUI.DisabledScope(_clipFolder == null))
+                    if (GUILayout.Button("Bulk-rename clip endings (last resort)"))
+                    {
+                        if (EditorUtility.DisplayDialog("CVRFury — bulk rename",
+                            "This renames the animation asset files in the folder. It can break references and " +
+                            "can guess wrong. Back up first.\n\nProceed?", "Rename", "Cancel"))
+                            RunAndRefresh(() => AnimationRenamer.RenameEndings(
+                                AssetDatabase.GetAssetPath(_clipFolder), _renameOn, _renameOff));
+                    }
             }
         }
 
@@ -334,61 +359,55 @@ namespace CVRFury.Builder.Convert
         }
 
         private static readonly string[] AxisNames = { "X", "Y", "Z" };
+        private static readonly string[] KindNames = { "Size", "Length", "Hue", "Emission" };
 
         private void StepResize()
         {
-            _sResize = Foldout(_sResize, "Size / Length sliders (in-game resize)");
+            _sResize = Foldout(_sResize, "Sliders (size, length, hue, emission)");
             if (!_sResize) return;
             using (new EditorGUI.IndentLevelScope())
             {
-                EditorGUILayout.LabelField("Add an in-game menu slider to resize anything — the whole avatar, " +
-                    "or a bone like the chest or privates. Tick Size (uniform) and/or Length (one axis) per " +
-                    "part. Works natively in CVR — no contacts or shaders.", EditorStyles.wordWrappedMiniLabel);
+                EditorGUILayout.LabelField("Add in-game menu sliders for anything: resize a part (Size/Length), " +
+                    "or shift a material's Hue / Emission. Each row makes one slider. Works natively in CVR.",
+                    EditorStyles.wordWrappedMiniLabel);
 
-                // Add a target (drag a bone/object, or use the whole avatar).
                 using (new EditorGUILayout.HorizontalScope())
                 {
-                    _scaleAdd = (Transform)EditorGUILayout.ObjectField("Add part", _scaleAdd, typeof(Transform), true);
-                    using (new EditorGUI.DisabledScope(_scaleAdd == null))
-                        if (GUILayout.Button("+", GUILayout.Width(28)))
-                        {
-                            _scaleRows.Add(new ScaleRow { target = _scaleAdd });
-                            _scaleAdd = null;
-                        }
+                    if (GUILayout.Button("+ Add slider")) _scaleRows.Add(new SliderRow());
                     using (new EditorGUI.DisabledScope(_avatar == null))
-                        if (GUILayout.Button("Whole avatar", GUILayout.Width(100)))
-                            _scaleRows.Add(new ScaleRow { target = _avatar.transform });
+                        if (GUILayout.Button("+ Whole-avatar size", GUILayout.Width(150)))
+                            _scaleRows.Add(new SliderRow { kind = SliderKind.Size, target = _avatar.transform });
                 }
 
-                // One row per part, with tickable Size / Length and their settings beside them.
-                ScaleRow remove = null;
+                SliderRow remove = null;
                 foreach (var row in _scaleRows)
                 {
                     using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
                     {
                         using (new EditorGUILayout.HorizontalScope())
                         {
-                            row.target = (Transform)EditorGUILayout.ObjectField(row.target, typeof(Transform), true);
+                            row.kind = (SliderKind)EditorGUILayout.Popup((int)row.kind, KindNames);
                             if (GUILayout.Button("✕", GUILayout.Width(24))) remove = row;
                         }
-                        using (new EditorGUILayout.HorizontalScope())
+
+                        if (row.kind == SliderKind.Size || row.kind == SliderKind.Length)
+                            row.target = (Transform)EditorGUILayout.ObjectField("Part", row.target, typeof(Transform), true);
+                        else
                         {
-                            row.size = EditorGUILayout.ToggleLeft("Size", row.size, GUILayout.Width(60));
-                            using (new EditorGUI.DisabledScope(!row.size))
-                            {
-                                row.sizeMin = EditorGUILayout.FloatField("min", row.sizeMin, GUILayout.Width(90));
-                                row.sizeMax = EditorGUILayout.FloatField("max", row.sizeMax, GUILayout.Width(90));
-                            }
+                            row.renderer = (Renderer)EditorGUILayout.ObjectField("Mesh", row.renderer, typeof(Renderer), true);
+                            if (string.IsNullOrEmpty(row.property))
+                                row.property = row.kind == SliderKind.Hue ? "_MainHueShift" : "_EmissionStrength";
+                            row.property = EditorGUILayout.TextField(new GUIContent("Shader property",
+                                "The material float property to drive. Defaults are Poiyomi's; check your shader " +
+                                "if the slider does nothing."), row.property);
                         }
+
                         using (new EditorGUILayout.HorizontalScope())
                         {
-                            row.length = EditorGUILayout.ToggleLeft("Length", row.length, GUILayout.Width(60));
-                            using (new EditorGUI.DisabledScope(!row.length))
-                            {
+                            if (row.kind == SliderKind.Length)
                                 row.axis = EditorGUILayout.Popup(row.axis, AxisNames, GUILayout.Width(40));
-                                row.lenMin = EditorGUILayout.FloatField("min", row.lenMin, GUILayout.Width(90));
-                                row.lenMax = EditorGUILayout.FloatField("max", row.lenMax, GUILayout.Width(90));
-                            }
+                            row.min = EditorGUILayout.FloatField("min", row.min, GUILayout.Width(110));
+                            row.max = EditorGUILayout.FloatField("max", row.max, GUILayout.Width(110));
                         }
                     }
                 }
@@ -397,7 +416,7 @@ namespace CVRFury.Builder.Convert
                 using (new EditorGUI.DisabledScope(_avatar == null || _scaleRows.Count == 0))
                     if (GUILayout.Button("Create sliders"))
                     {
-                        try { _resizeStatus = CreateScaleSliders(); }
+                        try { _resizeStatus = CreateSliders(); }
                         catch (System.Exception ex) { _resizeStatus = "Error: " + ex.Message; Debug.LogException(ex); }
                         Repaint();
                     }
@@ -407,30 +426,40 @@ namespace CVRFury.Builder.Convert
             }
         }
 
-        private string CreateScaleSliders()
+        private string CreateSliders()
         {
             int made = 0;
             var errors = new System.Collections.Generic.List<string>();
             foreach (var row in _scaleRows)
             {
-                if (row.target == null) continue;
-                var partName = row.target == _avatar.transform ? "Avatar" : row.target.name;
-                if (row.size)
+                string err = null;
+                switch (row.kind)
                 {
-                    var err = AvatarSizeSlider.AddSlider(_avatar, row.target, Vector3.one, row.sizeMin, row.sizeMax,
-                        partName + " Size");
-                    if (err != null) errors.Add(err); else made++;
+                    case SliderKind.Size:
+                    {
+                        var part = row.target == (_avatar ? _avatar.transform : null) ? "Avatar" : row.target?.name;
+                        err = AvatarSizeSlider.AddSlider(_avatar, row.target, Vector3.one, row.min, row.max, part + " Size");
+                        break;
+                    }
+                    case SliderKind.Length:
+                    {
+                        var axisVec = new Vector3(row.axis == 0 ? 1 : 0, row.axis == 1 ? 1 : 0, row.axis == 2 ? 1 : 0);
+                        err = AvatarSizeSlider.AddSlider(_avatar, row.target, axisVec, row.min, row.max,
+                            (row.target ? row.target.name : "?") + " Length");
+                        break;
+                    }
+                    case SliderKind.Hue:
+                        err = AvatarSizeSlider.AddMaterialSlider(_avatar, row.renderer, row.property, row.min, row.max,
+                            (row.renderer ? row.renderer.name : "?") + " Hue");
+                        break;
+                    case SliderKind.Emission:
+                        err = AvatarSizeSlider.AddMaterialSlider(_avatar, row.renderer, row.property, row.min, row.max,
+                            (row.renderer ? row.renderer.name : "?") + " Emission");
+                        break;
                 }
-                if (row.length)
-                {
-                    var axisVec = new Vector3(row.axis == 0 ? 1 : 0, row.axis == 1 ? 1 : 0, row.axis == 2 ? 1 : 0);
-                    var err = AvatarSizeSlider.AddSlider(_avatar, row.target, axisVec, row.lenMin, row.lenMax,
-                        partName + " Length");
-                    if (err != null) errors.Add(err); else made++;
-                }
+                if (err != null) errors.Add(err); else made++;
             }
-            var msg = $"Created {made} slider(s), each defaulting to the part's normal size. They appear in the " +
-                      "Advanced Settings menu and resize at runtime in CVR.";
+            var msg = $"Created {made} slider(s). They appear in the Advanced Settings menu and apply at runtime in CVR.";
             if (errors.Count > 0) msg += "\nSkipped: " + string.Join("; ", errors);
             return msg;
         }

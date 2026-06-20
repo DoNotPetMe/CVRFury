@@ -4,6 +4,18 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.54] - 2026-06-19
+
+### Added
+- **Sliders panel (size, length, hue, emission).** The resize section is now a general "Sliders" panel: each
+  row picks a type — **Size** (uniform), **Length** (one axis), **Hue** or **Emission** (a material float
+  property, e.g. Poiyomi's _MainHueShift / _EmissionStrength) — with its own target and min/max. One place to
+  add any in-game menu slider, and room to grow.
+- **Last-resort clip-ending renamer.** When a pack's clip names are too inconsistent to match, a new Step 2
+  tool scans the folder, guesses on/off from words at the end of each name (show/hide, enable/disable…), and
+  renames clips to end with your chosen markers (e.g. 1/0). Clearly flagged as a last resort — it edits asset
+  files, can mis-guess, and is confirmed before running.
+
 ## [0.9.53] - 2026-06-19
 
 ### Added
