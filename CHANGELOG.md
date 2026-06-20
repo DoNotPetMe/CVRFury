@@ -4,6 +4,19 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.53] - 2026-06-19
+
+### Added
+- **Size / Length sliders for any part.** The old whole-avatar size slider is now a multi-part panel: add any
+  bone/object (or the whole avatar) to a list, tick **Size** (uniform) and/or **Length** (one axis, X/Y/Z)
+  per part with their own min/max shown beside them, then "Create sliders". Each becomes an in-game Advanced
+  Settings slider that resizes that part at runtime in CVR — e.g. chest size, privates length. Scale actions
+  gained a per-axis option to make single-axis "length" possible.
+
+### Changed
+- **DPS orifice toggles are named after their socket** (e.g. "Footjob Socket", "Thighjob Socket") instead of
+  nine identical "DPS Orifice" entries, so you can tell them apart in the menu.
+
 ## [0.9.52] - 2026-06-19
 
 ### Fixed

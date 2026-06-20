@@ -48,8 +48,17 @@ namespace CVRFury.Builder.Convert
         private bool _removeFinalIK = true;
 
         private bool _s0, _s1 = true, _s2 = true, _se, _s3, _s4, _s5, _sSps, _sResize, _sCredits;
-        private float _resizeMin = 0.5f, _resizeMax = 2f;
         private string _resizeStatus = "";
+
+        // Size/length slider rows (one per body part you want a slider for).
+        private sealed class ScaleRow
+        {
+            public Transform target;
+            public bool size = true;  public float sizeMin = 0.5f, sizeMax = 2f;
+            public bool length = false; public int axis = 2 /*Z*/; public float lenMin = 0.5f, lenMax = 2f;
+        }
+        private readonly System.Collections.Generic.List<ScaleRow> _scaleRows = new System.Collections.Generic.List<ScaleRow>();
+        private Transform _scaleAdd;
         private double _bounceA = -100, _bounceB = -100; // last click time per name (bounce decays from it)
 
         // SPS / DPS (experimental)
@@ -324,20 +333,71 @@ namespace CVRFury.Builder.Convert
             return GUI.Button(r, label, style);
         }
 
+        private static readonly string[] AxisNames = { "X", "Y", "Z" };
+
         private void StepResize()
         {
-            _sResize = Foldout(_sResize, "Avatar size slider (in-game resize)");
+            _sResize = Foldout(_sResize, "Size / Length sliders (in-game resize)");
             if (!_sResize) return;
             using (new EditorGUI.IndentLevelScope())
             {
-                EditorGUILayout.LabelField("Adds a menu slider that scales your whole avatar at runtime. " +
-                    "Works natively in CVR — no contacts or shaders.", EditorStyles.wordWrappedMiniLabel);
-                _resizeMin = EditorGUILayout.Slider("Smallest (×)", _resizeMin, 0.1f, 1f);
-                _resizeMax = EditorGUILayout.Slider("Largest (×)", _resizeMax, 1f, 5f);
-                using (new EditorGUI.DisabledScope(_avatar == null))
-                    if (GUILayout.Button("Add avatar size slider"))
+                EditorGUILayout.LabelField("Add an in-game menu slider to resize anything — the whole avatar, " +
+                    "or a bone like the chest or privates. Tick Size (uniform) and/or Length (one axis) per " +
+                    "part. Works natively in CVR — no contacts or shaders.", EditorStyles.wordWrappedMiniLabel);
+
+                // Add a target (drag a bone/object, or use the whole avatar).
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    _scaleAdd = (Transform)EditorGUILayout.ObjectField("Add part", _scaleAdd, typeof(Transform), true);
+                    using (new EditorGUI.DisabledScope(_scaleAdd == null))
+                        if (GUILayout.Button("+", GUILayout.Width(28)))
+                        {
+                            _scaleRows.Add(new ScaleRow { target = _scaleAdd });
+                            _scaleAdd = null;
+                        }
+                    using (new EditorGUI.DisabledScope(_avatar == null))
+                        if (GUILayout.Button("Whole avatar", GUILayout.Width(100)))
+                            _scaleRows.Add(new ScaleRow { target = _avatar.transform });
+                }
+
+                // One row per part, with tickable Size / Length and their settings beside them.
+                ScaleRow remove = null;
+                foreach (var row in _scaleRows)
+                {
+                    using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
                     {
-                        try { _resizeStatus = AvatarSizeSlider.Add(_avatar, _resizeMin, _resizeMax); }
+                        using (new EditorGUILayout.HorizontalScope())
+                        {
+                            row.target = (Transform)EditorGUILayout.ObjectField(row.target, typeof(Transform), true);
+                            if (GUILayout.Button("✕", GUILayout.Width(24))) remove = row;
+                        }
+                        using (new EditorGUILayout.HorizontalScope())
+                        {
+                            row.size = EditorGUILayout.ToggleLeft("Size", row.size, GUILayout.Width(60));
+                            using (new EditorGUI.DisabledScope(!row.size))
+                            {
+                                row.sizeMin = EditorGUILayout.FloatField("min", row.sizeMin, GUILayout.Width(90));
+                                row.sizeMax = EditorGUILayout.FloatField("max", row.sizeMax, GUILayout.Width(90));
+                            }
+                        }
+                        using (new EditorGUILayout.HorizontalScope())
+                        {
+                            row.length = EditorGUILayout.ToggleLeft("Length", row.length, GUILayout.Width(60));
+                            using (new EditorGUI.DisabledScope(!row.length))
+                            {
+                                row.axis = EditorGUILayout.Popup(row.axis, AxisNames, GUILayout.Width(40));
+                                row.lenMin = EditorGUILayout.FloatField("min", row.lenMin, GUILayout.Width(90));
+                                row.lenMax = EditorGUILayout.FloatField("max", row.lenMax, GUILayout.Width(90));
+                            }
+                        }
+                    }
+                }
+                if (remove != null) _scaleRows.Remove(remove);
+
+                using (new EditorGUI.DisabledScope(_avatar == null || _scaleRows.Count == 0))
+                    if (GUILayout.Button("Create sliders"))
+                    {
+                        try { _resizeStatus = CreateScaleSliders(); }
                         catch (System.Exception ex) { _resizeStatus = "Error: " + ex.Message; Debug.LogException(ex); }
                         Repaint();
                     }
@@ -345,6 +405,34 @@ namespace CVRFury.Builder.Convert
                     EditorGUILayout.HelpBox(_resizeStatus,
                         _resizeStatus.StartsWith("Error") ? MessageType.Error : MessageType.Info);
             }
+        }
+
+        private string CreateScaleSliders()
+        {
+            int made = 0;
+            var errors = new System.Collections.Generic.List<string>();
+            foreach (var row in _scaleRows)
+            {
+                if (row.target == null) continue;
+                var partName = row.target == _avatar.transform ? "Avatar" : row.target.name;
+                if (row.size)
+                {
+                    var err = AvatarSizeSlider.AddSlider(_avatar, row.target, Vector3.one, row.sizeMin, row.sizeMax,
+                        partName + " Size");
+                    if (err != null) errors.Add(err); else made++;
+                }
+                if (row.length)
+                {
+                    var axisVec = new Vector3(row.axis == 0 ? 1 : 0, row.axis == 1 ? 1 : 0, row.axis == 2 ? 1 : 0);
+                    var err = AvatarSizeSlider.AddSlider(_avatar, row.target, axisVec, row.lenMin, row.lenMax,
+                        partName + " Length");
+                    if (err != null) errors.Add(err); else made++;
+                }
+            }
+            var msg = $"Created {made} slider(s), each defaulting to the part's normal size. They appear in the " +
+                      "Advanced Settings menu and resize at runtime in CVR.";
+            if (errors.Count > 0) msg += "\nSkipped: " + string.Join("; ", errors);
+            return msg;
         }
 
         private void StepSps()

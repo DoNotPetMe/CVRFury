@@ -116,7 +116,12 @@ namespace CVRFury.Builder
                 case FuryAction.ActionType.ScaleFactor:
                     if (a.scaleTarget == null) return;
                     var p = Path(root, a.scaleTarget);
-                    var s = a.scaleTarget.localScale * a.scaleFactor;
+                    var b = a.scaleTarget.localScale;
+                    // Apply the factor only on the chosen axes (uniform "size" = all three; "length" = one).
+                    var s = new Vector3(
+                        a.scaleAxes.x != 0f ? b.x * a.scaleFactor : b.x,
+                        a.scaleAxes.y != 0f ? b.y * a.scaleFactor : b.y,
+                        a.scaleAxes.z != 0f ? b.z * a.scaleFactor : b.z);
                     SetFloat(clip, p, typeof(Transform), "m_LocalScale.x", s.x);
                     SetFloat(clip, p, typeof(Transform), "m_LocalScale.y", s.y);
                     SetFloat(clip, p, typeof(Transform), "m_LocalScale.z", s.z);

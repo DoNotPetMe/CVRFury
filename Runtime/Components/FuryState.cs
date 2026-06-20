@@ -41,6 +41,9 @@ namespace CVRFury.Components
         // --- ScaleFactor ---
         public Transform scaleTarget;
         public float scaleFactor = 1f;
+        // Which axes the factor applies to (1 = scale this axis, 0 = leave it). (1,1,1) = uniform "size";
+        // e.g. (0,0,1) = "length" along Z only. Defaults to uniform for backwards compatibility.
+        public Vector3 scaleAxes = Vector3.one;
 
         // --- MaterialProperty (float / color) ---
         public Renderer propertyRenderer;

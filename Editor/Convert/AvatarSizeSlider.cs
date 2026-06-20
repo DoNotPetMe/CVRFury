@@ -5,46 +5,55 @@ using CVRFury.Components;
 namespace CVRFury.Builder.Convert
 {
     /// <summary>
-    /// Adds a native in-game avatar-size slider: a CVRFury Slider on the avatar root whose two endpoints
-    /// scale the avatar between <c>min</c>× and <c>max</c>× its authored size. Because it's a normal AAS
-    /// slider + scale animation, it works in ChilloutVR with no contacts or special shaders — drag the
-    /// slider in the Advanced Settings menu and the avatar grows/shrinks.
+    /// Builds native in-game scale sliders: a CVRFury Slider whose two endpoints scale a target between
+    /// <c>min</c>× and <c>max</c>× its authored size. Uniform (1,1,1) = a "size" slider; a single axis
+    /// (e.g. 0,0,1) = a "length" slider. Works in ChilloutVR with no contacts or special shaders — drag
+    /// the slider in the Advanced Settings menu and the part grows/shrinks.
     /// </summary>
     internal static class AvatarSizeSlider
     {
+        /// <summary>Whole-avatar uniform size slider (kept for the one-click convenience button).</summary>
         public static string Add(GameObject avatar, float min, float max)
         {
             if (avatar == null) return "Select your avatar first.";
-            if (max <= min) return "Max size must be larger than min size.";
+            var msg = AddSlider(avatar, avatar.transform, Vector3.one, min, max, "Avatar Size");
+            return msg ?? $"Added an \"Avatar Size\" slider ({min:0.##}× – {max:0.##}×), defaulting to normal size.";
+        }
 
-            var root = avatar.transform;
+        /// <summary>Add (or replace) a scale slider named <paramref name="label"/> that scales
+        /// <paramref name="target"/> on the given <paramref name="axes"/> between min× and max×. The slider
+        /// component lives on the avatar so it shows in the menu; the animation drives the target. Returns an
+        /// error string, or null on success.</summary>
+        public static string AddSlider(GameObject avatar, Transform target, Vector3 axes, float min, float max, string label)
+        {
+            if (avatar == null) return "Select your avatar first.";
+            if (target == null) return $"'{label}': no target object set.";
+            if (max <= min) return $"'{label}': max must be larger than min.";
+            if (axes == Vector3.zero) return $"'{label}': no axis selected.";
 
-            // Remove a previous CVRFury size slider so re-running doesn't stack duplicates.
+            // Replace a previous slider with the same label so re-running doesn't stack duplicates.
             foreach (var existing in avatar.GetComponents<CVRFurySlider>())
-                if (existing.menuPath == "Avatar Size") Object.DestroyImmediate(existing);
+                if (existing.menuPath == label) Object.DestroyImmediate(existing);
 
             var slider = Undo.AddComponent<CVRFurySlider>(avatar);
-            slider.menuPath = "Avatar Size";
+            slider.menuPath = label;
             slider.saved = true;
             slider.localOnly = false;
-
-            slider.minState.actions.Add(ScaleAction(root, min));
-            slider.maxState.actions.Add(ScaleAction(root, max));
-
-            // Default the slider so the avatar loads at its normal (1×) size: value where min..max == 1.
+            slider.minState.actions.Add(ScaleAction(target, axes, min));
+            slider.maxState.actions.Add(ScaleAction(target, axes, max));
+            // Default so the part loads at its normal (1×) size: the value where min..max == 1.
             slider.defaultValue = Mathf.Clamp01((1f - min) / (max - min));
 
             EditorUtility.SetDirty(avatar);
-            return $"Added an \"Avatar Size\" slider ({min:0.##}× – {max:0.##}×), defaulting to normal size. " +
-                   "It scales the whole avatar at runtime via the Advanced Settings menu — no contacts needed. " +
-                   "Test-bake or upload to use it.";
+            return null;
         }
 
-        private static FuryAction ScaleAction(Transform root, float factor) => new FuryAction
+        private static FuryAction ScaleAction(Transform target, Vector3 axes, float factor) => new FuryAction
         {
             type = FuryAction.ActionType.ScaleFactor,
-            scaleTarget = root,
+            scaleTarget = target,
             scaleFactor = factor,
+            scaleAxes = axes,
         };
     }
 }

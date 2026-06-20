@@ -175,11 +175,14 @@ namespace CVRFury.Builder.Convert
         /// <summary>Create a Raliv-DPS orifice marker (the light rig) at <paramref name="target"/> so a
         /// DPS-shader penetrator deforms toward it in CVR. Experimental: the light codes are the documented
         /// canonical values and may need calibration against a working orifice.</summary>
-        public static GameObject GenerateDpsOrifice(Transform target, string name = "DPS Orifice (CVRFury)",
+        public static GameObject GenerateDpsOrifice(Transform target, string name = null,
                                                     bool addToggle = true)
         {
             if (target == null) return null;
-            var root = new GameObject(name);
+            // Name (and menu-label) after the socket's own hierarchy name so each orifice is identifiable
+            // ("Footjob Socket", "Thighjob Socket", …) instead of nine identical "DPS Orifice" entries.
+            var label = string.IsNullOrEmpty(name) ? CleanLabel(target.name) : name;
+            var root = new GameObject(label + " — DPS Orifice");
             UnityEditor.Undo.RegisterCreatedObjectUndo(root, "Bake DPS orifice");
             root.transform.SetParent(target, worldPositionStays: false);
             root.transform.localPosition = Vector3.zero;
@@ -187,18 +190,26 @@ namespace CVRFury.Builder.Convert
 
             MakeMarkerLight(root.transform, "DPS_Light", Vector3.zero);
             MakeMarkerLight(root.transform, "DPS_Light_Normal", new Vector3(0f, 0f, DpsNormalOffset));
-            AssignOrificeIcon(root);                 // distinct scene/hierarchy icon (not the plain light icon)
-            if (addToggle) AddDefaultOffToggle(root); // menu toggle, OFF by default
+            AssignOrificeIcon(root);                        // distinct scene/hierarchy icon (not the plain light icon)
+            if (addToggle) AddDefaultOffToggle(root, label); // menu toggle, OFF by default, named after the socket
             return root;
+        }
+
+        /// <summary>Tidy a hierarchy name into a menu label (drop common socket/marker suffixes/noise).</summary>
+        private static string CleanLabel(string raw)
+        {
+            if (string.IsNullOrEmpty(raw)) return "Orifice";
+            var s = raw.Replace("_", " ").Trim();
+            return s.Length == 0 ? "Orifice" : s;
         }
 
         /// <summary>Make the orifice start disabled and add a CVRFury menu toggle (default OFF) that enables
         /// it. So every DPS location is opt-in: no deformation until the wearer turns it on in the menu.</summary>
-        private static void AddDefaultOffToggle(GameObject orifice)
+        private static void AddDefaultOffToggle(GameObject orifice, string label)
         {
             var host = orifice.transform.root.gameObject; // keep the toggle on an ACTIVE object so it bakes
             var toggle = UnityEditor.Undo.AddComponent<CVRFuryToggle>(host);
-            toggle.menuPath = orifice.name;
+            toggle.menuPath = label;
             toggle.defaultOn = false;
             toggle.saved = true;
             toggle.state.actions.Add(new FuryAction
