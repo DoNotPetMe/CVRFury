@@ -82,9 +82,19 @@ namespace CVRFury.Builder.Convert
                                               AnimationClip clip, AudioClip audio)
         {
             if (clip == null) return $"Emote {index}: pick an animation before adding audio.";
+            var combined = MakeAudioClip(avatar, $"Emote {index}", clip, audio);
+            bool any = false;
+            foreach (var c in controllers) if (c != null && SetClip(c, index, combined)) any = true;
+            return any ? null : $"Emote slot {index} not found in the controller.";
+        }
 
-            // 1) An always-on (play-on-awake) AudioSource on a child that starts disabled.
-            var goName = $"CVRFury Emote {index} Audio";
+        /// <summary>Build a clip that plays <paramref name="clip"/> AND activates a child AudioSource (set up
+        /// with <paramref name="audio"/>, play-on-awake) for its duration — so the sound plays with the
+        /// animation and stops when it ends. Reusable by emotes and dances.</summary>
+        public static AnimationClip MakeAudioClip(GameObject avatar, string id, AnimationClip clip, AudioClip audio)
+        {
+            // An always-on (play-on-awake) AudioSource on a child that starts disabled.
+            var goName = $"CVRFury Audio {id}";
             var existing = avatar.transform.Find(goName);
             GameObject audioGo = existing != null ? existing.gameObject : new GameObject(goName);
             if (existing == null)
@@ -98,7 +108,7 @@ namespace CVRFury.Builder.Convert
             src.spatialBlend = 1f; // 3D, so others hear it positionally
             audioGo.SetActive(false);
 
-            // 2) A combined clip: the animation, plus a curve that activates the audio object.
+            // A combined clip: the animation, plus a curve that activates the audio object.
             var combined = Object.Instantiate(clip);
             combined.name = clip.name + " +audio";
             float len = Mathf.Max(combined.length, 0.05f);
@@ -109,10 +119,7 @@ namespace CVRFury.Builder.Convert
             if (!AssetDatabase.IsValidFolder(dir)) AssetDatabase.CreateFolder("Assets", "CVRFury Emotes");
             var path = AssetDatabase.GenerateUniqueAssetPath($"{dir}/{combined.name}.anim");
             AssetDatabase.CreateAsset(combined, path);
-
-            bool any = false;
-            foreach (var c in controllers) if (c != null && SetClip(c, index, combined)) any = true;
-            return any ? null : $"Emote slot {index} not found in the controller.";
+            return combined;
         }
     }
 }

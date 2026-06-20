@@ -53,16 +53,30 @@ namespace CVRFury.Builder.Convert
         /// <summary>Build the dance dropdown + exclusive layer (Off + each dance) into every target controller,
         /// matching the controller's WriteDefaults so it doesn't fight locomotion. Returns an error or null.</summary>
         public static string Build(GameObject avatar, CckAvatar cvr, AnimatorController[] controllers,
-                                   List<AnimationClip> dances, string menuName = "Dances", string param = "Dances")
+                                   List<AnimationClip> dances, string folder, string menuName = "Dances", string param = "Dances")
         {
             if (cvr == null) return "No CVRAvatar — run Step 1 first.";
             if (controllers == null || controllers.Length == 0) return "No writable controller — run Step 2 first.";
             if (dances == null || dances.Count == 0) return "No dance clips found to build from.";
 
+            // Auto-match an audio clip to each dance by name, and (if found) bake a clip that plays the dance
+            // and its sound together.
+            var audioMap = AudioByName(folder);
+            int withAudio = 0;
+
             // Option 0 = Off (empty), then one per dance.
             var clips = new AnimationClip[dances.Count + 1];
             clips[0] = null;
-            for (int i = 0; i < dances.Count; i++) clips[i + 1] = dances[i];
+            for (int i = 0; i < dances.Count; i++)
+            {
+                var dance = dances[i];
+                if (audioMap.TryGetValue(Norm(dance.name), out var audio) && audio != null)
+                {
+                    clips[i + 1] = EmoteSlots.MakeAudioClip(avatar, "Dance " + dance.name, dance, audio);
+                    withAudio++;
+                }
+                else clips[i + 1] = dance;
+            }
             var names = new[] { "Off" }.Concat(dances.Select(d => d.name)).ToArray();
 
             foreach (var c in controllers)
@@ -80,8 +94,30 @@ namespace CVRFury.Builder.Convert
 
             AssetDatabase.SaveAssets();
             cvr.Persist();
-            return $"Built a synced \"{menuName}\" dropdown with {dances.Count} dance(s) (plus Off). Everyone " +
-                   "sees the same selection in CVR. Test in Play mode or upload.";
+            return $"Built a synced \"{menuName}\" dropdown with {dances.Count} dance(s) (plus Off)" +
+                   (withAudio > 0 ? $", {withAudio} with auto-matched audio" : " (no matching audio found by name)") +
+                   ". Everyone sees the same selection in CVR. Test in Play mode or upload.";
         }
+
+        /// <summary>AudioClips in the dances folder (recursive), keyed by normalised name, so each dance can
+        /// find the sound that shares its name. Falls back to the whole project if no folder is given.</summary>
+        private static Dictionary<string, AudioClip> AudioByName(string folder)
+        {
+            var map = new Dictionary<string, AudioClip>();
+            var guids = !string.IsNullOrEmpty(folder) && AssetDatabase.IsValidFolder(folder)
+                ? AssetDatabase.FindAssets("t:AudioClip", new[] { folder })
+                : AssetDatabase.FindAssets("t:AudioClip");
+            foreach (var g in guids)
+            {
+                var a = AssetDatabase.LoadAssetAtPath<AudioClip>(AssetDatabase.GUIDToAssetPath(g));
+                if (a == null) continue;
+                var key = Norm(a.name);
+                if (!map.ContainsKey(key)) map[key] = a;
+            }
+            return map;
+        }
+
+        private static string Norm(string s) =>
+            string.IsNullOrEmpty(s) ? "" : new string(s.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
     }
 }

@@ -4,6 +4,19 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.67] - 2026-06-19
+
+### Fixed
+- **Motorbike from emote/dance layers (real controller cause).** Full-body override layers now run
+  WriteDefaults-OFF so their empty "Off" state passes through to locomotion instead of writing the bind pose.
+  Emote layers no longer "match the controller" (which could force WD-on); "Fix motorbike pose" now also forces
+  WD-off on all CVRFury emote/dance layers and prints the controller's layers (weight + mask) to pinpoint any
+  other full-body layer causing it.
+
+### Added
+- **Auto-matched dance audio.** Building the dance menu now finds an AudioClip sharing each dance's name (in
+  the dances folder, else project-wide) and plays it with the dance via an AudioSource the dance activates.
+
 ## [0.9.66] - 2026-06-19
 
 ### Fixed

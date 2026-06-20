@@ -59,6 +59,7 @@ namespace CVRFury.Builder.Convert
         // Sync Dances → CVR dance menu
         private DefaultAsset _dancesFolder;
         private List<AnimationClip> _dances = new List<AnimationClip>();
+        private string _dancesFolderUsed = "";
         private string _dancesStatus = "";
         private string _resizeStatus = "";
 
@@ -212,9 +213,27 @@ namespace CVRFury.Builder.Convert
                         {
                             var log = new BuildLog();
                             ControllerGuard.ReassertLocomotion(_avatar, log);
+                            // Force CVRFury full-body layers (emotes/dances) to WriteDefaults-off so their
+                            // "Off" state passes through to locomotion instead of writing the bind/motorbike pose.
+                            int fixedWd = 0;
+                            foreach (var c in EmoteControllers(out _))
+                            {
+                                fixedWd += AnimatorUtil.SetWriteDefaultsForLayers(c, "CVRFury Emote:", false);
+                                fixedWd += AnimatorUtil.SetWriteDefaultsForLayers(c, "CVRFury Dances", false);
+                                EditorUtility.SetDirty(c);
+                            }
+                            AssetDatabase.SaveAssets();
                             var msgs = log.Entries.Select(e => e.Message).ToList();
+                            if (fixedWd > 0) msgs.Add($"Set {fixedWd} emote/dance state(s) to WriteDefaults-off " +
+                                "(stops the Off pose overriding locomotion).");
+                            // Diagnostic: any UNMASKED, weight>0 layer (other than the base locomotion) can pose
+                            // the body. If it still motorbikes, the culprit is usually one of these — paste this.
+                            EmoteControllers(out var dc);
+                            if (dc != null)
+                                msgs.Add("Layers: " + string.Join(", ", dc.layers.Select(l =>
+                                    $"{l.name}[w{l.defaultWeight:0.#}{(l.avatarMask ? ",masked" : "")}]")));
                             return msgs.Count > 0 ? string.Join("\n", msgs)
-                                : "Locomotion controller is OK (has CVR movement) — nothing to fix.";
+                                : "Locomotion controller is OK (has CVR movement) and no emote/dance layers needed fixing.";
                         });
 
                 EditorGUILayout.Space(4);
@@ -833,6 +852,7 @@ namespace CVRFury.Builder.Convert
                     {
                         var path = _dancesFolder != null ? AssetDatabase.GetAssetPath(_dancesFolder) : null;
                         _dances = SyncDances.Detect(path, out var used);
+                        _dancesFolderUsed = used;
                         _dancesStatus = _dances.Count == 0
                             ? "No dance clips found. Point the folder field at the pack's animations folder and try again."
                             : $"Found {_dances.Count} dance(s) in '{used}': " +
@@ -848,7 +868,7 @@ namespace CVRFury.Builder.Convert
                         try
                         {
                             var controllers = EmoteControllers(out _);
-                            _dancesStatus = SyncDances.Build(_avatar, CckAvatar.FindOn(_avatar), controllers, _dances);
+                            _dancesStatus = SyncDances.Build(_avatar, CckAvatar.FindOn(_avatar), controllers, _dances, _dancesFolderUsed);
                         }
                         catch (System.Exception ex) { _dancesStatus = "Error: " + ex.Message; Debug.LogException(ex); }
                         Repaint();
@@ -999,10 +1019,11 @@ namespace CVRFury.Builder.Convert
 
             int added = 0;
             var skipped = new List<string>();
-            // Match the controller's existing WriteDefaults convention. A mismatch is what makes an emote
-            // look right while moving but wrong (default/bind pose bleeding through) when idle.
-            bool wd = AnimatorUtil.DetectWriteDefaults(controller);
-            // Repair any emote layers already built with the wrong WriteDefaults from an earlier run.
+            // Full-body override layers must run WriteDefaults OFF: their empty "Off" state then contributes
+            // nothing, so locomotion shows through. WD ON makes the Off state write the default/bind pose over
+            // locomotion — the motorbike. (This is the opposite of clothing toggles, which are mask-protected.)
+            const bool wd = false;
+            // Repair any emote layers built with the wrong WriteDefaults from an earlier run.
             int repaired = 0;
             foreach (var t in targets) repaired += AnimatorUtil.SetWriteDefaultsForLayers(t, "CVRFury Emote:", wd);
             // GoGoLoco (and similar) ship locomotion/system clips in the same folder as their emotes —
