@@ -381,7 +381,11 @@ namespace CVRFury.Builder.Convert
                     if (GUILayout.Button("+ Add slider")) _scaleRows.Add(new SliderRow());
                     using (new EditorGUI.DisabledScope(_avatar == null))
                         if (GUILayout.Button("+ Whole-avatar size", GUILayout.Width(150)))
-                            _scaleRows.Add(new SliderRow { kind = SliderKind.Size, target = _avatar.transform });
+                        {
+                            var r = new SliderRow { kind = SliderKind.Size, label = "Avatar Size" };
+                            r.targets[0] = _avatar.transform;
+                            _scaleRows.Add(r);
+                        }
                 }
 
                 SliderRow remove = null;
