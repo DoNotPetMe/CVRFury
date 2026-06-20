@@ -4,6 +4,18 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.61] - 2026-06-19
+
+### Added
+- **Scan multiple clip folders.** Step 2 (clip linking) and the bulk renamer now take a primary Animations
+  Folder plus any number of extra folders, so clips split across separate folders are all covered. Nested
+  subfolders were already scanned recursively (clarified in the UI) — this is for *non-nested* sibling folders.
+
+## [0.9.60] - 2026-06-19
+
+### Changed
+- README repeats trimmed (non-destruction stated once; condensed the dedicated section).
+
 ## [0.9.59] - 2026-06-19
 
 ### Changed

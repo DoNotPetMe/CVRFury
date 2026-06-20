@@ -20,6 +20,7 @@ namespace CVRFury.Builder.Convert
 
         // Step 2 (clips + controller)
         private DefaultAsset _clipFolder;
+        private readonly List<DefaultAsset> _extraClipFolders = new List<DefaultAsset>(); // also-scan folders (siblings)
         private string _onSuffix = "toggled";
         private string _offSuffix = "default";
         private string _renameOn = "1", _renameOff = "0"; // last-resort bulk renamer endings
@@ -148,6 +149,9 @@ namespace CVRFury.Builder.Convert
                     "VRChat FX controller here — its hundreds of params blow the synced-bit budget.",
                     MessageType.None);
                 _clipFolder = (DefaultAsset)EditorGUILayout.ObjectField("Animations Folder", _clipFolder, typeof(DefaultAsset), false);
+                EditorGUILayout.LabelField("Subfolders are scanned automatically. Add more folders only if " +
+                    "clips live in separate (non-nested) folders.", EditorStyles.wordWrappedMiniLabel);
+                DrawExtraFolders(_extraClipFolders);
                 _onSuffix = EditorGUILayout.TextField(new GUIContent("ON  clip name ends with",
                     "One or more comma-separated words, e.g. \"toggled, on, enabled\". Used to recognise " +
                     "the ON clip when a creator named some clips differently from the rest."), _onSuffix);
@@ -172,9 +176,9 @@ namespace CVRFury.Builder.Convert
                     using (new EditorGUI.DisabledScope(_avatar == null || _clipFolder == null))
                         if (GUILayout.Button("Link clips" + (_buildController ? " & build controller" : "")))
                         {
-                            var folderPath = AssetDatabase.GetAssetPath(_clipFolder);
+                            var folders = ClipFolderPaths();
                             RunAndRefresh(() => ToggleClipLinker.LinkClips(
-                                _avatar, folderPath, _onSuffix, _offSuffix, _buildController, _controller));
+                                _avatar, folders, _onSuffix, _offSuffix, _buildController, _controller));
                         }
                 }
                 else
@@ -182,7 +186,7 @@ namespace CVRFury.Builder.Convert
                     using (new EditorGUI.DisabledScope(_avatar == null || _clipFolder == null))
                         if (GUILayout.Button("Preview / refresh matches"))
                             _reviewRows = ToggleClipLinker.Preview(
-                                _avatar, AssetDatabase.GetAssetPath(_clipFolder), _onSuffix, _offSuffix);
+                                _avatar, ClipFolderPaths(), _onSuffix, _offSuffix);
                     if (_reviewRows != null) DrawReviewList();
                 }
 
@@ -219,7 +223,7 @@ namespace CVRFury.Builder.Convert
                             "This renames the animation asset files in the folder. It can break references and " +
                             "can guess wrong. Back up first.\n\nProceed?", "Rename", "Cancel"))
                             RunAndRefresh(() => AnimationRenamer.RenameEndings(
-                                AssetDatabase.GetAssetPath(_clipFolder), _renameOn, _renameOff));
+                                ClipFolderPaths(), _renameOn, _renameOff));
                     }
             }
         }
@@ -891,6 +895,31 @@ namespace CVRFury.Builder.Convert
         }
 
         // --- helpers ---
+
+        /// <summary>All folders to scan for clips: the primary Animations Folder plus any extras. Each is
+        /// scanned recursively by FindAssets, so nested subfolders come along automatically.</summary>
+        private string[] ClipFolderPaths()
+        {
+            var paths = new List<string>();
+            if (_clipFolder != null) paths.Add(AssetDatabase.GetAssetPath(_clipFolder));
+            foreach (var f in _extraClipFolders)
+                if (f != null) paths.Add(AssetDatabase.GetAssetPath(f));
+            return paths.ToArray();
+        }
+
+        /// <summary>A small editable list of extra folder slots (for clips spread across separate folders).</summary>
+        private static void DrawExtraFolders(List<DefaultAsset> list)
+        {
+            int removeAt = -1;
+            for (int i = 0; i < list.Count; i++)
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    list[i] = (DefaultAsset)EditorGUILayout.ObjectField("+ also scan", list[i], typeof(DefaultAsset), false);
+                    if (GUILayout.Button("✕", GUILayout.Width(24))) removeAt = i;
+                }
+            if (removeAt >= 0) list.RemoveAt(removeAt);
+            if (GUILayout.Button("+ add folder", EditorStyles.miniButton, GUILayout.Width(100))) list.Add(null);
+        }
 
         /// <summary>True if the controller is a project asset we may safely add layers to — i.e. a per-avatar
         /// controller, not ChilloutVR's shared stock AvatarAnimator (which lives under a CCK/Packages folder

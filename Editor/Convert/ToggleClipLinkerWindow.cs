@@ -18,12 +18,12 @@ namespace CVRFury.Builder.Convert
     /// </summary>
     internal static class ToggleClipLinker
     {
-        public static string LinkClips(GameObject avatar, string folderPath, string onSuffix, string offSuffix,
+        public static string LinkClips(GameObject avatar, string[] folders, string onSuffix, string offSuffix,
                                        bool build, AnimatorController controller)
         {
             if (avatar == null) return "Select your avatar first.";
-            if (string.IsNullOrEmpty(folderPath) || !AssetDatabase.IsValidFolder(folderPath))
-                return "Pick a valid project folder of animation clips.";
+            var valid = ValidFolders(folders);
+            if (valid.Length == 0) return "Pick at least one valid project folder of animation clips.";
 
             var cvr = CckAvatar.FindOn(avatar);
             if (cvr == null) return "No CVRAvatar found on the selected avatar (run step 1 first).";
@@ -39,8 +39,8 @@ namespace CVRFury.Builder.Convert
                 return "Set both the ON and OFF suffix words. You can list several comma-separated " +
                        "alternatives, e.g. ON: \"toggled, on, enabled\"  OFF: \"default, off, disabled\".";
 
-            // --- pair clips by base name ---
-            var pairs = PairClips(folderPath, onList, offList, out int clipCount);
+            // --- pair clips by base name (every folder is scanned recursively, including subfolders) ---
+            var pairs = PairClips(valid, onList, offList, out int clipCount);
 
             // --- assign clips onto matching toggle entries (non-destructive) ---
             int linked = 0;
@@ -250,11 +250,13 @@ namespace CVRFury.Builder.Convert
         }
 
         private static Dictionary<string, (AnimationClip onClip, AnimationClip offClip, string baseName)> PairClips(
-            string folderPath, List<string> onList, List<string> offList, out int clipCount)
+            string[] folders, List<string> onList, List<string> offList, out int clipCount)
         {
             var pairs = new Dictionary<string, (AnimationClip onClip, AnimationClip offClip, string baseName)>();
             clipCount = 0;
-            foreach (var guid in AssetDatabase.FindAssets("t:AnimationClip", new[] { folderPath }))
+            // FindAssets with searchInFolders recurses into every subfolder, so nested folders (e.g.
+            // Animations/Clothing/…) are covered automatically; passing several folders also covers siblings.
+            foreach (var guid in AssetDatabase.FindAssets("t:AnimationClip", folders))
             {
                 var clip = AssetDatabase.LoadAssetAtPath<AnimationClip>(AssetDatabase.GUIDToAssetPath(guid));
                 if (clip == null) continue;
@@ -263,6 +265,14 @@ namespace CVRFury.Builder.Convert
                 else if (TryStripAny(clip.name, offList, out var baseOff)) Put(pairs, baseOff, clip, false);
             }
             return pairs;
+        }
+
+        /// <summary>Keep only the entries that are real, existing project folders (and de-dupe).</summary>
+        public static string[] ValidFolders(string[] folders)
+        {
+            if (folders == null) return new string[0];
+            return folders.Where(f => !string.IsNullOrEmpty(f) && AssetDatabase.IsValidFolder(f))
+                          .Distinct().ToArray();
         }
 
         /// <summary>One row of the smart-match review: a toggle/slider entry and the clips the tool thinks
@@ -292,15 +302,15 @@ namespace CVRFury.Builder.Convert
         /// name matches first; for anything left unmatched, fuzzy-guess from the leftover clip pairs so the
         /// user can confirm or correct in the review panel. Saved per-avatar manual picks are overlaid on
         /// top so re-previewing keeps your edits.</summary>
-        public static List<Assignment> Preview(GameObject avatar, string folderPath, string onSuffix, string offSuffix)
+        public static List<Assignment> Preview(GameObject avatar, string[] folders, string onSuffix, string offSuffix)
         {
             var rows = new List<Assignment>();
             var cvr = CckAvatar.FindOn(avatar);
             var entries = cvr?.SettingsList;
-            if (entries == null || string.IsNullOrEmpty(folderPath) || !AssetDatabase.IsValidFolder(folderPath))
-                return rows;
+            var valid = ValidFolders(folders);
+            if (entries == null || valid.Length == 0) return rows;
 
-            var pairs = PairClips(folderPath, SplitWords(onSuffix), SplitWords(offSuffix), out _);
+            var pairs = PairClips(valid, SplitWords(onSuffix), SplitWords(offSuffix), out _);
             var used = new HashSet<string>();
 
             // Pass 1: exact match by display name or machine-name leaf.

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
@@ -18,14 +19,15 @@ namespace CVRFury.Builder.Convert
         private static readonly string[] OffWords =
             { "disabled", "disable", "hidden", "hide", "default", "none", "unequip", "false", "inactive", "off" };
 
-        public static string RenameEndings(string folderPath, string onEnding, string offEnding)
+        public static string RenameEndings(string[] folders, string onEnding, string offEnding)
         {
-            if (string.IsNullOrEmpty(folderPath) || !AssetDatabase.IsValidFolder(folderPath))
-                return "Pick a valid folder of animation clips first.";
+            var valid = (folders ?? new string[0])
+                .Where(f => !string.IsNullOrEmpty(f) && AssetDatabase.IsValidFolder(f)).Distinct().ToArray();
+            if (valid.Length == 0) return "Pick a valid folder of animation clips first.";
             if (string.IsNullOrEmpty(onEnding) || string.IsNullOrEmpty(offEnding))
                 return "Set both the ON and OFF endings.";
 
-            var guids = AssetDatabase.FindAssets("t:AnimationClip", new[] { folderPath });
+            var guids = AssetDatabase.FindAssets("t:AnimationClip", valid); // recurses into subfolders
             int renamed = 0;
             var skipped = new List<string>();
             var taken = new HashSet<string>();
