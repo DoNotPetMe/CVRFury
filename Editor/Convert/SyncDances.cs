@@ -68,8 +68,10 @@ namespace CVRFury.Builder.Convert
             foreach (var c in controllers)
             {
                 if (c.parameters.Any(p => p.name == param)) continue; // already built here
-                AnimatorUtil.AddModesLayer(c, "CVRFury Dances", param, clips, 0.1f, defaultIndex: 0);
-                AnimatorUtil.SetWriteDefaultsForLayers(c, "CVRFury Dances", AnimatorUtil.DetectWriteDefaults(c));
+                // Int param so it matches the CVR dropdown (an Int control) — a Float would show as a slider
+                // and the dropdown's integer selection wouldn't drive it. States stay WriteDefaults-off so the
+                // empty "Off" option contributes nothing and locomotion shows through (no motorbike).
+                AnimatorUtil.AddModesLayer(c, "CVRFury Dances", param, clips, 0.1f, defaultIndex: 0, useInt: true);
                 EditorUtility.SetDirty(c);
             }
 

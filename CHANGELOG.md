@@ -4,6 +4,16 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.66] - 2026-06-19
+
+### Fixed
+- **Dance menu was a slider, not a dropdown.** The dance layer used a Float parameter; it's now an **Int** with
+  exact `Equals` conditions so it matches the synced AAS dropdown (and shows as a dropdown, not a 0–1 slider).
+- **Play Mode Tester motorbike pose.** The tester now simulates a grounded, standing avatar (drives CVR's
+  locomotion params: Grounded on, movement zero) so it shows the in-game idle instead of the no-input
+  motorbike pose. Toggle "Stand still (simulate grounded)" to disable.
+- Dance layer keeps WriteDefaults off so the empty "Off" option passes through to locomotion (no motorbike).
+
 ## [0.9.65] - 2026-06-19
 
 ### Added

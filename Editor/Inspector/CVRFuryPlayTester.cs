@@ -14,6 +14,7 @@ namespace CVRFury.Builder
     {
         private GameObject _avatar;
         private Vector2 _scroll;
+        private bool _simulateStanding = true;
 
         // ChilloutVR drives these itself; hide them so the list shows only your settings.
         private static readonly HashSet<string> Core = new HashSet<string>
@@ -60,6 +61,13 @@ namespace CVRFury.Builder
                     "(Build & attach a controller) first.", MessageType.Warning);
                 return;
             }
+
+            // Without locomotion input the avatar sits in CVR's no-input/falling pose (the "motorbike").
+            // Simulate a grounded, standing avatar so what you see matches in-game idle while testing.
+            _simulateStanding = EditorGUILayout.ToggleLeft(new GUIContent("Stand still (simulate grounded)",
+                "Drives CVR's locomotion params to a grounded idle so the avatar doesn't motorbike in Play mode."),
+                _simulateStanding);
+            if (_simulateStanding) DriveStanding(anim);
 
             var labels = BuildLabelLookup(_avatar);
             var ps = anim.parameters;
@@ -108,6 +116,34 @@ namespace CVRFury.Builder
                         case AnimatorControllerParameterType.Int: anim.SetInteger(p.name, p.defaultInt); break;
                     }
                 }
+        }
+
+        /// <summary>Hold CVR's locomotion parameters at "grounded, not moving" so the avatar stands in idle
+        /// instead of dropping into the no-input motorbike pose while you test.</summary>
+        private static void DriveStanding(Animator anim)
+        {
+            foreach (var p in anim.parameters)
+            {
+                switch (p.name)
+                {
+                    case "Grounded": Set(anim, p, 1f); break;
+                    case "Upright": Set(anim, p, 1f); break;
+                    case "MovementX": case "MovementY":
+                    case "VelocityX": case "VelocityY": case "VelocityZ":
+                    case "Sitting": case "Flying": case "Crouching": case "Prone": case "Swimming":
+                        Set(anim, p, 0f); break;
+                }
+            }
+        }
+
+        private static void Set(Animator anim, AnimatorControllerParameter p, float v)
+        {
+            switch (p.type)
+            {
+                case AnimatorControllerParameterType.Bool: anim.SetBool(p.name, v > 0.5f); break;
+                case AnimatorControllerParameterType.Int: anim.SetInteger(p.name, Mathf.RoundToInt(v)); break;
+                case AnimatorControllerParameterType.Float: anim.SetFloat(p.name, v); break;
+            }
         }
 
         /// <summary>Map each synced parameter (machine name) to its friendly AAS display name for labels.</summary>

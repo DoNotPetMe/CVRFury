@@ -197,9 +197,11 @@ namespace CVRFury.Builder
         /// within ±0.5 of its index. This is the animator side of a Modes / Dropdown control.
         /// </summary>
         public static void AddModesLayer(AnimatorController c, string layerName, string param,
-                                         AnimationClip[] clips, float transitionSeconds, int defaultIndex)
+                                         AnimationClip[] clips, float transitionSeconds, int defaultIndex,
+                                         bool useInt = false)
         {
-            EnsureFloatParam(c, param, defaultIndex);
+            if (useInt) EnsureIntParam(c, param, defaultIndex);
+            else EnsureFloatParam(c, param, defaultIndex);
 
             var name = UniqueLayerName(c, layerName);
             c.AddLayer(name);
@@ -219,9 +221,14 @@ namespace CVRFury.Builder
                 var t = sm.AddAnyStateTransition(state);
                 ConfigureTransition(t, transitionSeconds);
                 t.canTransitionToSelf = false;
-                // Window [i-0.5, i+0.5); omit the unbounded side at the ends.
-                if (i > 0) t.AddCondition(AnimatorConditionMode.Greater, i - 0.5f, param);
-                if (i < clips.Length - 1) t.AddCondition(AnimatorConditionMode.Less, i + 0.5f, param);
+                if (useInt)
+                    t.AddCondition(AnimatorConditionMode.Equals, i, param); // exact int match (dropdown)
+                else
+                {
+                    // Float window [i-0.5, i+0.5); omit the unbounded side at the ends.
+                    if (i > 0) t.AddCondition(AnimatorConditionMode.Greater, i - 0.5f, param);
+                    if (i < clips.Length - 1) t.AddCondition(AnimatorConditionMode.Less, i + 0.5f, param);
+                }
             }
         }
 
