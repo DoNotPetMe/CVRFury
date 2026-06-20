@@ -405,9 +405,17 @@ namespace CVRFury.Builder.Convert
                         using (new EditorGUILayout.HorizontalScope())
                         {
                             if (row.kind == SliderKind.Length)
-                                row.axis = EditorGUILayout.Popup(row.axis, AxisNames, GUILayout.Width(40));
-                            row.min = EditorGUILayout.FloatField("min", row.min, GUILayout.Width(110));
-                            row.max = EditorGUILayout.FloatField("max", row.max, GUILayout.Width(110));
+                            {
+                                GUILayout.Label("axis", GUILayout.Width(30));
+                                row.axis = EditorGUILayout.Popup(row.axis, AxisNames, GUILayout.Width(45));
+                                GUILayout.Space(8);
+                            }
+                            GUILayout.Label("min", GUILayout.Width(28));
+                            row.min = EditorGUILayout.FloatField(row.min, GUILayout.Width(60));
+                            GUILayout.Space(8);
+                            GUILayout.Label("max", GUILayout.Width(28));
+                            row.max = EditorGUILayout.FloatField(row.max, GUILayout.Width(60));
+                            GUILayout.FlexibleSpace();
                         }
                     }
                 }

@@ -4,6 +4,13 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.56] - 2026-06-19
+
+### Fixed
+- **Sliders panel min/max fields were unusably tiny.** The number boxes had their labels packed inside a
+  fixed width, leaving no room to type. Labels are now drawn separately so min/max (and the Length axis) are
+  proper, editable fields.
+
 ## [0.9.55] - 2026-06-19
 
 ### Added
