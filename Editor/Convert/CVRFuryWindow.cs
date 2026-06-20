@@ -56,8 +56,9 @@ namespace CVRFury.Builder.Convert
         private sealed class SliderRow
         {
             public SliderKind kind = SliderKind.Size;
-            public Transform target;     // Size / Length
-            public Renderer renderer;    // Hue / Emission
+            public string label = "";    // optional menu name; blank = auto from first target
+            public readonly List<Transform> targets = new List<Transform> { null };  // Size / Length (≥1, equal scaling)
+            public readonly List<Renderer> renderers = new List<Renderer> { null };  // Hue / Emission
             public string property = ""; // Hue / Emission shader property
             public int axis = 2;         // Length (X/Y/Z)
             public float min = 0.5f, max = 2f;
@@ -390,11 +391,15 @@ namespace CVRFury.Builder.Convert
                             if (GUILayout.Button("✕", GUILayout.Width(24))) remove = row;
                         }
 
+                        row.label = EditorGUILayout.TextField(new GUIContent("Menu name",
+                            "Optional. Blank = named after the first target (e.g. \"Boobs\" for a left+right pair)."),
+                            row.label);
+
                         if (row.kind == SliderKind.Size || row.kind == SliderKind.Length)
-                            row.target = (Transform)EditorGUILayout.ObjectField("Part", row.target, typeof(Transform), true);
+                            DrawTargetList(row.targets, "Part", "Add part — list several for equal scaling (L+R)");
                         else
                         {
-                            row.renderer = (Renderer)EditorGUILayout.ObjectField("Mesh", row.renderer, typeof(Renderer), true);
+                            DrawRendererList(row.renderers, "Mesh");
                             if (string.IsNullOrEmpty(row.property))
                                 row.property = row.kind == SliderKind.Hue ? "_MainHueShift" : "_EmissionStrength";
                             row.property = EditorGUILayout.TextField(new GUIContent("Shader property",
@@ -434,35 +439,62 @@ namespace CVRFury.Builder.Convert
             }
         }
 
+        private static void DrawTargetList(List<Transform> list, string label, string addTip)
+        {
+            for (int i = 0; i < list.Count; i++)
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    list[i] = (Transform)EditorGUILayout.ObjectField(i == 0 ? label : " ", list[i], typeof(Transform), true);
+                    if (GUILayout.Button("✕", GUILayout.Width(24)) && list.Count > 1) { list.RemoveAt(i); break; }
+                }
+            if (GUILayout.Button(new GUIContent("+ target", addTip), EditorStyles.miniButton, GUILayout.Width(80)))
+                list.Add(null);
+        }
+
+        private static void DrawRendererList(List<Renderer> list, string label)
+        {
+            for (int i = 0; i < list.Count; i++)
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    list[i] = (Renderer)EditorGUILayout.ObjectField(i == 0 ? label : " ", list[i], typeof(Renderer), true);
+                    if (GUILayout.Button("✕", GUILayout.Width(24)) && list.Count > 1) { list.RemoveAt(i); break; }
+                }
+            if (GUILayout.Button(new GUIContent("+ mesh", "Add another mesh for equal scaling"), EditorStyles.miniButton, GUILayout.Width(80)))
+                list.Add(null);
+        }
+
         private string CreateSliders()
         {
             int made = 0;
-            var errors = new System.Collections.Generic.List<string>();
+            var errors = new List<string>();
             foreach (var row in _scaleRows)
             {
                 string err = null;
+                var transforms = row.targets.Where(t => t != null).ToList();
+                var renderers = row.renderers.Where(r => r != null).ToList();
                 switch (row.kind)
                 {
                     case SliderKind.Size:
                     {
-                        var part = row.target == (_avatar ? _avatar.transform : null) ? "Avatar" : row.target?.name;
-                        err = AvatarSizeSlider.AddSlider(_avatar, row.target, Vector3.one, row.min, row.max, part + " Size");
+                        var name = SliderLabel(row.label, transforms.Count > 0 ? transforms[0].name : null,
+                            transforms.Count > 0 && transforms[0] == (_avatar ? _avatar.transform : null) ? "Avatar Size" : "Size");
+                        err = AvatarSizeSlider.AddSlider(_avatar, transforms, Vector3.one, row.min, row.max, name);
                         break;
                     }
                     case SliderKind.Length:
                     {
                         var axisVec = new Vector3(row.axis == 0 ? 1 : 0, row.axis == 1 ? 1 : 0, row.axis == 2 ? 1 : 0);
-                        err = AvatarSizeSlider.AddSlider(_avatar, row.target, axisVec, row.min, row.max,
-                            (row.target ? row.target.name : "?") + " Length");
+                        var name = SliderLabel(row.label, transforms.Count > 0 ? transforms[0].name : null, "Length");
+                        err = AvatarSizeSlider.AddSlider(_avatar, transforms, axisVec, row.min, row.max, name);
                         break;
                     }
                     case SliderKind.Hue:
-                        err = AvatarSizeSlider.AddMaterialSlider(_avatar, row.renderer, row.property, row.min, row.max,
-                            (row.renderer ? row.renderer.name : "?") + " Hue");
+                        err = AvatarSizeSlider.AddMaterialSlider(_avatar, renderers, row.property, row.min, row.max,
+                            SliderLabel(row.label, renderers.Count > 0 ? renderers[0].name : null, "Hue"));
                         break;
                     case SliderKind.Emission:
-                        err = AvatarSizeSlider.AddMaterialSlider(_avatar, row.renderer, row.property, row.min, row.max,
-                            (row.renderer ? row.renderer.name : "?") + " Emission");
+                        err = AvatarSizeSlider.AddMaterialSlider(_avatar, renderers, row.property, row.min, row.max,
+                            SliderLabel(row.label, renderers.Count > 0 ? renderers[0].name : null, "Emission"));
                         break;
                 }
                 if (err != null) errors.Add(err); else made++;
@@ -470,6 +502,13 @@ namespace CVRFury.Builder.Convert
             var msg = $"Created {made} slider(s). They appear in the Advanced Settings menu and apply at runtime in CVR.";
             if (errors.Count > 0) msg += "\nSkipped: " + string.Join("; ", errors);
             return msg;
+        }
+
+        /// <summary>Menu label: the user's custom name if set, else "{first target} {kind}".</summary>
+        private static string SliderLabel(string custom, string firstName, string kindWord)
+        {
+            if (!string.IsNullOrWhiteSpace(custom)) return custom.Trim();
+            return (string.IsNullOrEmpty(firstName) ? "?" : firstName) + " " + kindWord;
         }
 
         private void StepSps()

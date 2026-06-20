@@ -4,6 +4,14 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.57] - 2026-06-19
+
+### Added
+- **One slider can drive multiple targets equally.** Each Sliders row now takes a list of targets (or meshes
+  for hue/emission) — add left + right and a single slider scales both together (e.g. one "Boobs" size
+  slider). Added an optional Menu name per row so you can call it whatever you like instead of auto-naming
+  from the first target.
+
 ## [0.9.56] - 2026-06-19
 
 ### Fixed

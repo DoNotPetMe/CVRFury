@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEditor;
 using CVRFury.Components;
@@ -16,18 +18,18 @@ namespace CVRFury.Builder.Convert
         public static string Add(GameObject avatar, float min, float max)
         {
             if (avatar == null) return "Select your avatar first.";
-            var msg = AddSlider(avatar, avatar.transform, Vector3.one, min, max, "Avatar Size");
+            var msg = AddSlider(avatar, new[] { avatar.transform }, Vector3.one, min, max, "Avatar Size");
             return msg ?? $"Added an \"Avatar Size\" slider ({min:0.##}× – {max:0.##}×), defaulting to normal size.";
         }
 
-        /// <summary>Add (or replace) a scale slider named <paramref name="label"/> that scales
-        /// <paramref name="target"/> on the given <paramref name="axes"/> between min× and max×. The slider
-        /// component lives on the avatar so it shows in the menu; the animation drives the target. Returns an
-        /// error string, or null on success.</summary>
-        public static string AddSlider(GameObject avatar, Transform target, Vector3 axes, float min, float max, string label)
+        /// <summary>Add (or replace) one scale slider named <paramref name="label"/> that scales ALL the given
+        /// <paramref name="targets"/> equally on <paramref name="axes"/> between min× and max× — so a single
+        /// slider can drive a symmetric pair (left + right). Returns an error string, or null on success.</summary>
+        public static string AddSlider(GameObject avatar, IEnumerable<Transform> targets, Vector3 axes, float min, float max, string label)
         {
             if (avatar == null) return "Select your avatar first.";
-            if (target == null) return $"'{label}': no target object set.";
+            var list = targets?.Where(t => t != null).ToList() ?? new List<Transform>();
+            if (list.Count == 0) return $"'{label}': no target object set.";
             if (max <= min) return $"'{label}': max must be larger than min.";
             if (axes == Vector3.zero) return $"'{label}': no axis selected.";
 
@@ -39,8 +41,11 @@ namespace CVRFury.Builder.Convert
             slider.menuPath = label;
             slider.saved = true;
             slider.localOnly = false;
-            slider.minState.actions.Add(ScaleAction(target, axes, min));
-            slider.maxState.actions.Add(ScaleAction(target, axes, max));
+            foreach (var t in list)
+            {
+                slider.minState.actions.Add(ScaleAction(t, axes, min));
+                slider.maxState.actions.Add(ScaleAction(t, axes, max));
+            }
             // Default so the part loads at its normal (1×) size: the value where min..max == 1.
             slider.defaultValue = Mathf.Clamp01((1f - min) / (max - min));
 
@@ -51,10 +56,11 @@ namespace CVRFury.Builder.Convert
         /// <summary>Add (or replace) a slider named <paramref name="label"/> that drives a material float
         /// property (e.g. a hue shift or emission strength) on <paramref name="r"/> between min and max. The
         /// slider loads at min. Returns an error string, or null on success.</summary>
-        public static string AddMaterialSlider(GameObject avatar, Renderer r, string property, float min, float max, string label)
+        public static string AddMaterialSlider(GameObject avatar, IEnumerable<Renderer> renderers, string property, float min, float max, string label)
         {
             if (avatar == null) return "Select your avatar first.";
-            if (r == null) return $"'{label}': no mesh/renderer set.";
+            var list = renderers?.Where(r => r != null).ToList() ?? new List<Renderer>();
+            if (list.Count == 0) return $"'{label}': no mesh/renderer set.";
             if (string.IsNullOrEmpty(property)) return $"'{label}': no shader property set.";
             if (max <= min) return $"'{label}': max must be larger than min.";
 
@@ -64,8 +70,11 @@ namespace CVRFury.Builder.Convert
             var slider = Undo.AddComponent<CVRFurySlider>(avatar);
             slider.menuPath = label;
             slider.saved = true;
-            slider.minState.actions.Add(MaterialAction(r, property, min));
-            slider.maxState.actions.Add(MaterialAction(r, property, max));
+            foreach (var r in list)
+            {
+                slider.minState.actions.Add(MaterialAction(r, property, min));
+                slider.maxState.actions.Add(MaterialAction(r, property, max));
+            }
             slider.defaultValue = 0f; // load at min (e.g. no hue shift)
 
             EditorUtility.SetDirty(avatar);
