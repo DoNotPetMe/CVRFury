@@ -153,8 +153,8 @@ namespace CVRFury.Builder.Convert
                     "clips live in separate (non-nested) folders.", EditorStyles.wordWrappedMiniLabel);
                 DrawExtraFolders(_extraClipFolders);
                 _onSuffix = EditorGUILayout.TextField(new GUIContent("ON  clip name ends with",
-                    "One or more comma-separated words, e.g. \"toggled, on, enabled\". Used to recognise " +
-                    "the ON clip when a creator named some clips differently from the rest."), _onSuffix);
+                    "One or more comma-separated words, e.g. \"toggled, on, enabled\". LEAVE BLANK if the ON " +
+                    "animation is named exactly after the toggle (e.g. \"Tail\" on / \"Tail off\" off)."), _onSuffix);
                 _offSuffix = EditorGUILayout.TextField(new GUIContent("OFF clip name ends with",
                     "One or more comma-separated words, e.g. \"default, off, disabled\"."), _offSuffix);
                 EditorGUILayout.LabelField(" ", "Tip: list several comma-separated words if clips aren't all named the same.", EditorStyles.miniLabel);

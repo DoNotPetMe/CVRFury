@@ -4,6 +4,13 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.63] - 2026-06-19
+
+### Added
+- **"Bare name = ON" clip matching.** Leave the ON suffix blank and CVRFury treats a clip named exactly after
+  the toggle as the ON animation, paired with its `name + off` counterpart (e.g. "Tail to side" on / "Tail to
+  side off" off). Covers creators who name the on clip after the toggle and only suffix the off clip.
+
 ## [0.9.62] - 2026-06-19
 
 ### Fixed

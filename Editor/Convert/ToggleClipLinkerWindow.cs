@@ -35,9 +35,9 @@ namespace CVRFury.Builder.Convert
             // / "default, off, disabled"), so clips named differently from the rest still pair up.
             var onList = SplitWords(onSuffix);
             var offList = SplitWords(offSuffix);
-            if (onList.Count == 0 || offList.Count == 0)
-                return "Set both the ON and OFF suffix words. You can list several comma-separated " +
-                       "alternatives, e.g. ON: \"toggled, on, enabled\"  OFF: \"default, off, disabled\".";
+            if (offList.Count == 0)
+                return "Set the OFF suffix word(s), e.g. \"off, default, disabled\". Leave ON blank if the " +
+                       "on animation is named exactly after the toggle (e.g. \"Tail\" + \"Tail off\").";
 
             // --- pair clips by base name (every folder is scanned recursively, including subfolders) ---
             var pairs = PairClips(valid, onList, offList, out int clipCount);
@@ -261,8 +261,13 @@ namespace CVRFury.Builder.Convert
                 var clip = AssetDatabase.LoadAssetAtPath<AnimationClip>(AssetDatabase.GUIDToAssetPath(guid));
                 if (clip == null) continue;
                 clipCount++;
-                if (TryStripAny(clip.name, onList, out var baseOn)) Put(pairs, baseOn, clip, true);
-                else if (TryStripAny(clip.name, offList, out var baseOff)) Put(pairs, baseOff, clip, false);
+                // OFF is checked first so "Tail off" is the off clip, not a bare-name on clip.
+                if (TryStripAny(clip.name, offList, out var baseOff)) Put(pairs, baseOff, clip, false);
+                else if (onList.Count > 0 && TryStripAny(clip.name, onList, out var baseOn)) Put(pairs, baseOn, clip, true);
+                // "Bare name = ON" mode: when no ON suffix is given, a clip with no off-suffix IS the on clip,
+                // and its full name is the base (so "Tail" pairs with "Tail off"). This matches creators who
+                // name the on animation exactly after the toggle.
+                else if (onList.Count == 0) Put(pairs, clip.name, clip, true);
             }
             return pairs;
         }
