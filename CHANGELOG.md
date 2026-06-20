@@ -4,6 +4,14 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.55] - 2026-06-19
+
+### Added
+- **Play Mode Tester (Tools ▸ CVRFury ▸ Play Mode Tester).** A CVR version of VRChat's Gesture Manager: in
+  Unity Play mode it lists your avatar's Advanced Avatar Settings (labelled from the AAS entries) and lets you
+  flip toggles, drag sliders, pick dropdowns and fire triggers live — the animations play exactly as in-game,
+  with no upload. Hides ChilloutVR's core locomotion/gesture parameters, and has a "Reset all to defaults".
+
 ## [0.9.54] - 2026-06-19
 
 ### Added
