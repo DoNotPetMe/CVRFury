@@ -1,30 +1,28 @@
 # CVRFury
 
-**Non-destructive avatar tooling for ChilloutVR.** CVRFury brings the workflow
-that [VRCFury](https://vrcfury.com) made popular on VRChat to the **ChilloutVR
-Content Creation Kit (CCK)**: drop feature components onto your avatar, and they
-are baked into the avatar's animators and **Advanced Avatar Settings (AAS)**
-automatically at upload time — your source scene is never modified.
+**VRCFury-style avatar tools for ChilloutVR.** Add features to your avatar as simple
+drop-on components, and CVRFury bakes them into ChilloutVR's Advanced Avatar Settings
+and animators for you at upload — your scene is never touched.
 
-> CVRFury is an independent project, inspired by VRCFury's design but containing
-> no VRCFury code. It is not affiliated with Alpha Blend Interactive (ChilloutVR)
-> or with VRChat / VRCFury. See [`LICENSE`](LICENSE).
+### What it does
+- **Menus, toggles & sliders** — clothing toggles, outfit switchers, gestures, and
+  size / length / hue / emission sliders (drive several parts at once), all from components.
+- **Brings VRChat avatars to ChilloutVR** — one window ports the avatar: viewpoint &
+  visemes, PhysBones → DynamicBones, the whole expression menu → Advanced Avatar Settings,
+  and it strips the VRChat parts that won't load.
+- **NSFW / DPS helpers** — detect SPS/DPS, bake DPS orifices and turn on penetrator deform,
+  all as opt-in menu toggles.
+- **Test in Play mode** — flip your toggles and sliders live in Unity, no upload needed.
 
----
+### Why it's easy
+- **Automatic at upload** — no hand-wiring animators: CVRFury builds the controller, the
+  synced parameters and the menu entries, then removes itself from the build.
+- **Non-destructive** — it works on a copy at build time, so your source avatar stays as-is.
+- **One window, step by step** — pick your avatar and work down the list; each button tells
+  you what it did and what to do next.
 
-## Why it exists
-
-ChilloutVR's CCK is powerful but its avatar setup is **destructive**: you wire
-toggles directly into one big animator and the CVRAvatar component, and prefabs
-shipped by clothing/asset creators can't "just work" on an arbitrary avatar.
-VRChat solved this with non-destructive tools (VRCFury, Modular Avatar) built on
-the SDK's preprocess callback. CVRFury does the same for ChilloutVR.
-
-The catch: **ChilloutVR's CCK exposes no formal preprocess interface.** CVRFury
-hooks the build the same proven way lilToon and NDMF-for-CVR do — by subscribing
-via reflection to the CCK's `CCK_BuildUtility.PreAvatarBundleEvent`, which fires
-on the avatar GameObject right before it is bundled for upload. See
-[`Documentation~/ARCHITECTURE.md`](Documentation~/ARCHITECTURE.md).
+> Independent project inspired by VRCFury's design — it contains no VRCFury code and isn't
+> affiliated with ChilloutVR / Alpha Blend Interactive or VRChat / VRCFury. See [`LICENSE`](LICENSE).
 
 ---
 

@@ -4,6 +4,12 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.59] - 2026-06-19
+
+### Changed
+- **README / package description rewritten** to be shorter and more human: leads with what the tool does,
+  what it does automatically, and why it's easy (one window, automatic at upload, non-destructive).
+
 ## [0.9.58] - 2026-06-19
 
 ### Added
