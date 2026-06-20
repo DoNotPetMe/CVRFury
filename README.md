@@ -2,7 +2,7 @@
 
 **VRCFury-style avatar tools for ChilloutVR.** Add features to your avatar as simple
 drop-on components, and CVRFury bakes them into ChilloutVR's Advanced Avatar Settings
-and animators for you at upload — your scene is never touched.
+and animators for you at upload.
 
 ### What it does
 - **Menus, toggles & sliders** — clothing toggles, outfit switchers, gestures, and
@@ -129,18 +129,10 @@ If you only need the broken `(Script)` components gone:
 > confirm CVRFury has hooked your CCK version and that every Advanced Avatar
 > Settings field it writes is present.
 
-## How non-destruction works
+## If a feature can't build
 
-CVRFury never edits your source assets:
-
-- It runs on the GameObject the CCK hands it at build time.
-- Generated animator controllers and clips are **clones** written to a temporary
-  folder (`Assets/_CVRFury/Generated`, cleared on each build).
-- All `CVRFuryComponent`s are stripped from the uploaded copy.
-
-If anything goes wrong, CVRFury logs a clear message (see **Tools ▸ CVRFury ▸
-Show Last Build Log**) and skips the offending feature rather than breaking your
-upload.
+CVRFury logs a clear message (**Tools ▸ CVRFury ▸ Show Last Build Log**) and skips the
+offending feature rather than breaking your upload.
 
 ---
 
