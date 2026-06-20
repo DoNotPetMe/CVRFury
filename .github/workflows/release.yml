@@ -1,0 +1,61 @@
+name: Release
+
+# Produces cleanly-named downloads (CVRFury.zip / CVRFury.unitypackage) so users never get GitHub's
+# auto-generated "CVRFury-<branch>.zip" name. Runs when you push a version tag (e.g. v0.9.57), or manually.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Files that make up the distributable package.
+      - name: Collect package files
+        id: files
+        run: |
+          find Editor Runtime -type f ! -name '*.meta' > include.txt
+          for f in package.json README.md CHANGELOG.md LICENSE; do
+            [ -f "$f" ] && echo "$f" >> include.txt
+          done
+          echo "Files:"; cat include.txt
+
+      # A plain zip is always produced (reliable; drag the folder into Assets, or import via VCC).
+      - name: Build CVRFury.zip
+        run: |
+          zip -r CVRFury.zip Editor Runtime \
+            $( [ -f package.json ] && echo package.json ) \
+            $( [ -f README.md ] && echo README.md ) \
+            $( [ -f CHANGELOG.md ] && echo CHANGELOG.md ) \
+            $( [ -f LICENSE ] && echo LICENSE )
+
+      # A .unitypackage for double-click import (built without Unity, from the .meta GUIDs).
+      - name: Build CVRFury.unitypackage
+        continue-on-error: true
+        uses: pCYSl5EDgo/create-unitypackage@v1
+        with:
+          package-path: CVRFury.unitypackage
+          include-files: include.txt
+
+      - name: Upload as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CVRFury
+          path: |
+            CVRFury.zip
+            CVRFury.unitypackage
+
+      # When triggered by a tag, also attach the named files to the GitHub Release.
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            CVRFury.zip
+            CVRFury.unitypackage

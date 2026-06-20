@@ -4,6 +4,14 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.58] - 2026-06-19
+
+### Added
+- **Release workflow for clean download names.** GitHub's branch-ZIP is auto-named "CVRFury-<branch>.zip",
+  which can't be renamed. A new GitHub Actions workflow builds properly-named **CVRFury.zip** and
+  **CVRFury.unitypackage** — attached to a GitHub Release when you push a `v*` tag, or downloadable as a
+  workflow artifact via "Run workflow". Distribute those instead of the branch ZIP.
+
 ## [0.9.57] - 2026-06-19
 
 ### Added
