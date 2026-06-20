@@ -4,6 +4,15 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.64] - 2026-06-19
+
+### Added
+- **Emote wheel slot editor (CVR's emote menu, not the toggle menu).** New section detects the avatar's real
+  emote slots — the animator states driven by the `Emote` parameter — and lists each with its current clip,
+  so you can confirm it's targeting the emote wheel. Assign a replacement animation per slot (and an optional
+  audio clip, played via an AudioSource the emote activates). Changes are written into the base controller as
+  well, so they survive CVR's upload regeneration.
+
 ## [0.9.63] - 2026-06-19
 
 ### Added

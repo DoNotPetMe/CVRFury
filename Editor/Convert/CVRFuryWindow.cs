@@ -49,7 +49,12 @@ namespace CVRFury.Builder.Convert
         // Strip
         private bool _removeFinalIK = true;
 
-        private bool _s0, _s1 = true, _s2 = true, _se, _s3, _s4, _s5, _sSps, _sResize, _sCredits;
+        private bool _s0, _s1 = true, _s2 = true, _se, _sEmoteWheel, _s3, _s4, _s5, _sSps, _sResize, _sCredits;
+
+        // Emote wheel (CVR emote menu) slot overrides
+        private sealed class EmoteSlotRow { public int index; public string current; public AnimationClip newClip; public AudioClip audio; }
+        private readonly List<EmoteSlotRow> _emoteSlots = new List<EmoteSlotRow>();
+        private string _emoteWheelStatus = "";
         private string _resizeStatus = "";
 
         // Unified slider rows (size / length / hue / emission) — one per control you want.
@@ -102,6 +107,7 @@ namespace CVRFury.Builder.Convert
             Step1Parameters();
             Step2Clips();
             StepEmotes();
+            StepEmoteWheel();
             Step3PhysBones();
             Step4Magica();
             StepSps();
@@ -802,6 +808,113 @@ namespace CVRFury.Builder.Convert
             return $"Removed all CVRFury emotes ({entries} menu entr(ies), {layers} animator layer(s), {parms} " +
                    "parameter(s)). If the avatar STILL motorbikes now, the cause is the base controller, not the " +
                    "emotes — use \"Fix motorbike pose\", or re-run Step 2 to rebuild locomotion.";
+        }
+
+        private void StepEmoteWheel()
+        {
+            _sEmoteWheel = Foldout(_sEmoteWheel, "Emote wheel (CVR emote menu — separate from toggles)");
+            if (!_sEmoteWheel) return;
+            using (new EditorGUI.IndentLevelScope())
+            {
+                EditorGUILayout.HelpBox("Replaces the clips in ChilloutVR's built-in EMOTE WHEEL (the emote " +
+                    "radial, not the Advanced Settings toggles). Detect first — it reads the avatar's animator " +
+                    "for the real emote slots (states driven by the Emote parameter), so you see exactly what " +
+                    "you're changing.", MessageType.Info);
+
+                using (new EditorGUI.DisabledScope(_avatar == null))
+                    if (GUILayout.Button("Detect emote slots"))
+                    {
+                        try
+                        {
+                            EmoteControllers(out var c);
+                            var slots = c != null ? EmoteSlots.Detect(c) : new List<EmoteSlots.Slot>();
+                            _emoteSlots.Clear();
+                            foreach (var s in slots)
+                                _emoteSlots.Add(new EmoteSlotRow { index = s.index, current = s.clip ? s.clip.name : "(empty)" });
+                            _emoteWheelStatus = slots.Count == 0
+                                ? "No emote slots found — this controller has no Emote-parameter states. Run " +
+                                  "Step 2 (Build & attach) so it carries CVR's emote layer, then detect again."
+                                : $"Found {slots.Count} emote slot(s): " +
+                                  string.Join(", ", slots.Select(s => $"#{s.index} ({s.location})")) +
+                                  ". Assign replacements below, then Apply.";
+                        }
+                        catch (System.Exception ex) { _emoteWheelStatus = "Error: " + ex.Message; Debug.LogException(ex); }
+                        Repaint();
+                    }
+
+                foreach (var row in _emoteSlots)
+                    using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+                    {
+                        EditorGUILayout.LabelField($"Emote slot {row.index}", $"now: {row.current}");
+                        row.newClip = (AnimationClip)EditorGUILayout.ObjectField("Replace with", row.newClip, typeof(AnimationClip), false);
+                        row.audio = (AudioClip)EditorGUILayout.ObjectField("Audio (optional)", row.audio, typeof(AudioClip), false);
+                    }
+
+                if (_emoteSlots.Count > 0)
+                    using (new EditorGUI.DisabledScope(_avatar == null))
+                        if (GUILayout.Button("Apply emote changes"))
+                        {
+                            try { _emoteWheelStatus = ApplyEmoteWheel(); }
+                            catch (System.Exception ex) { _emoteWheelStatus = "Error: " + ex.Message; Debug.LogException(ex); }
+                            Repaint();
+                        }
+
+                if (!string.IsNullOrEmpty(_emoteWheelStatus))
+                    EditorGUILayout.HelpBox(_emoteWheelStatus,
+                        _emoteWheelStatus.StartsWith("Error") ? MessageType.Error : MessageType.Info);
+            }
+        }
+
+        /// <summary>Controllers to write emote slots into: the live AAS animator plus the writable per-avatar
+        /// base controller (so changes survive CVR's upload regeneration). <paramref name="detect"/> is the
+        /// one to read slots from.</summary>
+        private AnimatorController[] EmoteControllers(out AnimatorController detect)
+        {
+            var list = new List<AnimatorController>();
+            var cvr = CckAvatar.FindOn(_avatar);
+            var anim = cvr != null ? Reflect.GetField(cvr.AdvancedSettings, CckNames.AdvancedSettings_Animator) as AnimatorController : null;
+            if (anim == null)
+            {
+                var a = _avatar != null ? _avatar.GetComponentInChildren<Animator>() : null;
+                anim = a != null ? a.runtimeAnimatorController as AnimatorController : null;
+            }
+            if (anim != null) list.Add(anim);
+            var baseC = cvr != null ? Reflect.GetField(cvr.AdvancedSettings, CckNames.AdvancedSettings_BaseController) as AnimatorController : null;
+            if (baseC != null && baseC != anim && IsWritablePerAvatarController(baseC)) list.Add(baseC);
+            detect = anim ?? baseC;
+            return list.ToArray();
+        }
+
+        private string ApplyEmoteWheel()
+        {
+            var controllers = EmoteControllers(out _);
+            if (controllers.Length == 0) return "No writable controller — run Step 2 (Build & attach) first.";
+
+            int changed = 0;
+            var errors = new List<string>();
+            foreach (var row in _emoteSlots)
+            {
+                if (row.newClip == null) continue;
+                if (row.audio != null)
+                {
+                    var err = EmoteSlots.SetClipWithAudio(_avatar, controllers, row.index, row.newClip, row.audio);
+                    if (err != null) errors.Add(err); else changed++;
+                }
+                else
+                {
+                    bool any = false;
+                    foreach (var c in controllers) if (EmoteSlots.SetClip(c, row.index, row.newClip)) any = true;
+                    if (any) changed++; else errors.Add($"Slot {row.index} not found.");
+                }
+            }
+            foreach (var c in controllers) EditorUtility.SetDirty(c);
+            AssetDatabase.SaveAssets();
+            CckAvatar.FindOn(_avatar)?.Persist();
+
+            if (changed == 0 && errors.Count == 0) return "Nothing to apply — assign a replacement clip to a slot first.";
+            var msg = $"Updated {changed} emote slot(s) in the emote wheel.";
+            if (errors.Count > 0) msg += "\nSkipped: " + string.Join("; ", errors);
+            return msg;
         }
 
         private string AddEmotes()
