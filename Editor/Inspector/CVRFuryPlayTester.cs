@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEditor;
 using UnityEditor.Animations;
 using UnityEngine;
@@ -134,8 +135,20 @@ namespace CVRFury.Builder
                     EditorGUILayout.LabelField($"{li}: {anim.GetLayerName(li)}",
                         $"w={w:0.##}{(masked ? "  (masked)" : "")}");
                 }
-                EditorGUILayout.LabelField("Suspect: an unmasked layer at w=1 that isn't locomotion.",
-                    EditorStyles.wordWrappedMiniLabel);
+
+                // What the BASE layer is actually playing right now, and whether real CVR locomotion exists.
+                EditorGUILayout.Space(2);
+                var info = anim.GetCurrentAnimatorClipInfo(0);
+                var playing = info.Length > 0
+                    ? string.Join(", ", info.Select(ci => ci.clip ? ci.clip.name : "?"))
+                    : "(nothing — base layer has no clip playing)";
+                EditorGUILayout.LabelField("Base layer playing", playing);
+                bool hasLoco = ctrl != null && ControllerGuard.HasCvrLocomotion(ctrl);
+                EditorGUILayout.LabelField("Real CVR locomotion blendtree", hasLoco ? "yes" : "NO — this is the problem");
+                var path = ctrl != null ? AssetDatabase.GetAssetPath(ctrl) : "(none)";
+                EditorGUILayout.LabelField("Controller asset", string.IsNullOrEmpty(path) ? "(runtime/none)" : path);
+                EditorGUILayout.LabelField("Suspect: an unmasked layer at w=1 that isn't locomotion, or no " +
+                    "locomotion blendtree at all.", EditorStyles.wordWrappedMiniLabel);
             }
         }
 
