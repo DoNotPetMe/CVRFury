@@ -102,10 +102,14 @@ namespace CVRFury.Builder.Convert
                 Undo.RegisterCreatedObjectUndo(audioGo, "Add emote audio");
                 audioGo.transform.SetParent(avatar.transform, false);
             }
-            var src = audioGo.GetComponent<AudioSource>() ?? Undo.AddComponent<AudioSource>(audioGo);
-            src.clip = audio;
-            src.playOnAwake = true;
-            src.spatialBlend = 1f; // 3D, so others hear it positionally
+            var src = audioGo.GetComponent<AudioSource>();
+            if (src == null) src = audioGo.AddComponent<AudioSource>(); // '??' breaks on Unity's fake-null
+            if (src != null)
+            {
+                src.clip = audio;
+                src.playOnAwake = true;
+                src.spatialBlend = 1f; // 3D, so others hear it positionally
+            }
             audioGo.SetActive(false);
 
             // A combined clip: the animation, plus a curve that activates the audio object.

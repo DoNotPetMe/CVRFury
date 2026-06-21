@@ -711,7 +711,8 @@ namespace CVRFury.Builder.Convert
             {
                 var go = ((Component)pb).gameObject;
                 var rootT = Reflect.GetField(pb, VrcNames.PB_Root) as Transform ?? go.transform;
-                var comp = go.GetComponent(magicaType) ?? go.AddComponent(magicaType);
+                var comp = go.GetComponent(magicaType);
+                if (comp == null) comp = go.AddComponent(magicaType); // '??' breaks on Unity's fake-null
                 var sd = Reflect.GetProperty(comp, "SerializeData") ?? Reflect.GetField(comp, "serializeData");
                 if (sd != null)
                 {
