@@ -41,6 +41,24 @@ namespace CVRFury.Builder
             return false;
         }
 
+        /// <summary>Heuristic: the base layer is a VRChat locomotion system (GoGo Loco and friends), whose
+        /// states/params CVR doesn't drive. Recognised by its characteristic state names.</summary>
+        public static bool LooksLikeVRChatLocomotion(AnimatorController c)
+        {
+            if (c == null || c.layers.Length == 0) return false;
+            var sm = c.layers[0].stateMachine;
+            if (sm == null) return false;
+            int hits = 0;
+            foreach (var cs in sm.states)
+            {
+                var n = (cs.state?.name ?? "").ToLowerInvariant();
+                if (n.Contains("standard locomotion") || n.Contains("crouching locomotion") ||
+                    n.Contains("prone locomotion") || n.Contains("locflying") || n == "emotes")
+                    hits++;
+            }
+            return hits >= 2; // several GoGo-Loco-style states = almost certainly VRChat locomotion
+        }
+
         private static bool BlendTreeDrivesLocomotion(BlendTree bt)
         {
             if (bt.blendParameter == "MovementX" || bt.blendParameter == "MovementY" ||
@@ -65,8 +83,13 @@ namespace CVRFury.Builder
             var fix = HasCvrLocomotion(baseC) ? baseC : FindGeneratedWithLocomotion();
             if (fix == null)
             {
-                log?.Warning("The AAS animator has no CVR locomotion (motorbike pose) and no replacement " +
-                             "with locomotion was found. Re-run Step 2 (Build & attach) as your last step.");
+                var gogo = LooksLikeVRChatLocomotion(animator) ? " This avatar's locomotion is a VRChat system " +
+                    "(e.g. GoGo Loco) — it's driven by VRChat parameters CVR doesn't provide, so it can't work " +
+                    "in CVR. Remove the GoGo Loco object, then rebuild with Step 2 (Build & attach) leaving the " +
+                    "Controller field EMPTY so it uses CVR's native locomotion." : "";
+                log?.Warning("The AAS animator has no CVR locomotion (motorbike pose) and no replacement with " +
+                             "CVR locomotion was found. Re-run Step 2 (Build & attach) with an empty Controller " +
+                             "field as your last step." + gogo);
                 return;
             }
 

@@ -4,6 +4,21 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.72] - 2026-06-19
+
+### Added
+- **Detects VRChat locomotion (GoGo Loco) as the motorbike cause.** When the base layer is a VRChat
+  locomotion system, "Fix motorbike pose" now says so explicitly and tells you to remove it and rebuild on
+  CVR's native locomotion (Step 2 with an empty Controller field). VRChat locomotion is driven by parameters
+  CVR doesn't provide, so it can't work in CVR.
+
+## [0.9.70-0.9.71] - 2026-06-19
+
+### Added
+- Play Mode Tester diagnostics: live animator-layer weights/masks, the base layer's currently-playing clip,
+  whether a real CVR locomotion blend tree exists, and the controller asset path; simulate-standing also
+  zeroes Emote and sets IsLocal.
+
 ## [0.9.69] - 2026-06-19
 
 ### Added
