@@ -149,6 +149,8 @@ namespace CVRFury.Builder
                 {
                     case "Grounded": Set(anim, p, 1f); break;
                     case "Upright": Set(anim, p, 1f); break;
+                    case "IsLocal": Set(anim, p, 1f); break;
+                    case "Emote": Set(anim, p, 0f); break; // not emoting → stay in locomotion
                     case "MovementX": case "MovementY":
                     case "VelocityX": case "VelocityY": case "VelocityZ":
                     case "Sitting": case "Flying": case "Crouching": case "Prone": case "Swimming":
