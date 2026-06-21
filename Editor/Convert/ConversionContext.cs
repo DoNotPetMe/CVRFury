@@ -106,6 +106,9 @@ namespace CVRFury.Builder.Convert
         /// generator extends. Exposed so the controller-generation step can seed from it.</summary>
         public AnimatorController FindCvrLocomotion() => FindCvrDefaultAvatarAnimator();
 
+        /// <summary>Static accessor so tools outside the conversion pipeline can locate CVR's stock animator.</summary>
+        public static AnimatorController FindCvrStockAnimator() => FindCvrDefaultAvatarAnimator();
+
         /// <summary>Best-effort locate of CVR's default avatar animator controller. The CCK ships it
         /// as <c>…/CCK/Animations/AvatarAnimator.controller</c>, but the install folder varies
         /// (<c>ABI.CCK</c> on older kits, <c>CVR.CCK</c> on newer ones), so match on ".CCK" + the

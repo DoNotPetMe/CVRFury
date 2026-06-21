@@ -236,6 +236,15 @@ namespace CVRFury.Builder.Convert
                                 : "Locomotion controller is OK (has CVR movement) and no emote/dance layers needed fixing.";
                         });
 
+                EditorGUILayout.Space(2);
+                EditorGUILayout.HelpBox("Still motorbiking (e.g. the avatar shipped with GoGo Loco / VRChat " +
+                    "locomotion)? This force-replaces the controller with CVR's own native locomotion so the " +
+                    "avatar stands. It's a clean base WITHOUT your toggles — then re-run \"Link clips & build\" " +
+                    "above (empty Controller) to rebuild toggles on it.", MessageType.None);
+                using (new EditorGUI.DisabledScope(_avatar == null))
+                    if (GUILayout.Button("Reset to CVR native locomotion"))
+                        RunAndRefresh(ResetToCvrLocomotion);
+
                 EditorGUILayout.Space(4);
                 EditorGUILayout.HelpBox("LAST RESORT: if the clip names are all over the place and matching keeps " +
                     "failing, this scans every clip in the folder above, guesses on/off from words at the end of " +
@@ -986,6 +995,36 @@ namespace CVRFury.Builder.Convert
             var msg = $"Updated {changed} emote slot(s) in the emote wheel.";
             if (errors.Count > 0) msg += "\nSkipped: " + string.Join("; ", errors);
             return msg;
+        }
+
+        private string ResetToCvrLocomotion()
+        {
+            var cvr = CckAvatar.FindOn(_avatar);
+            if (cvr == null) return "No CVRAvatar found on the selected avatar.";
+            var stock = ConversionContext.FindCvrStockAnimator();
+            if (stock == null)
+                return "Couldn't find CVR's stock AvatarAnimator. Make sure the ChilloutVR CCK is imported " +
+                       "(it ships AvatarAnimator.controller under the CCK's Animations folder).";
+
+            const string dir = "Assets/CVRFury Generated";
+            if (!AssetDatabase.IsValidFolder(dir)) AssetDatabase.CreateFolder("Assets", "CVRFury Generated");
+            var path = AssetDatabase.GenerateUniqueAssetPath($"{dir}/{_avatar.name} CVR Locomotion.controller");
+            if (!AssetDatabase.CopyAsset(AssetDatabase.GetAssetPath(stock), path))
+                return "Failed to copy CVR's stock AvatarAnimator.";
+            var copy = AssetDatabase.LoadAssetAtPath<AnimatorController>(path);
+            if (copy == null) return "Copied CVR's animator but couldn't load it back.";
+
+            Reflect.SetField(cvr.AdvancedSettings, CckNames.AdvancedSettings_BaseController, copy);
+            Reflect.SetField(cvr.AdvancedSettings, CckNames.AdvancedSettings_Animator, copy);
+            Reflect.SetField(cvr.AdvancedSettings, CckNames.AdvancedSettings_Initialized, true);
+            var anim = _avatar.GetComponentInChildren<Animator>();
+            if (anim != null) anim.runtimeAnimatorController = copy;
+            cvr.Persist();
+
+            return "Reset to CVR's native locomotion — the avatar will now STAND in ChilloutVR (no more " +
+                   "motorbike). This is a clean controller WITHOUT your toggles/dances. Next: run \"Link clips " +
+                   "& build\" above with the Controller field EMPTY to rebuild toggles on this base, then re-add " +
+                   "Sync Dances / emotes if you use them.";
         }
 
         private string AddEmotes()

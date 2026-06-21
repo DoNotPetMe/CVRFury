@@ -4,6 +4,14 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.73] - 2026-06-19
+
+### Added
+- **"Reset to CVR native locomotion" button (Step 2).** Force-replaces the avatar's controller with a copy of
+  CVR's stock AvatarAnimator, so an avatar that shipped with VRChat locomotion (GoGo Loco) — baked into the
+  controller during conversion's "Merge playable layers" — finally stands in CVR. It's a clean base without
+  toggles; re-run "Link clips & build" (empty Controller) to rebuild them on it.
+
 ## [0.9.72] - 2026-06-19
 
 ### Added
