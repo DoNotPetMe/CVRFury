@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEditor;
+using UnityEditor.Animations;
 using UnityEngine;
 
 namespace CVRFury.Builder
@@ -15,6 +16,7 @@ namespace CVRFury.Builder
         private GameObject _avatar;
         private Vector2 _scroll;
         private bool _simulateStanding = true;
+        private bool _showLayers;
 
         // ChilloutVR drives these itself; hide them so the list shows only your settings.
         private static readonly HashSet<string> Core = new HashSet<string>
@@ -116,6 +118,25 @@ namespace CVRFury.Builder
                         case AnimatorControllerParameterType.Int: anim.SetInteger(p.name, p.defaultInt); break;
                     }
                 }
+
+            // Live layer diagnostics — to find what's posing the body (the motorbike). The culprit is an
+            // UNMASKED layer at weight ~1 that isn't the base locomotion (often a merged VRChat Action/FX layer).
+            EditorGUILayout.Space();
+            _showLayers = EditorGUILayout.Foldout(_showLayers, "Animator layers (motorbike diagnostics)");
+            if (_showLayers)
+            {
+                var ctrl = anim.runtimeAnimatorController as AnimatorController;
+                for (int li = 0; li < anim.layerCount; li++)
+                {
+                    bool masked = ctrl != null && li < ctrl.layers.Length && ctrl.layers[li].avatarMask != null;
+                    float w = anim.GetLayerWeight(li);
+                    if (li == 0) w = 1f; // base layer is always full weight
+                    EditorGUILayout.LabelField($"{li}: {anim.GetLayerName(li)}",
+                        $"w={w:0.##}{(masked ? "  (masked)" : "")}");
+                }
+                EditorGUILayout.LabelField("Suspect: an unmasked layer at w=1 that isn't locomotion.",
+                    EditorStyles.wordWrappedMiniLabel);
+            }
         }
 
         /// <summary>Hold CVR's locomotion parameters at "grounded, not moving" so the avatar stands in idle

@@ -4,6 +4,13 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.69] - 2026-06-19
+
+### Added
+- **Live layer diagnostics in the Play Mode Tester.** A "Animator layers (motorbike diagnostics)" foldout
+  lists every animator layer with its live weight and whether it's masked — so the layer posing the body
+  (an unmasked, weight-1 non-locomotion layer, often a merged VRChat Action/FX layer) is easy to spot.
+
 ## [0.9.68] - 2026-06-19
 
 ### Fixed
