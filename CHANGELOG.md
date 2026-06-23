@@ -4,6 +4,12 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.76] - 2026-06-19
+
+### Removed
+- **VRCFury → CVR toggle conversion** (added in 0.9.75) — pulled for now; it was too janky to ship. May
+  return later in a more robust form.
+
 ## [0.9.75] - 2026-06-19
 
 ### Added
