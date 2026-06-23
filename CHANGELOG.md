@@ -4,6 +4,15 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.74] - 2026-06-19
+
+### Fixed
+- **Sync Dances no longer motorbikes.** Dances were built as a separate full-body override layer at weight 1,
+  which fights CVR's locomotion and forces the default pose even when "Off". They're now added as states
+  **inside the base locomotion layer** (driven by the Dances int param, returning to Standard Locomotion at
+  0) — exactly how CVR handles emotes — so the avatar stands when no dance is selected. Re-running cleans up
+  the old override layer/states first, and the menu dropdown is refreshed in place.
+
 ## [0.9.73] - 2026-06-19
 
 ### Added

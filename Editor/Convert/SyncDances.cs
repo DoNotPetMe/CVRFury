@@ -79,24 +79,78 @@ namespace CVRFury.Builder.Convert
             }
             var names = new[] { "Off" }.Concat(dances.Select(d => d.name)).ToArray();
 
-            foreach (var c in controllers)
+            // Build the dances as states INSIDE the base locomotion layer (layer 0), driven by the Dances
+            // int param and returning to locomotion when 0 — exactly how CVR handles emotes. A separate
+            // full-body override layer fights locomotion and motorbikes even when off; states inside the
+            // locomotion layer don't, because when Dances=0 the layer simply stays in Standard Locomotion.
+            int added = 0;
+            foreach (var c in controllers.Where(c => c != null).Distinct())
             {
-                if (c.parameters.Any(p => p.name == param)) continue; // already built here
-                // Int param so it matches the CVR dropdown (an Int control) — a Float would show as a slider
-                // and the dropdown's integer selection wouldn't drive it. States stay WriteDefaults-off so the
-                // empty "Off" option contributes nothing and locomotion shows through (no motorbike).
-                AnimatorUtil.AddModesLayer(c, "CVRFury Dances", param, clips, 0.1f, defaultIndex: 0, useInt: true);
-                EditorUtility.SetDirty(c);
-            }
+                CleanOldDances(c);                       // remove any previous dance layer/states (re-run safe)
+                AnimatorUtil.EnsureIntParam(c, param, 0);
+                if (c.layers.Length == 0) continue;
+                var sm = c.layers[0].stateMachine;
+                var home = sm.defaultState;              // Standard Locomotion / locomotion default
+                bool wd = home != null && home.writeDefaultValues; // match the locomotion layer's WD
+                for (int i = 0; i < dances.Count; i++)
+                {
+                    var clip = clips[i + 1];
+                    var st = sm.AddState("CVRFury Dance " + dances[i].name,
+                        new Vector3(360, 80 + i * 60, 0));
+                    st.motion = clip;
+                    st.writeDefaultValues = wd;
 
+                    var toDance = sm.AddAnyStateTransition(st);
+                    toDance.hasExitTime = false; toDance.hasFixedDuration = true; toDance.duration = 0.1f;
+                    toDance.canTransitionToSelf = false;
+                    toDance.AddCondition(AnimatorConditionMode.Equals, i + 1, param);
+
+                    if (home != null)
+                    {
+                        var back = st.AddTransition(home);  // back to locomotion when the wheel is set to Off
+                        back.hasExitTime = false; back.hasFixedDuration = true; back.duration = 0.1f;
+                        back.AddCondition(AnimatorConditionMode.Equals, 0, param);
+                    }
+                }
+                EditorUtility.SetDirty(c);
+                added++;
+            }
+            if (added == 0) return "No controller layer to add dances to — run Step 2 (Build & attach) first.";
+
+            // Refresh the menu dropdown (remove a previous one with the same machine name first).
+            RemoveAasEntry(cvr, param);
             if (!cvr.AddDropdown(menuName, param, names, 0, false))
-                return "Built the dance layer, but couldn't add the menu dropdown (AAS write failed).";
+                return "Added the dance states, but couldn't add the menu dropdown (AAS write failed).";
 
             AssetDatabase.SaveAssets();
             cvr.Persist();
             return $"Built a synced \"{menuName}\" dropdown with {dances.Count} dance(s) (plus Off)" +
                    (withAudio > 0 ? $", {withAudio} with auto-matched audio" : " (no matching audio found by name)") +
-                   ". Everyone sees the same selection in CVR. Test in Play mode or upload.";
+                   ". They live in the locomotion layer and return to standing when set to Off — no motorbike. " +
+                   "Test in Play mode or upload.";
+        }
+
+        /// <summary>Remove any previous CVRFury dance setup (old override layer + in-layer dance states) so
+        /// re-running is clean.</summary>
+        private static void CleanOldDances(AnimatorController c)
+        {
+            AnimatorUtil.RemoveLayers(c, "CVRFury Dances"); // old separate-override-layer approach
+            if (c.layers.Length == 0) return;
+            var sm = c.layers[0].stateMachine;
+            foreach (var t in sm.anyStateTransitions.ToList())
+                if (t.destinationState != null && t.destinationState.name.StartsWith("CVRFury Dance "))
+                    sm.RemoveAnyStateTransition(t);
+            foreach (var s in sm.states.ToList())
+                if (s.state != null && s.state.name.StartsWith("CVRFury Dance "))
+                    sm.RemoveState(s.state);
+        }
+
+        private static void RemoveAasEntry(CckAvatar cvr, string machine)
+        {
+            var list = cvr.SettingsList;
+            if (list == null) return;
+            for (int i = list.Count - 1; i >= 0; i--)
+                if (CckAvatar.EntryMachineName(list[i]) == machine) list.RemoveAt(i);
         }
 
         /// <summary>AudioClips in the dances folder (recursive), keyed by normalised name, so each dance can
