@@ -4,6 +4,16 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.75] - 2026-06-19
+
+### Added
+- **VRCFury → CVR toggle conversion (experimental).** With VRCFury imported (so its components load instead
+  of showing as missing scripts), a new section detects VRCFury features and converts the **Toggles** into
+  CVRFury menu toggles (menu path + object on/off, default-on, saved) — read by reflection, version-tolerant.
+  Note: VRCFury toggles aren't in the VRChat menu at rest (VRCFury injects them only at build), which is why
+  the normal expression-menu conversion never caught them. Armature/Blendshape Link and Full Controller
+  aren't converted yet.
+
 ## [0.9.74] - 2026-06-19
 
 ### Fixed

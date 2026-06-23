@@ -49,7 +49,8 @@ namespace CVRFury.Builder.Convert
         // Strip
         private bool _removeFinalIK = true;
 
-        private bool _s0, _s1 = true, _s2 = true, _se, _sEmoteWheel, _sDances, _s3, _s4, _s5, _sSps, _sResize, _sCredits;
+        private bool _s0, _s1 = true, _s2 = true, _se, _sEmoteWheel, _sDances, _sVrcFury, _s3, _s4, _s5, _sSps, _sResize, _sCredits;
+        private string _vrcFuryStatus = "";
 
         // Emote wheel (CVR emote menu) slot overrides
         private sealed class EmoteSlotRow { public int index; public string current; public AnimationClip newClip; public AudioClip audio; }
@@ -113,6 +114,7 @@ namespace CVRFury.Builder.Convert
             Step1Parameters();
             Step2Clips();
             StepEmotes();
+            StepVrcFury();
             StepEmoteWheel();
             StepDances();
             Step3PhysBones();
@@ -843,6 +845,32 @@ namespace CVRFury.Builder.Convert
             return $"Removed all CVRFury emotes ({entries} menu entr(ies), {layers} animator layer(s), {parms} " +
                    "parameter(s)). If the avatar STILL motorbikes now, the cause is the base controller, not the " +
                    "emotes — use \"Fix motorbike pose\", or re-run Step 2 to rebuild locomotion.";
+        }
+
+        private void StepVrcFury()
+        {
+            _sVrcFury = Foldout(_sVrcFury, "VRCFury → CVR (convert VRCFury toggles) — experimental");
+            if (!_sVrcFury) return;
+            using (new EditorGUI.IndentLevelScope())
+            {
+                EditorGUILayout.HelpBox("With VRCFury imported, its components load (no longer 'missing script') " +
+                    "so CVRFury can read them. Detect, then convert the VRCFury Toggles into CVR menu toggles. " +
+                    "(Armature/Blendshape Link & Full Controller aren't converted yet.)", MessageType.Info);
+                using (new EditorGUI.DisabledScope(_avatar == null))
+                {
+                    if (GUILayout.Button("Detect VRCFury features"))
+                    {
+                        try { _vrcFuryStatus = VRCFuryConverter.DetectReport(_avatar); }
+                        catch (System.Exception ex) { _vrcFuryStatus = "Error: " + ex.Message; Debug.LogException(ex); }
+                        Repaint();
+                    }
+                    if (GUILayout.Button("Convert VRCFury toggles → CVR"))
+                        RunAndRefresh(() => VRCFuryConverter.ConvertToggles(_avatar));
+                }
+                if (!string.IsNullOrEmpty(_vrcFuryStatus))
+                    EditorGUILayout.HelpBox(_vrcFuryStatus,
+                        _vrcFuryStatus.StartsWith("Error") ? MessageType.Error : MessageType.Info);
+            }
         }
 
         private void StepDances()
