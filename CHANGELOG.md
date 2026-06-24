@@ -4,6 +4,19 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.77] - 2026-06-19
+
+### Added
+- **Pre-flight check.** New section at the top of the window: one button reports whether the avatar is
+  upload-ready — CVRAvatar present, **locomotion is CVR's (flags GoGo Loco / VRChat locomotion)**, no missing
+  scripts, all shaders compile, and synced bits under 3200 — each with a ✓/✗ so problems are caught before
+  CVR's cryptic upload abort.
+
+### Changed
+- **Conversion won't build on VRChat locomotion.** When the merged base is GoGo Loco / VRChat locomotion (or
+  has no CVR locomotion blend tree), AAS generation now falls back to CVR's stock AvatarAnimator, so converted
+  avatars get working CVR locomotion instead of the motorbike pose.
+
 ## [0.9.76] - 2026-06-19
 
 ### Removed

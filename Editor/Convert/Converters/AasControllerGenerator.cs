@@ -53,6 +53,22 @@ namespace CVRFury.Builder.Convert
                 return;
             }
 
+            // Guard against building on VRChat locomotion: if the merged base is GoGo Loco / VRChat
+            // locomotion (or has no CVR locomotion blend tree), it won't respond to CVR's movement params and
+            // the avatar motorbikes. Fall back to CVR's stock AvatarAnimator so locomotion actually works.
+            if (ControllerGuard.LooksLikeVRChatLocomotion(baseController) ||
+                !ControllerGuard.HasCvrLocomotion(baseController))
+            {
+                var stock = ctx.FindCvrLocomotion();
+                if (stock != null && stock != baseController)
+                {
+                    ctx.Log.Warning("The base controller had VRChat/GoGo Loco locomotion (which can't work in " +
+                                    "CVR) — using CVR's stock AvatarAnimator for locomotion instead so the " +
+                                    "avatar doesn't motorbike.");
+                    baseController = stock;
+                }
+            }
+
             var genPath = ctx.Assets.NewPath(ctx.AvatarRoot.name + " AAS", "controller");
             AnimatorController gen = null;
             if (AssetDatabase.CopyAsset(AssetDatabase.GetAssetPath(baseController), genPath))

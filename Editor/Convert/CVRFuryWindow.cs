@@ -49,7 +49,9 @@ namespace CVRFury.Builder.Convert
         // Strip
         private bool _removeFinalIK = true;
 
-        private bool _s0, _s1 = true, _s2 = true, _se, _sEmoteWheel, _sDances, _s3, _s4, _s5, _sSps, _sResize, _sCredits;
+        private bool _sPre = true, _s0, _s1 = true, _s2 = true, _se, _sEmoteWheel, _sDances, _s3, _s4, _s5, _sSps, _sResize, _sCredits;
+        private string _preflight = "";
+        private bool _preflightOk;
 
         // Emote wheel (CVR emote menu) slot overrides
         private sealed class EmoteSlotRow { public int index; public string current; public AnimationClip newClip; public AudioClip audio; }
@@ -109,6 +111,7 @@ namespace CVRFury.Builder.Convert
                 "Avatar", _avatar != null ? _avatar : Selection.activeGameObject, typeof(GameObject), true);
 
             EditorGUILayout.Space();
+            StepPreflight();
             Step0Basics();
             Step1Parameters();
             Step2Clips();
@@ -405,6 +408,26 @@ namespace CVRFury.Builder.Convert
 
         private static readonly string[] AxisNames = { "X", "Y", "Z" };
         private static readonly string[] KindNames = { "Size", "Length", "Hue", "Emission" };
+
+        private void StepPreflight()
+        {
+            _sPre = Foldout(_sPre, "✈ Pre-flight check — is this avatar upload-ready?");
+            if (!_sPre) return;
+            using (new EditorGUI.IndentLevelScope())
+            {
+                EditorGUILayout.LabelField("One look before uploading: locomotion, missing scripts, shaders, " +
+                    "synced-bit budget.", EditorStyles.wordWrappedMiniLabel);
+                using (new EditorGUI.DisabledScope(_avatar == null))
+                    if (GUILayout.Button("Run pre-flight check"))
+                    {
+                        try { _preflight = PreflightCheck.Report(_avatar, out _preflightOk); }
+                        catch (System.Exception ex) { _preflight = "Error: " + ex.Message; _preflightOk = false; Debug.LogException(ex); }
+                        Repaint();
+                    }
+                if (!string.IsNullOrEmpty(_preflight))
+                    EditorGUILayout.HelpBox(_preflight, _preflightOk ? MessageType.Info : MessageType.Warning);
+            }
+        }
 
         private void StepResize()
         {
