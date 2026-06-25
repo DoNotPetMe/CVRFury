@@ -177,6 +177,33 @@ namespace CVRFury.Builder.Convert
             GUILayout.Space(38);
         }
 
+        /// <summary>Themed replacement for EditorGUILayout.HelpBox — same signature, but tinted to match the
+        /// window instead of Unity's flat grey (warnings/errors keep semantic amber/red).</summary>
+        private static void ThemedBox(string text, MessageType type)
+        {
+            Color bg, fg, accent;
+            switch (type)
+            {
+                case MessageType.Error:
+                    bg = new Color(0.30f, 0.13f, 0.13f); fg = new Color(1f, 0.82f, 0.82f); accent = new Color(0.85f, 0.35f, 0.35f); break;
+                case MessageType.Warning:
+                    bg = new Color(0.28f, 0.23f, 0.09f); fg = new Color(1f, 0.93f, 0.72f); accent = new Color(0.88f, 0.74f, 0.32f); break;
+                default: // None / Info → brand tint
+                    bg = new Color(0.195f, 0.165f, 0.235f); fg = new Color(0.82f, 0.80f, 0.88f); accent = new Color(0.52f, 0.37f, 0.62f); break;
+            }
+            var style = new GUIStyle(EditorStyles.label)
+            {
+                wordWrap = true, richText = true, fontSize = 11,
+                normal = { textColor = fg }, padding = new RectOffset(10, 8, 6, 6),
+            };
+            var content = new GUIContent(text);
+            var rect = GUILayoutUtility.GetRect(content, style, GUILayout.ExpandWidth(true));
+            EditorGUI.DrawRect(rect, bg);
+            EditorGUI.DrawRect(new Rect(rect.x, rect.y, 3f, rect.height), accent);
+            GUI.Label(rect, content, style);
+            EditorGUILayout.Space(2);
+        }
+
         /// <summary>A coloured, clickable category header. Returns the (possibly toggled) open state.</summary>
         private bool Category(string title, bool open)
         {
@@ -206,7 +233,7 @@ namespace CVRFury.Builder.Convert
             if (!_s1) return;
             using (new EditorGUI.IndentLevelScope())
             {
-                EditorGUILayout.HelpBox(
+                ThemedBox(
                     "Creates a CCK Advanced Avatar Setting for every VRChat menu control (Machine Name = the " +
                     "VRChat parameter). Non-destructive and leaves your controller alone. Re-running is safe.",
                     MessageType.None);
@@ -222,7 +249,7 @@ namespace CVRFury.Builder.Convert
             if (!_s2) return;
             using (new EditorGUI.IndentLevelScope())
             {
-                EditorGUILayout.HelpBox(
+                ThemedBox(
                     "Matches on/off animation clips from a folder to your toggles by name, and (optionally) " +
                     "builds & attaches a controller so the parameters exist and toggles animate. Leave the " +
                     "Controller empty to copy CVR's stock AvatarAnimator (keeps locomotion). Do NOT drop your " +
@@ -271,7 +298,7 @@ namespace CVRFury.Builder.Convert
                 }
 
                 EditorGUILayout.Space(2);
-                EditorGUILayout.HelpBox("Motorbike pose / no movement after editing the avatar (e.g. visemes) " +
+                ThemedBox("Motorbike pose / no movement after editing the avatar (e.g. visemes) " +
                     "since you built the controller? Click this to re-point the avatar at a controller that has " +
                     "CVR locomotion. It also runs automatically at upload.", MessageType.None);
                 using (new EditorGUI.DisabledScope(_avatar == null))
@@ -304,7 +331,7 @@ namespace CVRFury.Builder.Convert
                         });
 
                 EditorGUILayout.Space(2);
-                EditorGUILayout.HelpBox("Still motorbiking (e.g. the avatar shipped with GoGo Loco / VRChat " +
+                ThemedBox("Still motorbiking (e.g. the avatar shipped with GoGo Loco / VRChat " +
                     "locomotion)? This force-replaces the controller with CVR's own native locomotion so the " +
                     "avatar stands. It's a clean base WITHOUT your toggles — then re-run \"Link clips & build\" " +
                     "above (empty Controller) to rebuild toggles on it.", MessageType.None);
@@ -313,7 +340,7 @@ namespace CVRFury.Builder.Convert
                         RunAndRefresh(ResetToCvrLocomotion);
 
                 EditorGUILayout.Space(4);
-                EditorGUILayout.HelpBox("LAST RESORT: if the clip names are all over the place and matching keeps " +
+                ThemedBox("LAST RESORT: if the clip names are all over the place and matching keeps " +
                     "failing, this scans every clip in the folder above, guesses on/off from words at the end of " +
                     "each name (show/hide, enable/disable…), and renames them to end with your markers below. It " +
                     "edits the actual asset files (can break references), can mis-guess, and may take a while — " +
@@ -344,7 +371,7 @@ namespace CVRFury.Builder.Convert
                 if (r.changed) changed++;
             }
             EditorGUILayout.LabelField($"{matched} matched · {guessed} guessed · {none} no clip · {nativeCount} object · {changed} changed", EditorStyles.miniBoldLabel);
-            EditorGUILayout.HelpBox("✔ exact match   ? best guess (check it!)   ✘ none found   ● object toggle (CVR " +
+            ThemedBox("✔ exact match   ? best guess (check it!)   ✘ none found   ● object toggle (CVR " +
                                     "toggles it directly — no clip needed). Use the ⊙ picker or drag a clip into a box " +
                                     "to change it. ON = shown/enabled, OFF = hidden.", MessageType.None);
 
@@ -405,7 +432,7 @@ namespace CVRFury.Builder.Convert
             using (new EditorGUI.IndentLevelScope())
             {
                 var dbPresent = Reflect.FindType(VrcNames.DynamicBoneType) != null;
-                EditorGUILayout.HelpBox(
+                ThemedBox(
                     dbPresent
                         ? "Converts VRCPhysBone/Collider to DynamicBone/Collider. The physics models differ, so " +
                           "tune the sliders below; defaults are a reasonable starting point. Colliders convert first."
@@ -489,7 +516,7 @@ namespace CVRFury.Builder.Convert
                         Repaint();
                     }
                 if (!string.IsNullOrEmpty(_preflight))
-                    EditorGUILayout.HelpBox(_preflight, _preflightOk ? MessageType.Info : MessageType.Warning);
+                    ThemedBox(_preflight, _preflightOk ? MessageType.Info : MessageType.Warning);
             }
         }
 
@@ -569,7 +596,7 @@ namespace CVRFury.Builder.Convert
                         Repaint();
                     }
                 if (!string.IsNullOrEmpty(_resizeStatus))
-                    EditorGUILayout.HelpBox(_resizeStatus,
+                    ThemedBox(_resizeStatus,
                         _resizeStatus.StartsWith("Error") ? MessageType.Error : MessageType.Info);
             }
         }
@@ -702,7 +729,7 @@ namespace CVRFury.Builder.Convert
                 EditorGUILayout.LabelField("Step 3 — Turn on the plug's deformation", EditorStyles.boldLabel);
                 EditorGUILayout.LabelField("Drop the penetrator's mesh object here (the one with its Mesh " +
                     "Renderer + material) — or auto-fill it from Step 1.", EditorStyles.wordWrappedMiniLabel);
-                EditorGUILayout.HelpBox("Use a shader with DPS / light-based deform (Poiyomi works well). This " +
+                ThemedBox("Use a shader with DPS / light-based deform (Poiyomi works well). This " +
                     "enables that — not SPS, which needs VRChat contacts and stays inert in CVR.", MessageType.None);
                 using (new EditorGUILayout.HorizontalScope())
                 {
@@ -729,7 +756,7 @@ namespace CVRFury.Builder.Convert
                 if (!string.IsNullOrEmpty(_spsStatus))
                 {
                     EditorGUILayout.Space(4);
-                    EditorGUILayout.HelpBox(_spsStatus,
+                    ThemedBox(_spsStatus,
                         _spsStatus.StartsWith("Error") ? MessageType.Error : MessageType.Info);
                 }
 
@@ -758,11 +785,11 @@ namespace CVRFury.Builder.Convert
             {
                 if (MagicaType() == null)
                 {
-                    EditorGUILayout.HelpBox("Magica Cloth 2 is not installed — this step is skipped. Install it to enable.",
+                    ThemedBox("Magica Cloth 2 is not installed — this step is skipped. Install it to enable.",
                                             MessageType.None);
                     return;
                 }
-                EditorGUILayout.HelpBox(
+                ThemedBox(
                     "Magica Cloth 2 detected. Adds a MagicaCloth component to each PhysBone root, sets the cloth type " +
                     "and assigns the root bone. After running, open each MagicaCloth and press its Build button (or " +
                     "enter Play) and tune — Magica's solver is configured at build time.",
@@ -840,7 +867,7 @@ namespace CVRFury.Builder.Convert
             if (!_s0) return;
             using (new EditorGUI.IndentLevelScope())
             {
-                EditorGUILayout.HelpBox("Copies the VRChat viewpoint, visemes, blink and eye-look settings onto the CVRAvatar.",
+                ThemedBox("Copies the VRChat viewpoint, visemes, blink and eye-look settings onto the CVRAvatar.",
                                         MessageType.None);
                 using (new EditorGUI.DisabledScope(_avatar == null))
                     if (GUILayout.Button("Apply avatar basics"))
@@ -854,7 +881,7 @@ namespace CVRFury.Builder.Convert
             if (!_s5) return;
             using (new EditorGUI.IndentLevelScope())
             {
-                EditorGUILayout.HelpBox("Removes leftover VRChat components and missing scripts once you're happy. " +
+                ThemedBox("Removes leftover VRChat components and missing scripts once you're happy. " +
                                         "Do this last — afterwards you can remove the VRChat SDK.", MessageType.Warning);
                 _removeFinalIK = EditorGUILayout.ToggleLeft("Also remove FinalIK / VRIK (CVR has its own IK)", _removeFinalIK);
                 using (new EditorGUI.DisabledScope(_avatar == null))
@@ -885,7 +912,7 @@ namespace CVRFury.Builder.Convert
             if (!_se) return;
             using (new EditorGUI.IndentLevelScope())
             {
-                EditorGUILayout.HelpBox(
+                ThemedBox(
                     "Adds a menu toggle for each animation clip in a folder. While the toggle is ON the clip plays " +
                     "(sit / dance / pose); when OFF the avatar returns to normal CVR movement — the layer only poses " +
                     "the body while toggled on, so it doesn't break locomotion. Point this at a folder of full-body " +
@@ -938,7 +965,7 @@ namespace CVRFury.Builder.Convert
             if (!_sDances) return;
             using (new EditorGUI.IndentLevelScope())
             {
-                EditorGUILayout.HelpBox("Turns a Sync-Dances-style pack already in your project into a CVR " +
+                ThemedBox("Turns a Sync-Dances-style pack already in your project into a CVR " +
                     "dance menu: a synced dropdown (Off + each dance). Leave the folder blank to auto-find it " +
                     "by name. Uses only the dance clips — none of the VRChat setup.", MessageType.Info);
                 _dancesFolder = (DefaultAsset)EditorGUILayout.ObjectField("Dances folder (optional)", _dancesFolder, typeof(DefaultAsset), false);
@@ -972,7 +999,7 @@ namespace CVRFury.Builder.Convert
                     }
 
                 if (!string.IsNullOrEmpty(_dancesStatus))
-                    EditorGUILayout.HelpBox(_dancesStatus,
+                    ThemedBox(_dancesStatus,
                         _dancesStatus.StartsWith("Error") ? MessageType.Error : MessageType.Info);
             }
         }
@@ -983,7 +1010,7 @@ namespace CVRFury.Builder.Convert
             if (!_sEmoteWheel) return;
             using (new EditorGUI.IndentLevelScope())
             {
-                EditorGUILayout.HelpBox("Replaces the clips in ChilloutVR's built-in EMOTE WHEEL (the emote " +
+                ThemedBox("Replaces the clips in ChilloutVR's built-in EMOTE WHEEL (the emote " +
                     "radial, not the Advanced Settings toggles). Detect first — it reads the avatar's animator " +
                     "for the real emote slots (states driven by the Emote parameter), so you see exactly what " +
                     "you're changing.", MessageType.Info);
@@ -1027,7 +1054,7 @@ namespace CVRFury.Builder.Convert
                         }
 
                 if (!string.IsNullOrEmpty(_emoteWheelStatus))
-                    EditorGUILayout.HelpBox(_emoteWheelStatus,
+                    ThemedBox(_emoteWheelStatus,
                         _emoteWheelStatus.StartsWith("Error") ? MessageType.Error : MessageType.Info);
             }
         }
