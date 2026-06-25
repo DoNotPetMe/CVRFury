@@ -50,6 +50,7 @@ namespace CVRFury.Builder.Convert
         private bool _removeFinalIK = true;
 
         private bool _sPre = true, _s0, _s1 = true, _s2 = true, _se, _sEmoteWheel, _sDances, _s3, _s4, _s5, _sSps, _sResize, _sCredits;
+        private bool _catConvert = true, _catAnim, _catFeatures; // top-level category groups
         private string _preflight = "";
         private bool _preflightOk;
 
@@ -98,31 +99,46 @@ namespace CVRFury.Builder.Convert
 
         private void OnGUI()
         {
-            _scroll = EditorGUILayout.BeginScrollView(_scroll);
+            // Subtle dark backdrop instead of the flat editor gray.
+            EditorGUI.DrawRect(new Rect(0, 0, position.width, position.height), new Color(0.145f, 0.135f, 0.16f));
 
-            EditorGUILayout.Space();
-            EditorGUILayout.LabelField($"CVRFury  v{CckNames.CvrFuryVersion}", EditorStyles.boldLabel);
-            EditorGUILayout.HelpBox(
-                "VRChat → ChilloutVR, one step at a time. Pick your avatar, then work down the steps. " +
-                "Both the VRChat SDK and the CCK must be present and compiling in this project.",
-                MessageType.Info);
+            DrawBanner();
+            _scroll = EditorGUILayout.BeginScrollView(_scroll);
 
             _avatar = (GameObject)EditorGUILayout.ObjectField(
                 "Avatar", _avatar != null ? _avatar : Selection.activeGameObject, typeof(GameObject), true);
 
-            EditorGUILayout.Space();
+            EditorGUILayout.Space(2);
             StepPreflight();
-            Step0Basics();
-            Step1Parameters();
-            Step2Clips();
-            StepEmotes();
-            StepEmoteWheel();
-            StepDances();
-            Step3PhysBones();
-            Step4Magica();
-            StepSps();
-            StepResize();
-            Step5Strip();
+
+            _catConvert = Category("Convert  ·  VRChat → ChilloutVR", _catConvert);
+            if (_catConvert)
+                using (new EditorGUI.IndentLevelScope())
+                {
+                    Step0Basics();
+                    Step1Parameters();
+                    Step2Clips();
+                    Step3PhysBones();
+                    Step4Magica();
+                    Step5Strip();
+                }
+
+            _catAnim = Category("Emotes, Dances & Poses", _catAnim);
+            if (_catAnim)
+                using (new EditorGUI.IndentLevelScope())
+                {
+                    StepEmotes();
+                    StepEmoteWheel();
+                    StepDances();
+                }
+
+            _catFeatures = Category("Avatar features  ·  sliders & NSFW", _catFeatures);
+            if (_catFeatures)
+                using (new EditorGUI.IndentLevelScope())
+                {
+                    StepResize();
+                    StepSps();
+                }
 
             if (!string.IsNullOrEmpty(_log))
             {
@@ -135,6 +151,54 @@ namespace CVRFury.Builder.Convert
 
             EditorGUILayout.EndScrollView();
         }
+
+        // --- pretty headers ----------------------------------------------------------------------
+        private static readonly Color BrandDark = new Color(0.16f, 0.09f, 0.20f);
+        private static readonly Color BrandHeader = new Color(0.22f, 0.13f, 0.28f);
+        private static readonly Color BrandText = new Color(0.86f, 0.74f, 0.95f);
+
+        private void DrawBanner()
+        {
+            var rect = new Rect(0, 0, position.width, 34);
+            EditorGUI.DrawRect(rect, BrandDark);
+            EditorGUI.DrawRect(new Rect(0, 33, position.width, 1), new Color(0.45f, 0.30f, 0.55f)); // accent underline
+            var style = new GUIStyle(EditorStyles.boldLabel)
+            {
+                normal = { textColor = BrandText }, fontSize = 15,
+                alignment = TextAnchor.MiddleLeft, padding = new RectOffset(12, 0, 0, 0),
+            };
+            GUI.Label(rect, $"✦ CVRFury", style);
+            var ver = new GUIStyle(EditorStyles.miniLabel)
+            {
+                normal = { textColor = new Color(0.65f, 0.55f, 0.72f) },
+                alignment = TextAnchor.MiddleRight, padding = new RectOffset(0, 12, 0, 0),
+            };
+            GUI.Label(rect, $"v{CckNames.CvrFuryVersion}", ver);
+            GUILayout.Space(38);
+        }
+
+        /// <summary>A coloured, clickable category header. Returns the (possibly toggled) open state.</summary>
+        private bool Category(string title, bool open)
+        {
+            EditorGUILayout.Space(5);
+            var rect = EditorGUILayout.GetControlRect(false, 24);
+            EditorGUI.DrawRect(rect, BrandHeader);
+            var style = new GUIStyle(EditorStyles.boldLabel)
+            {
+                normal = { textColor = BrandText }, fontSize = 12,
+                alignment = TextAnchor.MiddleLeft, padding = new RectOffset(10, 0, 0, 0),
+            };
+            GUI.Label(rect, $"{(open ? "▾" : "▸")}  {title}", style);
+            if (Event.current.type == EventType.MouseDown && rect.Contains(Event.current.mousePosition))
+            {
+                open = !open;
+                Event.current.Use();
+                Repaint();
+            }
+            EditorGUIUtility.AddCursorRect(rect, MouseCursor.Link);
+            return open;
+        }
+
 
         private void Step1Parameters()
         {

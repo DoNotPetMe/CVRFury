@@ -4,6 +4,15 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.78] - 2026-06-19
+
+### Changed
+- **Window redesigned: grouped + branded.** The ~13 flat foldouts are now organised under three coloured
+  category headers — **Convert** (the numbered VRChat→CVR steps + PhysBones/Magica/Strip), **Emotes, Dances &
+  Poses** (emote toggles, emote wheel, Sync Dances), and **Avatar features** (sliders, SPS/DPS) — with
+  Pre-flight at the top and Credits at the bottom. Added a brand banner, accent colours, and a darker backdrop
+  instead of the flat gray.
+
 ## [0.9.77] - 2026-06-19
 
 ### Added
