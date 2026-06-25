@@ -4,6 +4,13 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.80] - 2026-06-19
+
+### Changed
+- **Content no longer stretches across wide monitors.** The window keeps its controls in a readable ~600px
+  column (left-aligned) instead of spreading edge-to-edge, so fields, the clip-match review list, and toggle
+  tags stay legible at any window width.
+
 ## [0.9.79] - 2026-06-19
 
 ### Changed

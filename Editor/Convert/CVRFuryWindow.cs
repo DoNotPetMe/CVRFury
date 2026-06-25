@@ -105,6 +105,11 @@ namespace CVRFury.Builder.Convert
             DrawBanner();
             _scroll = EditorGUILayout.BeginScrollView(_scroll);
 
+            // Keep content to a readable column instead of stretching across a wide monitor.
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Space(10);
+            EditorGUILayout.BeginVertical(GUILayout.MaxWidth(ContentWidth));
+
             _avatar = (GameObject)EditorGUILayout.ObjectField(
                 "Avatar", _avatar != null ? _avatar : Selection.activeGameObject, typeof(GameObject), true);
 
@@ -149,8 +154,14 @@ namespace CVRFury.Builder.Convert
 
             StepCredits();
 
+            EditorGUILayout.EndVertical();
+            GUILayout.FlexibleSpace();
+            EditorGUILayout.EndHorizontal();
             EditorGUILayout.EndScrollView();
         }
+
+        // Max readable column width; the window can be wider but content won't stretch past this.
+        private const float ContentWidth = 600f;
 
         // --- pretty headers ----------------------------------------------------------------------
         private static readonly Color BrandDark = new Color(0.16f, 0.09f, 0.20f);
