@@ -110,8 +110,22 @@ namespace CVRFury.Builder.Convert
             GUILayout.Space(10);
             EditorGUILayout.BeginVertical(GUILayout.MaxWidth(ContentWidth));
 
-            _avatar = (GameObject)EditorGUILayout.ObjectField(
+            var picked = (GameObject)EditorGUILayout.ObjectField(
                 "Avatar", _avatar != null ? _avatar : Selection.activeGameObject, typeof(GameObject), true);
+            if (picked != _avatar) _avatar = ResolveAvatarRoot(picked); // snap to the avatar root, not a child
+
+            if (_avatar == null)
+            {
+                ThemedBox("👋 Drop your avatar above to begin.\n" +
+                          "New here? Converting a VRChat avatar? Open “Convert” and press “Convert & Verify”. " +
+                          "Building CVR features from scratch? Just add the pieces under each section.",
+                          MessageType.Info);
+                EditorGUILayout.EndVertical();
+                GUILayout.FlexibleSpace();
+                EditorGUILayout.EndHorizontal();
+                EditorGUILayout.EndScrollView();
+                return;
+            }
 
             EditorGUILayout.Space(2);
             StepPreflight();
@@ -120,6 +134,19 @@ namespace CVRFury.Builder.Convert
             if (_catConvert)
                 using (new EditorGUI.IndentLevelScope())
                 {
+                    ThemedBox("One-click: brings over visemes/eyes, the expression menu, and PhysBones, strips " +
+                        "VRChat leftovers, and pre-flights the result — using CVR's own locomotion (no motorbike). " +
+                        "Work on a COPY: it edits the avatar in place (undoable). The manual steps below do the " +
+                        "same, one piece at a time.", MessageType.None);
+                    using (new EditorGUI.DisabledScope(_avatar == null))
+                        if (GUILayout.Button("✨ Convert & Verify  (recommended)", GUILayout.Height(28)))
+                            if (EditorUtility.DisplayDialog("CVRFury — Convert & Verify",
+                                $"Convert '{_avatar.name}' from VRChat to ChilloutVR now?\n\nThis edits the avatar " +
+                                "in place (undoable). Ideally work on a copy. The VRChat Avatars SDK must be imported " +
+                                "so the source data can be read.", "Convert", "Cancel"))
+                                RunAndRefresh(RunConvertAndVerify);
+                    EditorGUILayout.Space(4);
+                    EditorGUILayout.LabelField("… or run the steps manually:", EditorStyles.miniBoldLabel);
                     Step0Basics();
                     Step1Parameters();
                     Step2Clips();
@@ -162,6 +189,39 @@ namespace CVRFury.Builder.Convert
 
         // Max readable column width; the window can be wider but content won't stretch past this.
         private const float ContentWidth = 600f;
+
+        /// <summary>Snap a picked object to the avatar ROOT (the highest ancestor carrying an Animator), so
+        /// dropping a child mesh/bone still targets the whole avatar instead of a sub-object.</summary>
+        private static GameObject ResolveAvatarRoot(GameObject go)
+        {
+            if (go == null) return null;
+            var best = go;
+            for (var t = go.transform; t != null; t = t.parent)
+                if (t.GetComponent<Animator>() != null) best = t.gameObject;
+            return best;
+        }
+
+        private string RunConvertAndVerify()
+        {
+            if (_avatar == null) return "Select your avatar first.";
+            // Recommended options: bring over the basics + menu + PhysBones, strip VRChat leftovers, and do
+            // NOT merge playable layers (that's what drags in VRChat/GoGo Loco locomotion and motorbikes).
+            var opts = new ConversionOptions
+            {
+                avatarBasics = true,
+                expressions = true,
+                physBones = true,
+                physBoneColliders = true,
+                removeOriginalPhysBones = true,
+                mergePlayableLayers = false,
+                mergeGestureLayer = false,
+                stripVrcAndBroken = true,
+            };
+            var log = VRChatConverter.Convert(_avatar, opts);
+            var lines = log.Entries.Select(e => (e.Level == BuildLog.Level.Error ? "✗ " : e.Level == BuildLog.Level.Warning ? "! " : "• ") + e.Message);
+            var pre = PreflightCheck.Report(_avatar, out _);
+            return "Convert:\n" + string.Join("\n", lines) + "\n\n" + pre;
+        }
 
         // --- pretty headers ----------------------------------------------------------------------
         private static readonly Color BrandDark = new Color(0.16f, 0.09f, 0.20f);
@@ -348,7 +408,11 @@ namespace CVRFury.Builder.Convert
                     "above (empty Controller) to rebuild toggles on it.", MessageType.None);
                 using (new EditorGUI.DisabledScope(_avatar == null))
                     if (GUILayout.Button("Reset to CVR native locomotion"))
-                        RunAndRefresh(ResetToCvrLocomotion);
+                        if (EditorUtility.DisplayDialog("CVRFury — Reset locomotion",
+                            "Replace this avatar's controller with CVR's native locomotion?\n\nThe avatar will " +
+                            "stand correctly, but this is a clean controller WITHOUT your toggles — you'll " +
+                            "re-run “Link clips & build” to rebuild them.", "Reset", "Cancel"))
+                            RunAndRefresh(ResetToCvrLocomotion);
 
                 EditorGUILayout.Space(4);
                 ThemedBox("LAST RESORT: if the clip names are all over the place and matching keeps " +
@@ -527,7 +591,7 @@ namespace CVRFury.Builder.Convert
                         Repaint();
                     }
                 if (!string.IsNullOrEmpty(_preflight))
-                    ThemedBox(_preflight, _preflightOk ? MessageType.Info : MessageType.Warning);
+                    ThemedBox(_preflight, _preflightOk ? MessageType.Info : MessageType.Error);
             }
         }
 
@@ -897,8 +961,12 @@ namespace CVRFury.Builder.Convert
                 _removeFinalIK = EditorGUILayout.ToggleLeft("Also remove FinalIK / VRIK (CVR has its own IK)", _removeFinalIK);
                 using (new EditorGUI.DisabledScope(_avatar == null))
                     if (GUILayout.Button("Strip VRChat + broken components"))
-                        RunAndRefresh(() => RunConverter(new FinalCleanupConverter(),
-                            new ConversionOptions { stripVrcAndBroken = true, removeFinalIK = _removeFinalIK }, true));
+                        if (EditorUtility.DisplayDialog("CVRFury — Strip components",
+                            $"Permanently remove VRChat + broken components from '{_avatar.name}'?\n\nDo this only " +
+                            "once you're happy with the conversion. It edits the avatar in place (undoable).",
+                            "Strip", "Cancel"))
+                            RunAndRefresh(() => RunConverter(new FinalCleanupConverter(),
+                                new ConversionOptions { stripVrcAndBroken = true, removeFinalIK = _removeFinalIK }, true));
             }
         }
 
