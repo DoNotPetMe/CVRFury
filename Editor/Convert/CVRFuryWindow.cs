@@ -53,6 +53,7 @@ namespace CVRFury.Builder.Convert
         private bool _catConvert = true, _catAnim, _catFeatures; // top-level category groups
         private string _preflight = "";
         private bool _preflightOk;
+        private System.Collections.Generic.List<PreflightCheck.Result> _preflightResults;
 
         // Emote wheel (CVR emote menu) slot overrides
         private sealed class EmoteSlotRow { public int index; public string current; public AnimationClip newClip; public AudioClip audio; }
@@ -586,12 +587,29 @@ namespace CVRFury.Builder.Convert
                 using (new EditorGUI.DisabledScope(_avatar == null))
                     if (GUILayout.Button("Run pre-flight check"))
                     {
-                        try { _preflight = PreflightCheck.Report(_avatar, out _preflightOk); }
-                        catch (System.Exception ex) { _preflight = "Error: " + ex.Message; _preflightOk = false; Debug.LogException(ex); }
+                        try { _preflightResults = PreflightCheck.Run(_avatar); _preflight = PreflightCheck.Report(_avatar, out _preflightOk); }
+                        catch (System.Exception ex) { _preflight = "Error: " + ex.Message; _preflightOk = false; _preflightResults = null; Debug.LogException(ex); }
                         Repaint();
                     }
                 if (!string.IsNullOrEmpty(_preflight))
                     ThemedBox(_preflight, _preflightOk ? MessageType.Info : MessageType.Error);
+
+                // One-click fixes for the failures we know how to repair.
+                if (_preflightResults != null)
+                    foreach (var res in _preflightResults)
+                    {
+                        if (res.ok) continue;
+                        if (res.label == "Locomotion" &&
+                            GUILayout.Button("Fix locomotion → reset to CVR native"))
+                            RunAndRefresh(ResetToCvrLocomotion);
+                        else if (res.label == "Missing scripts" &&
+                            GUILayout.Button("Fix → clean missing scripts"))
+                            RunAndRefresh(() =>
+                            {
+                                int n = MissingScriptCleaner.RemoveInHierarchy(_avatar);
+                                return $"Removed {n} broken/missing-script component(s). Re-run pre-flight to confirm.";
+                            });
+                    }
             }
         }
 
