@@ -4,6 +4,29 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.81 – 0.9.84] - 2026-06-19 — "Ultracode" pass
+
+Big audit-driven improvement pass (bugs, automation, clarity, features).
+
+### Added
+- **One-click "Convert & Verify"** at the top of Convert — runs the full VRChat→CVR pipeline with recommended
+  options (no playable-layer merge, so no GoGo Loco motorbike) and pre-flights the result.
+- **Pre-flight one-click fixes** — failures now show contextual Fix buttons (reset locomotion, clean missing scripts).
+- **Blendshape sliders** — new slider kind: pick a mesh, choose a blendshape from a dropdown, set min/max.
+- **Empty-state guidance** and **avatar auto-root** (dropping a child snaps to the avatar root).
+- Confirmation dialogs before the destructive Strip and Reset-locomotion actions; pre-flight failures show red.
+
+### Fixed
+- **Native toggles synced as the wrong type** — CVRFury toggles built a Float animator param while declaring
+  the AAS entry Bool, wasting the synced-bit budget and mis-reporting it. Now Bool-driven end to end.
+- **Synced-bit estimate** unified to one conservative source (Float costs 64) so over-budget avatars don't pass.
+- **AAS layer generation** resolves the typed setting robustly (no reliance on a `setting` property that may
+  not exist), so per-entry layers actually build.
+- **CVR locomotion lookup** validates real locomotion + prefers the exact `AvatarAnimator` file (no wrong-controller motorbike).
+- **Idempotency** — re-running SPS orifice toggles, PhysBone conversion, and emote/dance audio no longer stacks
+  duplicate components/assets.
+- Upload hook warns when the avatar event specifically isn't hooked; ControllerMerger null-log guard.
+
 ## [0.9.80] - 2026-06-19
 
 ### Changed
