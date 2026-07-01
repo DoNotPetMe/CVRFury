@@ -55,6 +55,14 @@ namespace CVRFury.Builder.Convert
         private bool _preflightOk;
         private System.Collections.Generic.List<PreflightCheck.Result> _preflightResults;
 
+        // Convert & Verify options (advanced control over the one-click pipeline).
+        private bool _showConvertOpts;
+        private readonly ConversionOptions _convertOpts = new ConversionOptions
+        {
+            avatarBasics = true, expressions = true, physBones = true, physBoneColliders = true,
+            removeOriginalPhysBones = true, stripVrcAndBroken = true, mergePlayableLayers = false,
+        };
+
         // Emote wheel (CVR emote menu) slot overrides
         private sealed class EmoteSlotRow { public int index; public string current; public AnimationClip newClip; public AudioClip audio; }
         private readonly List<EmoteSlotRow> _emoteSlots = new List<EmoteSlotRow>();
@@ -140,6 +148,25 @@ namespace CVRFury.Builder.Convert
                         "VRChat leftovers, and pre-flights the result — using CVR's own locomotion (no motorbike). " +
                         "Work on a COPY: it edits the avatar in place (undoable). The manual steps below do the " +
                         "same, one piece at a time.", MessageType.None);
+                    _showConvertOpts = EditorGUILayout.Foldout(_showConvertOpts, "Options (advanced)", true);
+                    if (_showConvertOpts)
+                        using (new EditorGUI.IndentLevelScope())
+                        {
+                            _convertOpts.avatarBasics = EditorGUILayout.ToggleLeft(new GUIContent("Avatar basics",
+                                "Viewpoint, visemes, blink, eye look → CVRAvatar."), _convertOpts.avatarBasics);
+                            _convertOpts.expressions = EditorGUILayout.ToggleLeft(new GUIContent("Expression menu → AAS",
+                                "Bring the VRChat menu (toggles/radials) into CVR's Advanced Settings."), _convertOpts.expressions);
+                            _convertOpts.physBones = EditorGUILayout.ToggleLeft(new GUIContent("PhysBones → DynamicBones",
+                                "Convert bouncing bones (approximate; tune after)."), _convertOpts.physBones);
+                            _convertOpts.physBoneColliders = EditorGUILayout.ToggleLeft("… include colliders", _convertOpts.physBoneColliders);
+                            _convertOpts.removeOriginalPhysBones = EditorGUILayout.ToggleLeft("… remove the VRChat PhysBones after", _convertOpts.removeOriginalPhysBones);
+                            _convertOpts.stripVrcAndBroken = EditorGUILayout.ToggleLeft(new GUIContent("Strip VRChat + broken at the end",
+                                "Remove leftover VRChat components and missing scripts."), _convertOpts.stripVrcAndBroken);
+                            _convertOpts.forceLocalParameters = EditorGUILayout.ToggleLeft(new GUIContent("Force all params local (0 sync bits)",
+                                "Makes toggles work even on a heavy avatar, but others won't see them. For testing."), _convertOpts.forceLocalParameters);
+                            _convertOpts.mergePlayableLayers = EditorGUILayout.ToggleLeft(new GUIContent("Merge playable layers (NOT recommended)",
+                                "Merges VRChat FX/Action layers — this is what drags in GoGo Loco and causes the motorbike pose. Leave OFF."), _convertOpts.mergePlayableLayers);
+                        }
                     using (new EditorGUI.DisabledScope(_avatar == null))
                         if (GUILayout.Button("✨ Convert & Verify  (recommended)", GUILayout.Height(28)))
                             if (EditorUtility.DisplayDialog("CVRFury — Convert & Verify",
@@ -214,20 +241,7 @@ namespace CVRFury.Builder.Convert
         private string RunConvertAndVerify()
         {
             if (_avatar == null) return "Select your avatar first.";
-            // Recommended options: bring over the basics + menu + PhysBones, strip VRChat leftovers, and do
-            // NOT merge playable layers (that's what drags in VRChat/GoGo Loco locomotion and motorbikes).
-            var opts = new ConversionOptions
-            {
-                avatarBasics = true,
-                expressions = true,
-                physBones = true,
-                physBoneColliders = true,
-                removeOriginalPhysBones = true,
-                mergePlayableLayers = false,
-                mergeGestureLayer = false,
-                stripVrcAndBroken = true,
-            };
-            var log = VRChatConverter.Convert(_avatar, opts);
+            var log = VRChatConverter.Convert(_avatar, _convertOpts);
             var lines = log.Entries.Select(e => (e.Level == BuildLog.Level.Error ? "✗ " : e.Level == BuildLog.Level.Warning ? "! " : "• ") + e.Message);
             var pre = PreflightCheck.Report(_avatar, out _);
             return "Convert:\n" + string.Join("\n", lines) + "\n\n" + pre;
