@@ -68,15 +68,16 @@ namespace CVRFury.Builder.Convert
         private string _resizeStatus = "";
 
         // Unified slider rows (size / length / hue / emission) — one per control you want.
-        private enum SliderKind { Size, Length, Hue, Emission }
+        private enum SliderKind { Size, Length, Hue, Emission, Blendshape }
         private sealed class SliderRow
         {
             public SliderKind kind = SliderKind.Size;
             public string label = "";    // optional menu name; blank = auto from first target
             public readonly List<Transform> targets = new List<Transform> { null };  // Size / Length (≥1, equal scaling)
-            public readonly List<Renderer> renderers = new List<Renderer> { null };  // Hue / Emission
+            public readonly List<Renderer> renderers = new List<Renderer> { null };  // Hue / Emission / Blendshape (mesh)
             public string property = ""; // Hue / Emission shader property
             public int axis = 2;         // Length (X/Y/Z)
+            public int blendIndex;       // Blendshape dropdown selection
             public float min = 0.5f, max = 2f;
         }
         private readonly System.Collections.Generic.List<SliderRow> _scaleRows = new System.Collections.Generic.List<SliderRow>();
@@ -574,7 +575,7 @@ namespace CVRFury.Builder.Convert
         }
 
         private static readonly string[] AxisNames = { "X", "Y", "Z" };
-        private static readonly string[] KindNames = { "Size", "Length", "Hue", "Emission" };
+        private static readonly string[] KindNames = { "Size", "Length", "Hue", "Emission", "Blendshape" };
 
         private void StepPreflight()
         {
@@ -615,7 +616,7 @@ namespace CVRFury.Builder.Convert
 
         private void StepResize()
         {
-            _sResize = Foldout(_sResize, "Sliders (size, length, hue, emission)");
+            _sResize = Foldout(_sResize, "Sliders (size, length, hue, emission, blendshape)");
             if (!_sResize) return;
             using (new EditorGUI.IndentLevelScope())
             {
@@ -652,6 +653,16 @@ namespace CVRFury.Builder.Convert
 
                         if (row.kind == SliderKind.Size || row.kind == SliderKind.Length)
                             DrawTargetList(row.targets, "Part", "Add part — list several for equal scaling (L+R)");
+                        else if (row.kind == SliderKind.Blendshape)
+                        {
+                            DrawRendererList(row.renderers, "Mesh");
+                            var shapes = BlendshapeNames(row.renderers.FirstOrDefault() as SkinnedMeshRenderer);
+                            if (shapes.Length == 0)
+                                EditorGUILayout.LabelField(" ", "Drop a Skinned Mesh Renderer with blendshapes.", EditorStyles.miniLabel);
+                            else
+                                row.blendIndex = EditorGUILayout.Popup("Blendshape", Mathf.Clamp(row.blendIndex, 0, shapes.Length - 1), shapes);
+                            if (row.min == 0.5f && row.max == 2f) { row.min = 0f; row.max = 100f; } // sensible blendshape range
+                        }
                         else
                         {
                             DrawRendererList(row.renderers, "Mesh");
@@ -751,12 +762,31 @@ namespace CVRFury.Builder.Convert
                         err = AvatarSizeSlider.AddMaterialSlider(_avatar, renderers, row.property, row.min, row.max,
                             SliderLabel(row.label, renderers.Count > 0 ? renderers[0].name : null, "Emission"));
                         break;
+                    case SliderKind.Blendshape:
+                    {
+                        var smrs = row.renderers.OfType<SkinnedMeshRenderer>().Where(s => s != null).ToList();
+                        var shapes = BlendshapeNames(smrs.FirstOrDefault());
+                        var shape = shapes.Length > 0 ? shapes[Mathf.Clamp(row.blendIndex, 0, shapes.Length - 1)] : null;
+                        err = AvatarSizeSlider.AddBlendshapeSlider(_avatar, smrs, shape, row.min, row.max,
+                            SliderLabel(row.label, shape, "Slider"));
+                        break;
+                    }
                 }
                 if (err != null) errors.Add(err); else made++;
             }
             var msg = $"Created {made} slider(s). They appear in the Advanced Settings menu and apply at runtime in CVR.";
             if (errors.Count > 0) msg += "\nSkipped: " + string.Join("; ", errors);
             return msg;
+        }
+
+        /// <summary>Blendshape names on a mesh (empty array if none), for the Blendshape slider dropdown.</summary>
+        private static string[] BlendshapeNames(SkinnedMeshRenderer smr)
+        {
+            var mesh = smr != null ? smr.sharedMesh : null;
+            if (mesh == null) return System.Array.Empty<string>();
+            var names = new string[mesh.blendShapeCount];
+            for (int i = 0; i < names.Length; i++) names[i] = mesh.GetBlendShapeName(i);
+            return names;
         }
 
         /// <summary>Menu label: the user's custom name if set, else "{first target} {kind}".</summary>

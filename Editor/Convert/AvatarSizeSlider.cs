@@ -81,6 +81,41 @@ namespace CVRFury.Builder.Convert
             return null;
         }
 
+        /// <summary>Add (or replace) a slider that drives a blendshape (0..100) on the given meshes — e.g. a
+        /// body-size or expression slider straight from the mesh's shapekeys.</summary>
+        public static string AddBlendshapeSlider(GameObject avatar, IEnumerable<SkinnedMeshRenderer> smrs,
+                                                 string shape, float min, float max, string label)
+        {
+            if (avatar == null) return "Select your avatar first.";
+            var list = smrs?.Where(s => s != null).ToList() ?? new List<SkinnedMeshRenderer>();
+            if (list.Count == 0) return $"'{label}': no mesh set.";
+            if (string.IsNullOrEmpty(shape)) return $"'{label}': pick a blendshape.";
+            if (max <= min) return $"'{label}': max must be larger than min.";
+
+            foreach (var existing in avatar.GetComponents<CVRFurySlider>())
+                if (existing.menuPath == label) Object.DestroyImmediate(existing);
+
+            var slider = Undo.AddComponent<CVRFurySlider>(avatar);
+            slider.menuPath = label;
+            slider.saved = true;
+            foreach (var smr in list)
+            {
+                slider.minState.actions.Add(BlendAction(smr, shape, min));
+                slider.maxState.actions.Add(BlendAction(smr, shape, max));
+            }
+            slider.defaultValue = 0f; // load at min
+            EditorUtility.SetDirty(avatar);
+            return null;
+        }
+
+        private static FuryAction BlendAction(SkinnedMeshRenderer smr, string shape, float value) => new FuryAction
+        {
+            type = FuryAction.ActionType.BlendShape,
+            blendShapeRenderer = smr,
+            blendShape = shape,
+            blendShapeValue = value,
+        };
+
         private static FuryAction MaterialAction(Renderer r, string property, float value) => new FuryAction
         {
             type = FuryAction.ActionType.MaterialProperty,
