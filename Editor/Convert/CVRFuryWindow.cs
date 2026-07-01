@@ -177,8 +177,16 @@ namespace CVRFury.Builder.Convert
             if (!string.IsNullOrEmpty(_log))
             {
                 EditorGUILayout.Space();
-                EditorGUILayout.LabelField("Log", EditorStyles.boldLabel);
-                EditorGUILayout.TextArea(_log, GUILayout.MinHeight(120));
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    EditorGUILayout.LabelField("Log", EditorStyles.boldLabel);
+                    GUILayout.FlexibleSpace();
+                    if (GUILayout.Button("Copy", EditorStyles.miniButton, GUILayout.Width(50)))
+                        EditorGUIUtility.systemCopyBuffer = _log;
+                    if (GUILayout.Button("Clear", EditorStyles.miniButton, GUILayout.Width(50)))
+                        _log = "";
+                }
+                EditorGUILayout.TextArea(_log, GUILayout.MinHeight(90));
             }
 
             StepCredits();
@@ -232,22 +240,28 @@ namespace CVRFury.Builder.Convert
 
         private void DrawBanner()
         {
-            var rect = new Rect(0, 0, position.width, 34);
+            var rect = new Rect(0, 0, position.width, 44);
             EditorGUI.DrawRect(rect, BrandDark);
-            EditorGUI.DrawRect(new Rect(0, 33, position.width, 1), new Color(0.45f, 0.30f, 0.55f)); // accent underline
-            var style = new GUIStyle(EditorStyles.boldLabel)
+            EditorGUI.DrawRect(new Rect(0, 43, position.width, 2), new Color(0.45f, 0.30f, 0.55f)); // accent underline
+            var title = new GUIStyle(EditorStyles.boldLabel)
             {
-                normal = { textColor = BrandText }, fontSize = 15,
-                alignment = TextAnchor.MiddleLeft, padding = new RectOffset(12, 0, 0, 0),
+                normal = { textColor = BrandText }, fontSize = 16,
+                alignment = TextAnchor.LowerLeft, padding = new RectOffset(12, 0, 0, 2),
             };
-            GUI.Label(rect, $"✦ CVRFury", style);
+            GUI.Label(new Rect(0, 2, position.width, 24), "✦ CVRFury", title);
+            var sub = new GUIStyle(EditorStyles.miniLabel)
+            {
+                normal = { textColor = new Color(0.62f, 0.54f, 0.70f) },
+                alignment = TextAnchor.UpperLeft, padding = new RectOffset(14, 0, 0, 0),
+            };
+            GUI.Label(new Rect(0, 24, position.width, 18), "VRChat → ChilloutVR, made easy", sub);
             var ver = new GUIStyle(EditorStyles.miniLabel)
             {
                 normal = { textColor = new Color(0.65f, 0.55f, 0.72f) },
                 alignment = TextAnchor.MiddleRight, padding = new RectOffset(0, 12, 0, 0),
             };
             GUI.Label(rect, $"v{CckNames.CvrFuryVersion}", ver);
-            GUILayout.Space(38);
+            GUILayout.Space(48);
         }
 
         /// <summary>Themed replacement for EditorGUILayout.HelpBox — same signature, but tinted to match the
@@ -1427,10 +1441,28 @@ namespace CVRFury.Builder.Convert
             Repaint();
         }
 
-        private static bool Foldout(bool state, string label)
+        /// <summary>Themed sub-section foldout — a thin tinted bar with an accent edge, consistent with the
+        /// category headers (just quieter), instead of Unity's clashing grey foldout box.</summary>
+        private bool Foldout(bool state, string label)
         {
             EditorGUILayout.Space(2);
-            return EditorGUILayout.Foldout(state, label, true, EditorStyles.foldoutHeader);
+            var rect = EditorGUILayout.GetControlRect(false, 20);
+            EditorGUI.DrawRect(rect, new Color(0.185f, 0.165f, 0.215f));
+            EditorGUI.DrawRect(new Rect(rect.x, rect.y, 2f, rect.height), new Color(0.45f, 0.32f, 0.55f));
+            var style = new GUIStyle(EditorStyles.boldLabel)
+            {
+                normal = { textColor = new Color(0.80f, 0.78f, 0.87f) }, fontSize = 11,
+                alignment = TextAnchor.MiddleLeft, padding = new RectOffset(8, 0, 0, 0),
+            };
+            GUI.Label(rect, $"{(state ? "▾" : "▸")}  {label}", style);
+            if (Event.current.type == EventType.MouseDown && rect.Contains(Event.current.mousePosition))
+            {
+                state = !state;
+                Event.current.Use();
+                Repaint();
+            }
+            EditorGUIUtility.AddCursorRect(rect, MouseCursor.Link);
+            return state;
         }
     }
 }
