@@ -45,12 +45,14 @@ namespace CVRFury.Builder
 
             var hookedAvatar = false;
             var hookedProp = false;
+            var sawAvatarEvent = false;
             UnityAction<GameObject> avatarListener = OnPreAvatarBundle;
             UnityAction<GameObject> propListener = OnPrePropBundle;
 
             foreach (var e in events)
             {
                 if (e.EventInstance == null) continue;
+                if (e.IsAvatar) sawAvatarEvent = true;
                 if (e.IsAvatar && Reflect.AddUnityEventListener(e.EventInstance, avatarListener))
                 {
                     hookedAvatar = true;
@@ -66,16 +68,18 @@ namespace CVRFury.Builder
             }
 
             if (hookedAvatar || hookedProp)
-            {
                 _subscribed = true;
-            }
-            else
-            {
+
+            // Warn if AVATAR uploads specifically won't get CVRFury — even when a prop event hooked (which
+            // would otherwise flip _subscribed and hide the problem). Missing the avatar hook silently ships
+            // avatars with none of CVRFury's toggles / locomotion / sync-bit fixes.
+            if (!hookedAvatar)
                 Debug.LogWarning(
-                    "[CVRFury] The CCK is present but no avatar build event could be hooked, so CVRFury " +
-                    "features will NOT be applied on upload. Run Tools ▸ CVRFury ▸ Diagnose CCK " +
-                    "Integration and share the output so the hook can be updated for your CCK version.");
-            }
+                    "[CVRFury] " + (sawAvatarEvent
+                        ? "Found the CCK's avatar build event but couldn't attach to it"
+                        : "The CCK is present but no avatar build event was recognised") +
+                    ", so CVRFury features will NOT be applied to AVATAR uploads. Run Tools ▸ CVRFury ▸ " +
+                    "Diagnose CCK Integration and share the output so the hook can be updated for your CCK version.");
         }
 
         /// <summary>

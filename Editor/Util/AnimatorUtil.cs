@@ -314,7 +314,8 @@ namespace CVRFury.Builder
         /// controller actually carries the parameter and animates.</summary>
         public static void AddBoolToggleLayer(AnimatorController c, string layerName, string param,
                                               AnimationClip offClip, AnimationClip onClip, bool defaultOn,
-                                              AvatarMask mask = null, bool writeDefaults = false)
+                                              AvatarMask mask = null, bool writeDefaults = false,
+                                              float transitionSeconds = 0f)
         {
             EnsureBoolParam(c, param, defaultOn);
 
@@ -343,10 +344,10 @@ namespace CVRFury.Builder
             sm.defaultState = defaultOn ? on : off;
 
             var toOn = off.AddTransition(on);
-            ConfigureTransition(toOn, 0f);
+            ConfigureTransition(toOn, transitionSeconds);
             toOn.AddCondition(AnimatorConditionMode.If, 0f, param);
             var toOff = on.AddTransition(off);
-            ConfigureTransition(toOff, 0f);
+            ConfigureTransition(toOff, transitionSeconds);
             toOff.AddCondition(AnimatorConditionMode.IfNot, 0f, param);
         }
 

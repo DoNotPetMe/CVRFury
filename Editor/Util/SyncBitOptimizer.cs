@@ -30,7 +30,7 @@ namespace CVRFury.Builder
     /// </summary>
     internal static class SyncBitOptimizer
     {
-        private const int BoolBits = 1, IntBits = 8, FloatBits = 32; // CVR per-type synced-bit cost (approx)
+        private const int BoolBits = SyncCost.Bool, IntBits = SyncCost.Int, FloatBits = SyncCost.Float;
 
         /// <summary>
         /// Make a parameter's type compatible with how its transition conditions use it — WITHOUT

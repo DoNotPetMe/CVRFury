@@ -38,7 +38,8 @@ namespace CVRFury.Builder.Convert
                     foreach (var pbc in root.GetComponentsInChildren(pbcType, true))
                     {
                         var go = ((Component)pbc).gameObject;
-                        var dbc = go.AddComponent(dbcType);
+                        var dbc = go.GetComponent(dbcType);
+                        if (dbc == null) dbc = go.AddComponent(dbcType);
                         CopyFloat(pbc, VrcNames.PBC_Radius, dbc, VrcNames.DBC_Radius);
                         CopyFloat(pbc, VrcNames.PBC_Height, dbc, VrcNames.DBC_Height);
                         if (Reflect.GetField(pbc, VrcNames.PBC_Position) is Vector3 center)
@@ -59,7 +60,9 @@ namespace CVRFury.Builder.Convert
                 foreach (var pb in root.GetComponentsInChildren(pbType, true))
                 {
                     var go = ((Component)pb).gameObject;
-                    var db = go.AddComponent(dbType);
+                    // Re-run safe: reuse an existing DynamicBone on this object instead of stacking a second.
+                    var db = go.GetComponent(dbType);
+                    if (db == null) db = go.AddComponent(dbType);
 
                     var rootT = Reflect.GetField(pb, VrcNames.PB_Root) as Transform ?? go.transform;
                     Reflect.SetField(db, VrcNames.DB_Root, rootT);

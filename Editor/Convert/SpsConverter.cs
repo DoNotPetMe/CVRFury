@@ -208,10 +208,13 @@ namespace CVRFury.Builder.Convert
         private static void AddDefaultOffToggle(GameObject orifice, string label)
         {
             var host = orifice.transform.root.gameObject; // keep the toggle on an ACTIVE object so it bakes
-            var toggle = UnityEditor.Undo.AddComponent<CVRFuryToggle>(host);
+            // Don't stack duplicate menu entries on re-run: reuse an existing toggle with the same label.
+            var toggle = host.GetComponents<CVRFuryToggle>().FirstOrDefault(t => t.menuPath == label);
+            if (toggle == null) toggle = UnityEditor.Undo.AddComponent<CVRFuryToggle>(host);
             toggle.menuPath = label;
             toggle.defaultOn = false;
             toggle.saved = true;
+            toggle.state.actions.Clear();
             toggle.state.actions.Add(new FuryAction
             {
                 type = FuryAction.ActionType.ObjectToggle,

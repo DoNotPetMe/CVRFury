@@ -95,7 +95,12 @@ namespace CVRFury.Builder.Convert
                 i++;
                 if (entry == null) continue;
                 var machineName = Reflect.GetField(entry, CckNames.Entry_MachineName) as string;
-                var setting = Reflect.GetProperty(entry, CckNames.Entry_Setting);
+                // Resolve the entry's typed settings object the same robust way the rest of CckAvatar does.
+                // (There is no single "setting" field/property on the entry — it lives on the per-type field.)
+                var setting = Reflect.GetProperty(entry, CckNames.Entry_Setting)
+                              ?? Reflect.GetField(entry, CckNames.Entry_ToggleSettings)
+                              ?? Reflect.GetField(entry, CckNames.Entry_SliderSettings)
+                              ?? Reflect.GetField(entry, CckNames.Entry_DropdownSettings);
                 if (string.IsNullOrEmpty(machineName) || setting == null) { failed++; continue; }
 
                 if (baseParams.Contains(machineName)) { reused++; continue; } // existing layer drives it

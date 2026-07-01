@@ -121,7 +121,12 @@ namespace CVRFury.Builder.Convert
 
             var dir = "Assets/CVRFury Emotes";
             if (!AssetDatabase.IsValidFolder(dir)) AssetDatabase.CreateFolder("Assets", "CVRFury Emotes");
-            var path = AssetDatabase.GenerateUniqueAssetPath($"{dir}/{combined.name}.anim");
+            // Deterministic path per slot id so re-applying OVERWRITES the previous combined clip instead of
+            // spawning "<name> +audio 1.anim", "... 2.anim", … and bloating the project each run.
+            var safeId = string.Join("_", id.Split(System.IO.Path.GetInvalidFileNameChars()));
+            var path = $"{dir}/{safeId} +audio.anim";
+            var prior = AssetDatabase.LoadAssetAtPath<AnimationClip>(path);
+            if (prior != null) AssetDatabase.DeleteAsset(path);
             AssetDatabase.CreateAsset(combined, path);
             return combined;
         }

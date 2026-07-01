@@ -17,14 +17,17 @@ namespace CVRFury.Builder
             ctx.Assets.Save(onClip, onClip.name);
             ctx.Assets.Save(offClip, offClip.name);
 
-            AnimatorUtil.AddToggleLayer(
+            // Bool-driven layer (If/IfNot on a Bool param) so the animator parameter TYPE matches the Bool
+            // the AAS entry declares below. A Float-driven layer would make CVR sync the parameter as a
+            // 32/64-bit float while the menu says Bool — wasting the synced-bit budget and mis-reporting it.
+            AnimatorUtil.AddBoolToggleLayer(
                 controller,
                 layerName: $"CVRFury {displayName}",
                 param: param,
                 offClip: offClip,
                 onClip: onClip,
-                transitionSeconds: f.transitionSeconds,
-                defaultOn: f.defaultOn);
+                defaultOn: f.defaultOn,
+                transitionSeconds: f.transitionSeconds);
 
             // Expose it in the in-game Advanced Settings menu as a synced toggle.
             if (!ctx.Avatar.AddToggle(displayName, param, f.defaultOn, f.localOnly))

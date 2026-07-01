@@ -95,7 +95,7 @@ namespace CVRFury.Builder
             }
 
             if (droppedPoseLayers > 0)
-                log.Info($"Dropped {droppedPoseLayers} humanoid-pose layer(s) (hand gestures / locomotion / " +
+                log?.Info($"Dropped {droppedPoseLayers} humanoid-pose layer(s) (hand gestures / locomotion / " +
                          "emotes / face) from the merge — ChilloutVR drives these natively, so merging them " +
                          "would override CVR's body and freeze the avatar in the 'motorcycle pose'.");
         }

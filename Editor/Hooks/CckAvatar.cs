@@ -339,11 +339,12 @@ namespace CVRFury.Builder
                 var used = setting == null ? null : Reflect.GetField(setting, CckNames.Setting_UsedType)?.ToString();
                 switch (used)
                 {
-                    case CckNames.ParameterType_Bool:  boolN++;  estBits += 1;  break;
-                    case CckNames.ParameterType_Int:   intN++;   estBits += 8;  break;
-                    case CckNames.ParameterType_Float: floatN++; estBits += 32; break;
-                    default:                           unknownN++; estBits += 32; break; // unset defaults to Float
+                    case CckNames.ParameterType_Bool:  boolN++;  break;
+                    case CckNames.ParameterType_Int:   intN++;   break;
+                    case CckNames.ParameterType_Float: floatN++; break;
+                    default:                           unknownN++; break; // unset defaults to Float
                 }
+                estBits += SyncCost.ForUsedType(used);
             }
 
             return $"AAS readback: {boolN} Bool, {intN} Int, {floatN} Float synced" +
@@ -370,9 +371,7 @@ namespace CVRFury.Builder
                     Reflect.GetField(entry, CckNames.Entry_SliderSettings) ??
                     Reflect.GetField(entry, CckNames.Entry_DropdownSettings);
                 var used = setting == null ? null : Reflect.GetField(setting, CckNames.Setting_UsedType)?.ToString();
-                est += used == CckNames.ParameterType_Bool ? 1
-                     : used == CckNames.ParameterType_Int ? 8
-                     : 32; // Float or unset
+                est += SyncCost.ForUsedType(used);
             }
             return est;
         }

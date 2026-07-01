@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEditor;
 using UnityEditor.Animations;
 using UnityEngine;
@@ -115,22 +116,27 @@ namespace CVRFury.Builder.Convert
         /// Animations folder + an avatar-animator-looking file name.</summary>
         private static AnimatorController FindCvrDefaultAvatarAnimator()
         {
-            foreach (var guid in AssetDatabase.FindAssets("t:AnimatorController"))
+            AnimatorController fuzzyFallback = null;
+            foreach (var guid in AssetDatabase.FindAssets("AvatarAnimator t:AnimatorController")
+                         .Concat(AssetDatabase.FindAssets("t:AnimatorController")))
             {
                 var p = AssetDatabase.GUIDToAssetPath(guid);
                 var lower = p.ToLowerInvariant();
-                if (lower.Contains(".cck") && lower.Contains("/animations/") &&
-                    lower.Contains("avatar") && lower.Contains("animator"))
-                    return AssetDatabase.LoadAssetAtPath<AnimatorController>(p);
+                if (!(lower.Contains(".cck") && lower.Contains("/animations/") &&
+                      lower.Contains("avatar") && lower.Contains("animator")))
+                    continue;
+                var c = AssetDatabase.LoadAssetAtPath<AnimatorController>(p);
+                if (c == null) continue;
+                // Only accept a controller that actually has CVR locomotion — a third-party controller sitting
+                // in a CCK/Animations folder would otherwise be picked and re-introduce the motorbike pose.
+                if (ControllerGuard.HasCvrLocomotion(c))
+                {
+                    if (System.IO.Path.GetFileNameWithoutExtension(p).Equals("AvatarAnimator", System.StringComparison.OrdinalIgnoreCase))
+                        return c; // exact CVR stock name + real locomotion = the one we want
+                    fuzzyFallback = fuzzyFallback ?? c;
+                }
             }
-            // Fallback: any AvatarAnimator.controller shipped under a CCK folder.
-            foreach (var guid in AssetDatabase.FindAssets("AvatarAnimator t:AnimatorController"))
-            {
-                var p = AssetDatabase.GUIDToAssetPath(guid);
-                if (p.ToLowerInvariant().Contains(".cck"))
-                    return AssetDatabase.LoadAssetAtPath<AnimatorController>(p);
-            }
-            return null;
+            return fuzzyFallback;
         }
     }
 }
