@@ -20,7 +20,7 @@ namespace CVRFury.Builder
         /// <summary>CVRFury package version, surfaced in the conversion/build log so you can confirm at
         /// a glance which build actually ran (a stale recompile is the usual cause of "same issue").
         /// Keep in sync with package.json.</summary>
-        public const string CvrFuryVersion = "0.9.86";
+        public const string CvrFuryVersion = "0.10.0";
 
         // --- Build pipeline (editor) ---
         // Static UnityEvent&lt;GameObject&gt; fields that the CCK fires immediately before it
@@ -118,11 +118,17 @@ namespace CVRFury.Builder
         public const string DropdownOptionType = "ABI.CCK.Scripts.CVRAdvancedSettingsDropDownEntry";
         public const string DropdownOption_Name = "name";
 
-        // --- Built-in gesture parameters driven by the platform ---
-        // ChilloutVR feeds hand gestures into the animator through these float parameters,
-        // mirroring VRChat's GestureLeft / GestureRight convention (0 = neutral … 7 = thumbs up).
-        public const string GestureLeftParam = "GestureLeft";
-        public const string GestureRightParam = "GestureRight";
+        // --- Built-in gesture / locomotion parameters driven by the platform ---
+        // ChilloutVR's gesture values are NOT VRChat's: Open Hand = −1, Neutral = 0, Fist = 1
+        // (the Float variant is analog 0.01–1.0 with trigger squeeze), Thumbs Up = 2, Gun = 3,
+        // Point = 4, Peace = 5, Rock n Roll = 6. The *Idx parameters are the discrete Ints.
+        // Reference: docs.chilloutvr.net → CCK → Avatar → Animator Core Parameters.
+        public const string GestureLeftParam = "GestureLeft";        // Float, −1.0 … 6.0
+        public const string GestureRightParam = "GestureRight";      // Float, −1.0 … 6.0
+        public const string GestureLeftIdxParam = "GestureLeftIdx";  // Int, −1 … 6
+        public const string GestureRightIdxParam = "GestureRightIdx";// Int, −1 … 6
+        public const string CrouchingParam = "Crouching";            // Bool, game-driven
+        public const string ProneParam = "Prone";                    // Bool, game-driven
 
         // --- Viseme / blink / eye / spatial fields on CVRAvatar ---
         public const string Avatar_ViewPosition = "viewPosition";   // Vector3

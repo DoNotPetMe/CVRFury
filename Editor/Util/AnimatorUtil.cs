@@ -151,21 +151,25 @@ namespace CVRFury.Builder
         }
 
         /// <summary>
-        /// Add a layer that activates while a (platform-driven) float parameter equals a specific
-        /// discrete value — used for hand gestures. The On state is entered when the parameter is
-        /// within ±0.5 of <paramref name="value"/> and exited otherwise.
+        /// Add a layer that activates while a platform-driven gesture index equals a specific
+        /// value — used for hand gestures. Keys on ChilloutVR's discrete GestureLeftIdx /
+        /// GestureRightIdx core Ints (−1 … 6) with exact Equals/NotEqual conditions; the old
+        /// float-window approach on GestureLeft/GestureRight missed a fist at low trigger squeeze
+        /// (CVR encodes fist as an analog 0.01–1.0). A no-humanoid mask keeps the layer from ever
+        /// posing the rig, matching the toggle layers' structural guarantee.
         /// </summary>
         public static void AddGestureLayer(AnimatorController c, string layerName, string param,
-                                           int value, AnimationClip offClip, AnimationClip onClip,
+                                           int gestureIdx, AnimationClip offClip, AnimationClip onClip,
                                            float transitionSeconds)
         {
-            EnsureFloatParam(c, param, 0f);
+            EnsureIntParam(c, param, 0);
 
             var name = UniqueLayerName(c, layerName);
             c.AddLayer(name);
             var layers = c.layers;
             var idx = layers.Length - 1;
             layers[idx].defaultWeight = 1f;
+            layers[idx].avatarMask = CreateNoHumanoidMask(c);
             c.layers = layers;
 
             var sm = c.layers[idx].stateMachine;
@@ -179,16 +183,56 @@ namespace CVRFury.Builder
 
             var toOn = off.AddTransition(on);
             ConfigureTransition(toOn, transitionSeconds);
-            toOn.AddCondition(AnimatorConditionMode.Greater, value - 0.5f, param);
-            toOn.AddCondition(AnimatorConditionMode.Less, value + 0.5f, param);
+            toOn.AddCondition(AnimatorConditionMode.Equals, gestureIdx, param);
 
-            // Two exit transitions cover "below the window" OR "above the window".
-            var toOffLow = on.AddTransition(off);
-            ConfigureTransition(toOffLow, transitionSeconds);
-            toOffLow.AddCondition(AnimatorConditionMode.Less, value - 0.5f, param);
-            var toOffHigh = on.AddTransition(off);
-            ConfigureTransition(toOffHigh, transitionSeconds);
-            toOffHigh.AddCondition(AnimatorConditionMode.Greater, value + 0.5f, param);
+            var toOff = on.AddTransition(off);
+            ConfigureTransition(toOff, transitionSeconds);
+            toOff.AddCondition(AnimatorConditionMode.NotEqual, gestureIdx, param);
+        }
+
+        /// <summary>
+        /// Add a two-state layer gated on SEVERAL Bool parameters at once: the On state is entered
+        /// only while every gate matches its expected value (AND), and exited as soon as any one
+        /// stops matching (one exit transition per gate = OR). The animator side of a Blendshape
+        /// Logic rule.
+        /// </summary>
+        public static void AddMultiConditionBoolLayer(AnimatorController c, string layerName,
+                                                      IReadOnlyList<(string param, bool expected)> gates,
+                                                      AnimationClip offClip, AnimationClip onClip,
+                                                      float transitionSeconds)
+        {
+            foreach (var g in gates)
+                EnsureBoolParam(c, g.param);
+
+            var name = UniqueLayerName(c, layerName);
+            c.AddLayer(name);
+            var layers = c.layers;
+            var idx = layers.Length - 1;
+            layers[idx].defaultWeight = 1f;
+            c.layers = layers;
+
+            var sm = c.layers[idx].stateMachine;
+            var off = sm.AddState("Inactive");
+            off.motion = offClip;
+            off.writeDefaultValues = false;
+            var on = sm.AddState("Active");
+            on.motion = onClip;
+            on.writeDefaultValues = false;
+            sm.defaultState = off;
+
+            var toOn = off.AddTransition(on);
+            ConfigureTransition(toOn, transitionSeconds);
+            foreach (var g in gates)
+                toOn.AddCondition(g.expected ? AnimatorConditionMode.If : AnimatorConditionMode.IfNot,
+                    0f, g.param);
+
+            foreach (var g in gates)
+            {
+                var toOff = on.AddTransition(off);
+                ConfigureTransition(toOff, transitionSeconds);
+                toOff.AddCondition(g.expected ? AnimatorConditionMode.IfNot : AnimatorConditionMode.If,
+                    0f, g.param);
+            }
         }
 
         /// <summary>

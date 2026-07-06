@@ -32,6 +32,19 @@ namespace CVRFury.Builder
             return c.layers.Any(l => l.stateMachine != null && StateMachineDrivesLocomotion(l.stateMachine));
         }
 
+        /// <summary>Index of the first layer whose state machine contains a real CVR locomotion
+        /// blend tree (MovementX/MovementY), or −1. Used to add in-layer states (dances, custom
+        /// crouch/prone poses) to the layer CVR actually drives.</summary>
+        public static int FindLocomotionLayerIndex(AnimatorController c)
+        {
+            if (c == null) return -1;
+            for (var i = 0; i < c.layers.Length; i++)
+                if (c.layers[i].stateMachine != null &&
+                    StateMachineDrivesLocomotion(c.layers[i].stateMachine))
+                    return i;
+            return -1;
+        }
+
         private static bool StateMachineDrivesLocomotion(AnimatorStateMachine sm)
         {
             foreach (var cs in sm.states)

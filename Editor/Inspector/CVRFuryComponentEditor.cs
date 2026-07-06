@@ -86,7 +86,7 @@ namespace CVRFury.Builder
             return labels.ToList();
         }
 
-        private static void DrawBanner(string title)
+        protected static void DrawBanner(string title)
         {
             var rect = EditorGUILayout.GetControlRect(false, 28);
             EditorGUI.DrawRect(rect, new Color(0.18f, 0.10f, 0.22f));

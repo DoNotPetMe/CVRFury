@@ -4,6 +4,50 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-07-06
+
+Gesture fix + three new features (Presets, Locomotion Styles, Blendshape Logic).
+
+### Fixed
+- **Gesture component broke the CCK upload / never fired in-game.** Two real bugs:
+  - The gesture values followed VRChat's 0–7 order, but ChilloutVR's are **−1 … 6**
+    (Open Hand = −1, Neutral = 0, Fist = 1 analog, Thumbs Up = 2, Gun = 3, Point = 4,
+    Peace = 5, Rock n Roll = 6). Gestures fired on the wrong hand pose — or never
+    (ThumbsUp = 7 doesn't exist in CVR). The builder now maps the enum to CVR's real
+    indices and keys the layer on the discrete `GestureLeftIdx`/`GestureRightIdx`
+    core Ints with exact Equals/NotEqual conditions, so a fist is detected at any
+    trigger squeeze. Covered by unit tests.
+  - On a gesture-only avatar the bake enabled Advanced Avatar Settings but left
+    `avatarSettings.animator`/`overrides` null — the CCK's build path dereferences the
+    generated animator, aborting the upload with a generic build error. The bake now
+    wires the controller exactly like the CCK's own "Create Controller + Attach"
+    (base + animator + overrides + Animator component) and persists it.
+  - Gesture layers now carry the no-humanoid mask like toggle layers, so they can
+    never pose the rig (motorbike-pose class of bugs).
+
+### Added
+- **Presets** (`CVRFury Presets`) — a synced AAS dropdown of outfit/configuration
+  presets built from your existing CVRFury Toggles. Selecting a preset equips its
+  toggles and forces everything any other preset references to its resting state —
+  equip one, the rest turn off. Option 0 ("Custom") animates nothing so individual
+  toggles stay in manual control.
+- **Locomotion Styles** (`CVRFury Locomotion Styles`) — custom crouch/prone
+  animations selectable from an in-game dropdown. Assign the clips from your
+  crouch/prone pack (e.g. one distributed for NotAKidoS' SimpleAAS workflow) and
+  CVRFury bakes the synced dropdown plus pose states *inside* the locomotion layer,
+  gated on CVR's `Crouching`/`Prone` core parameters — the SyncDances/emote pattern,
+  so no motorbike pose and no manual controller work.
+- **Blendshape Logic** (`CVRFury Blendshape Logic`) — rule-based blendshape
+  automation: "when these GameObjects are on/off, set these blendshapes to these
+  values". Blendshapes are auto-detected and picked from a dropdown with a value
+  slider; conditions support multiple objects at once (AND), keyed on the synced
+  parameters of the CVRFury Toggles that drive them; the inspector can also create
+  a toggle straight from any detected blendshape.
+- `AnimatorUtil.AddMultiConditionBoolLayer` — two-state layer gated on several Bool
+  parameters (AND to enter, any-mismatch to exit).
+- `BuildContext.FeatureParams` — builders now record the synced parameter they
+  allocate per feature so later builders can gate on it.
+
 ## [0.9.81 – 0.9.84] - 2026-06-19 — "Ultracode" pass
 
 Big audit-driven improvement pass (bugs, automation, clarity, features).

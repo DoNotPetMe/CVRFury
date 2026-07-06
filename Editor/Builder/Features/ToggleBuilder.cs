@@ -9,6 +9,7 @@ namespace CVRFury.Builder
             var displayName = MenuLeaf(f.menuPath, f.gameObject.name);
             var param = ctx.AllocateParam(
                 !string.IsNullOrEmpty(f.parameterName) ? f.parameterName : displayName);
+            ctx.FeatureParams[f] = param; // Blendshape Logic keys its rules on toggle params.
 
             var controller = ctx.GetOrCreateController();
 

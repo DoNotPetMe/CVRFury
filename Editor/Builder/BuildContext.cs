@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using CVRFury.Components;
 using UnityEditor.Animations;
 using UnityEngine;
 
@@ -17,6 +19,12 @@ namespace CVRFury.Builder
         public readonly AssetSaver Assets;
         public readonly BuildTrigger Trigger;
         public readonly BuildLog Log = new BuildLog();
+
+        /// <summary>Synced parameter allocated for a feature during this build. Populated by
+        /// builders that own exactly one parameter (currently Toggle) so later builders — e.g.
+        /// Blendshape Logic — can gate their layers on it.</summary>
+        public readonly Dictionary<CVRFuryComponent, string> FeatureParams =
+            new Dictionary<CVRFuryComponent, string>();
 
         public AnimatorController Controller { get; private set; }
 

@@ -18,12 +18,22 @@ namespace CVRFury.Builder
         private Vector2 _scroll;
         private bool _simulateStanding = true;
         private bool _showLayers;
+        private int _stance;                       // 0 standing, 1 crouching, 2 prone
+        private int _gestureLeft = 1, _gestureRight = 1; // popup index; CVR idx = index − 1
+
+        // CVR's gesture indices (−1 … 6) in popup order, offset by +1.
+        private static readonly string[] GestureNames =
+        {
+            "Open Hand (−1)", "Neutral (0)", "Fist (1)", "Thumbs Up (2)",
+            "Gun (3)", "Point (4)", "Peace (5)", "Rock n Roll (6)",
+        };
 
         // ChilloutVR drives these itself; hide them so the list shows only your settings.
         private static readonly HashSet<string> Core = new HashSet<string>
         {
             "MovementX", "MovementY", "Grounded", "Crouching", "Prone", "Flying", "Sitting", "Swimming",
             "GestureLeft", "GestureRight", "GestureLeftWeight", "GestureRightWeight",
+            "GestureLeftIdx", "GestureRightIdx",
             "VelocityX", "VelocityY", "VelocityZ", "Toggle", "Emote", "CancelEmote", "IsLocal",
         };
 
@@ -152,9 +162,9 @@ namespace CVRFury.Builder
             }
         }
 
-        /// <summary>Hold CVR's locomotion parameters at "grounded, not moving" so the avatar stands in idle
-        /// instead of dropping into the no-input motorbike pose while you test.</summary>
-        private static void DriveStanding(Animator anim)
+        /// <summary>Hold CVR's locomotion parameters at "grounded, not moving" in the chosen stance so
+        /// the avatar idles (or crouches/prones) instead of dropping into the no-input motorbike pose.</summary>
+        private static void DriveStanding(Animator anim, int stance)
         {
             foreach (var p in anim.parameters)
             {
@@ -164,10 +174,28 @@ namespace CVRFury.Builder
                     case "Upright": Set(anim, p, 1f); break;
                     case "IsLocal": Set(anim, p, 1f); break;
                     case "Emote": Set(anim, p, 0f); break; // not emoting → stay in locomotion
+                    case "Crouching": Set(anim, p, stance == 1 ? 1f : 0f); break;
+                    case "Prone": Set(anim, p, stance == 2 ? 1f : 0f); break;
                     case "MovementX": case "MovementY":
                     case "VelocityX": case "VelocityY": case "VelocityZ":
-                    case "Sitting": case "Flying": case "Crouching": case "Prone": case "Swimming":
+                    case "Sitting": case "Flying": case "Swimming":
                         Set(anim, p, 0f); break;
+                }
+            }
+        }
+
+        /// <summary>Drive both gesture parameter styles like the game: the discrete *Idx Ints and the
+        /// analog Floats (fist held fully squeezed).</summary>
+        private static void DriveGestures(Animator anim, int left, int right)
+        {
+            foreach (var p in anim.parameters)
+            {
+                switch (p.name)
+                {
+                    case "GestureLeftIdx": Set(anim, p, left); break;
+                    case "GestureRightIdx": Set(anim, p, right); break;
+                    case "GestureLeft": Set(anim, p, left); break;
+                    case "GestureRight": Set(anim, p, right); break;
                 }
             }
         }

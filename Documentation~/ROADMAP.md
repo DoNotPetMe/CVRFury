@@ -30,8 +30,11 @@ honest about what exists and what's next.
 | Blendshape Link | 🟡 | bakes values; "keep live" animator-driven mirroring planned |
 | Object State / Apply During Upload | ✅ | activate / deactivate / delete |
 | Modes / multi-state (dropdown) | ✅ | exclusive states, union coverage, AAS `GameObjectDropdown` |
+| Presets dropdown (equip one, rest turn off) | ✅ | `CVRFuryPresets` — built from existing Toggles; "Custom" option keeps manual control |
+| Custom crouch/prone styles dropdown | ✅ | `CVRFuryLocomotionStyles` — in-locomotion-layer states gated on `Crouching`/`Prone` |
+| Blendshape logic (object-state → blendshape rules) | ✅ | `CVRFuryBlendshapeLogic` — auto-detect, multi-condition AND, create-toggle-from-blendshape |
 | Puppet / radial slider | ✅ | 1D blend-tree layer + synced AAS slider |
-| Gestures | ✅ | `CVRFuryGesture` keys a layer on GestureLeft/GestureRight |
+| Gestures | ✅ | `CVRFuryGesture` keys a layer on `GestureLeftIdx`/`GestureRightIdx` (CVR −1…6 mapping, unit-tested) |
 | Visemes / Blink / Eye helper | 🟡 | `CVRFuryAvatarSettings` sets the CVRAvatar fields (verify member names) |
 | Parameters declaration | ✅ | `CVRFuryParameters` declares params + optional menu exposure |
 | Exclusive toggle tags | ⬜ | CVR has no animator parameter drivers; use **Modes** for true exclusivity |

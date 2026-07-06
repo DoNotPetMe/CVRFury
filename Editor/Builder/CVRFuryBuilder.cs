@@ -162,23 +162,20 @@ namespace CVRFury.Builder
                 .ToList();
         }
 
-        /// <summary>Once features have populated the working controller, wire it back onto the
-        /// avatar's AAS as a fresh override controller so the build instance points at our
-        /// clone rather than the original asset.</summary>
+        /// <summary>Once features have populated the working controller, wire it onto the avatar
+        /// exactly like the CCK's own "Create Controller + Attach": base controller, generated
+        /// animator, override controller (on both the AAS container and the CVRAvatar) and the
+        /// Animator component, then persist. Leaving <c>avatarSettings.animator</c>/<c>overrides</c>
+        /// null while <c>avatarUsesAdvancedSettings</c> is true is what made animator-only features
+        /// (e.g. Gesture, whose avatars often have an empty AAS list) abort the CCK upload with a
+        /// generic build error — the CCK's build path dereferences the generated animator.</summary>
         private static void FinalizeAnimators(BuildContext ctx)
         {
             var controller = ctx.Controller;
             if (controller == null) return; // No feature needed an animator.
 
-            ctx.Avatar.EnableAdvancedSettings();
-            ctx.Avatar.BaseController = controller;
-
-            var overrides = new AnimatorOverrideController(controller)
-            {
-                name = controller.name + " (Overrides)",
-            };
-            ctx.Assets.Save(overrides, overrides.name);
-            ctx.Avatar.Overrides = overrides;
+            ctx.Avatar.AttachGeneratedController(controller);
+            ctx.Avatar.Persist();
         }
 
         /// <summary>Remove every CVRFury component from the build instance so nothing

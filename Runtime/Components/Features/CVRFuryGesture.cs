@@ -14,7 +14,11 @@ namespace CVRFury.Components
 
         public enum Hand { Left, Right }
 
-        /// <summary>Values follow the common VRChat/ChilloutVR gesture indices.</summary>
+        /// <summary>
+        /// Declared in VRChat's familiar order for readability. The serialized value is the enum
+        /// member, and the builder maps it to ChilloutVR's real gesture index (−1 … 6, where
+        /// Open Hand = −1 and Fist = 1) at build time — see <c>GestureBuilder.ToCvrGestureIndex</c>.
+        /// </summary>
         public enum GestureType
         {
             Neutral = 0,
