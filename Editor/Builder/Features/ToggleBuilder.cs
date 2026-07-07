@@ -33,6 +33,10 @@ namespace CVRFury.Builder
             if (!ctx.Avatar.AddToggle(displayName, param, f.defaultOn, f.localOnly))
                 ctx.Log.Warning($"Toggle '{displayName}' animates correctly but could not be added " +
                                 $"to the in-game menu (AAS write failed).");
+
+            // Record it so later-running features (Blendshape Rules) can find "what parameter
+            // drives this GameObject" for any target this toggle's actions touch.
+            ctx.RecordParam(f, param);
         }
 
         private static string MenuLeaf(string menuPath, string fallback)

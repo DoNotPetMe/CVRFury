@@ -4,6 +4,24 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — `feature/blendshape-rules`
+
+### Added
+- **CVRFury Blendshape Rules** component: set one or more blendshapes based on whether existing
+  CVRFury Toggle(s)/Modes option(s) are on/selected (AND across multiple conditions). Covers
+  GameObject-less items that are only controllable via a blendshape (e.g. a "shrink to hide"
+  shape with no toggle-able object of its own), and cases where a shape should only apply once
+  several other toggles are on together. Reverts to the scene's current ("resting") value when no
+  rule matches, same convention as every other CVRFury feature.
+- **Auto-detected blendshape dropdown**: any Blendshape action/target (in a Toggle, Slider, Modes
+  option, or the new Blendshape Rules component) now shows a dropdown of the assigned renderer's
+  actual blendshape names instead of a free-text field, with a "Make Toggle From This Blendshape"
+  shortcut on Blendshape Rules targets to spin one out into its own CVRFury Toggle.
+
+### Changed
+- `CVRFuryModes` now records its synced parameter via `BuildContext.RecordParam`, so later features
+  (e.g. Blendshape Rules) can reference "this Modes option is selected" without re-deriving names.
+
 ## [0.9.81 – 0.9.84] - 2026-06-19 — "Ultracode" pass
 
 Big audit-driven improvement pass (bugs, automation, clarity, features).

@@ -34,6 +34,7 @@ namespace CVRFury.Builder
 
             AnimatorUtil.AddModesLayer(controller, $"CVRFury {displayName}", param, clips,
                 f.transitionSeconds, f.defaultMode);
+            ctx.RecordParam(f, param);
 
             var options = f.modes.Select(m => string.IsNullOrEmpty(m.name) ? "Mode" : m.name).ToArray();
             if (!ctx.Avatar.AddDropdown(displayName, param, options,

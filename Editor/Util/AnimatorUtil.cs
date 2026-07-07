@@ -365,6 +365,51 @@ namespace CVRFury.Builder
             return mask;
         }
 
+        /// <summary>
+        /// Add a layer with one state per (conditions, clip) entry plus a catch-all "Rest" state.
+        /// Entries are tried in the order given (Any State priority — the first whose AND'd
+        /// conditions all hold wins); if none match this frame, the layer falls back to Rest. This
+        /// is the animator side of CVRFury Blendshape Rules: each entry is one rule's outcome for
+        /// one blendshape, gated on conditions copied from wherever that rule's GameObjects are
+        /// already toggled elsewhere on the avatar.
+        /// </summary>
+        public static void AddConditionalStatesLayer(AnimatorController c, string layerName,
+            AnimationClip restClip,
+            IReadOnlyList<(string label, List<AnimatorCondition> conditions, AnimationClip clip)> entries)
+        {
+            var name = UniqueLayerName(c, layerName);
+            c.AddLayer(name);
+            var layers = c.layers;
+            var idx = layers.Length - 1;
+            layers[idx].defaultWeight = 1f;
+            c.layers = layers;
+
+            var sm = c.layers[idx].stateMachine;
+            var rest = sm.AddState("Rest");
+            rest.motion = restClip;
+            rest.writeDefaultValues = false;
+            sm.defaultState = rest;
+
+            foreach (var e in entries)
+            {
+                var state = sm.AddState(e.label);
+                state.motion = e.clip;
+                state.writeDefaultValues = false;
+
+                var into = sm.AddAnyStateTransition(state);
+                ConfigureTransition(into, 0f);
+                into.canTransitionToSelf = false;
+                foreach (var cond in e.conditions)
+                    into.AddCondition(cond.mode, cond.threshold, cond.parameter);
+            }
+
+            // Catch-all, added LAST so every specific entry above gets first refusal this frame
+            // (Any State transitions are evaluated in the order they were added).
+            var toRest = sm.AddAnyStateTransition(rest);
+            ConfigureTransition(toRest, 0f);
+            toRest.canTransitionToSelf = false;
+        }
+
         private static void ConfigureTransition(AnimatorStateTransition t, float seconds)
         {
             t.hasExitTime = false;

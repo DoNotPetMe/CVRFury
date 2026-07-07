@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using CVRFury.Components;
 using UnityEditor.Animations;
 using UnityEngine;
 
@@ -21,6 +23,13 @@ namespace CVRFury.Builder
         public AnimatorController Controller { get; private set; }
 
         private readonly ParamNameAllocator _params = new ParamNameAllocator();
+
+        // Which synced parameter each Toggle/Modes/Slider feature ended up with, keyed by the
+        // component instance. Lets later-running features (e.g. Blendshape Rules, priority 60)
+        // find "what parameter drives this GameObject" without re-deriving/guessing the name —
+        // there is no other reliable way to recover an allocated name after the fact.
+        private readonly Dictionary<CVRFuryComponent, string> _recordedParams =
+            new Dictionary<CVRFuryComponent, string>();
 
         public BuildContext(GameObject root, CckAvatar avatar, AssetSaver assets, BuildTrigger trigger)
         {
@@ -53,5 +62,16 @@ namespace CVRFury.Builder
         /// <summary>Reserve a unique, sanitised synced-parameter machine name. If
         /// <paramref name="desired"/> is blank, one is generated.</summary>
         public string AllocateParam(string desired) => _params.Allocate(desired);
+
+        /// <summary>Record the parameter a feature ended up with, so a later-running feature
+        /// (e.g. Blendshape Rules) can look up "what drives this component" via
+        /// <see cref="TryGetRecordedParam"/> instead of re-deriving/guessing the name.</summary>
+        public void RecordParam(CVRFuryComponent feature, string param)
+        {
+            if (feature != null && !string.IsNullOrEmpty(param)) _recordedParams[feature] = param;
+        }
+
+        public bool TryGetRecordedParam(CVRFuryComponent feature, out string param) =>
+            _recordedParams.TryGetValue(feature, out param);
     }
 }

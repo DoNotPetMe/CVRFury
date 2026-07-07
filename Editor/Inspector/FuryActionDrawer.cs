@@ -30,7 +30,7 @@ namespace CVRFury.Builder
                     break;
                 case FuryAction.ActionType.BlendShape:
                     Field(ref r, property, "blendShapeRenderer", "Renderer");
-                    Field(ref r, property, "blendShape", "Blendshape");
+                    BlendShapeField(ref r, property);
                     Field(ref r, property, "blendShapeValue", "Value");
                     break;
                 case FuryAction.ActionType.MaterialSwap:
@@ -67,13 +67,31 @@ namespace CVRFury.Builder
                 FuryAction.ActionType.MaterialProperty => 4,
                 _ => 0,
             };
-            return (rows + 1) * (Line + Pad);
+            var height = (rows + 1) * (Line + Pad);
+
+            if (type == FuryAction.ActionType.BlendShape)
+            {
+                var renderer = property.FindPropertyRelative("blendShapeRenderer").objectReferenceValue as SkinnedMeshRenderer;
+                height += BlendshapeUtil.ExtraHeight(renderer, property.FindPropertyRelative("blendShape"), Line);
+            }
+
+            return height;
         }
 
         private static void Field(ref Rect r, SerializedProperty parent, string name, string label)
         {
             EditorGUI.PropertyField(r, parent.FindPropertyRelative(name), new GUIContent(label));
             r.y += Line + Pad;
+        }
+
+        /// <summary>Blendshape name as an auto-detected dropdown (see <see cref="BlendshapeUtil"/>)
+        /// instead of a plain typed field, advancing <paramref name="r"/> by however many rows it drew.</summary>
+        private static void BlendShapeField(ref Rect r, SerializedProperty property)
+        {
+            var renderer = property.FindPropertyRelative("blendShapeRenderer").objectReferenceValue as SkinnedMeshRenderer;
+            var nameProp = property.FindPropertyRelative("blendShape");
+            BlendshapeUtil.Field(r, renderer, nameProp, new GUIContent("Blendshape"));
+            r.y += Line + Pad + BlendshapeUtil.ExtraHeight(renderer, nameProp, Line);
         }
     }
 }
