@@ -64,6 +64,22 @@ namespace CVRFury.Builder.Convert
             if (string.IsNullOrEmpty(property)) return $"'{label}': no shader property set.";
             if (max <= min) return $"'{label}': max must be larger than min.";
 
+            // Animating a property the material doesn't expose silently does nothing in game — the #1 cause
+            // of "my hue slider doesn't work". Validate up front, with the locked-Poiyomi case called out.
+            foreach (var r in list)
+                foreach (var m in r.sharedMaterials)
+                {
+                    if (m == null || m.shader == null) continue;
+                    if (m.HasProperty(property)) continue;
+                    bool locked = m.shader.name.StartsWith("Hidden/Locked") || m.shader.name.StartsWith("Locked/");
+                    return locked
+                        ? $"'{label}': material '{m.name}' is LOCKED (Poiyomi) and '{property}' was baked away. " +
+                          "Unlock the material, right-click the property in the shader UI and set it to " +
+                          "\"Animated\", re-lock, then create the slider again."
+                        : $"'{label}': material '{m.name}' ({m.shader.name}) has no property '{property}' — the " +
+                          "slider would do nothing. Check the exact property name in the shader.";
+                }
+
             foreach (var existing in avatar.GetComponents<CVRFurySlider>())
                 if (existing.menuPath == label) Object.DestroyImmediate(existing);
 

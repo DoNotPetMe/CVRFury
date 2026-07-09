@@ -76,9 +76,14 @@ namespace CVRFury.Builder
             return removed;
         }
 
+        // NOTE: the Ensure*Param helpers are TYPE-CORRECTING, not name-only. A merged VRChat controller
+        // declares GestureLeft/GestureRight as Int; if a gesture layer then adds Float window conditions
+        // against the Int param, CVR's Float-driven hand system misbehaves and the CCK's regeneration can
+        // abort the whole upload with the generic validation error. Matching by name AND fixing the type
+        // guarantees the layer we build gets the parameter type it was written for.
         public static void EnsureFloatParam(AnimatorController c, string name, float def = 0f)
         {
-            if (c.parameters.Any(p => p.name == name)) return;
+            if (RetypeIfPresent(c, name, AnimatorControllerParameterType.Float)) return;
             c.AddParameter(new AnimatorControllerParameter
             {
                 name = name,
@@ -89,13 +94,30 @@ namespace CVRFury.Builder
 
         public static void EnsureBoolParam(AnimatorController c, string name, bool def = false)
         {
-            if (c.parameters.Any(p => p.name == name)) return;
+            if (RetypeIfPresent(c, name, AnimatorControllerParameterType.Bool)) return;
             c.AddParameter(new AnimatorControllerParameter
             {
                 name = name,
                 type = AnimatorControllerParameterType.Bool,
                 defaultBool = def,
             });
+        }
+
+        /// <summary>True if the parameter already exists (after correcting its type if needed).</summary>
+        private static bool RetypeIfPresent(AnimatorController c, string name, AnimatorControllerParameterType want)
+        {
+            var ps = c.parameters;
+            for (int i = 0; i < ps.Length; i++)
+            {
+                if (ps[i].name != name) continue;
+                if (ps[i].type != want)
+                {
+                    ps[i].type = want;
+                    c.parameters = ps; // struct array writeback required for the change to stick
+                }
+                return true;
+            }
+            return false;
         }
 
         /// <summary>
@@ -105,7 +127,7 @@ namespace CVRFury.Builder
         /// </summary>
         public static void EnsureIntParam(AnimatorController c, string name, int def = 0)
         {
-            if (c.parameters.Any(p => p.name == name)) return;
+            if (RetypeIfPresent(c, name, AnimatorControllerParameterType.Int)) return;
             c.AddParameter(new AnimatorControllerParameter
             {
                 name = name,

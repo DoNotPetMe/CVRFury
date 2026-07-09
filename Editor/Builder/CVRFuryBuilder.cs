@@ -71,6 +71,9 @@ namespace CVRFury.Builder
             CheckParameterBudget(ctx);
             CheckShaderErrors(avatarRoot, ctx.Log);
             StripComponents(avatarRoot);
+            // Serialize the reflection-written AAS data NOW — un-persisted mutations read back fine
+            // in-memory but can vanish from the upload clone after a domain reload.
+            ctx.Avatar.Persist();
             assets.Flush();
 
             ctx.Log.Info("CVRFury bake complete.");
@@ -170,6 +173,14 @@ namespace CVRFury.Builder
             var controller = ctx.Controller;
             if (controller == null) return; // No feature needed an animator.
 
+            // Remove duplicate parameter declarations before the CCK regenerates from this controller —
+            // a duplicated core name (GestureLeft, MovementX, …) can make the CCK's own AddParameter throw,
+            // which surfaces as the generic "Build asset failed content validation" abort.
+            DedupeParameters(controller, ctx.Log);
+            // Give the bake path the same condition/param-type repair the convert path runs, so merged
+            // VRChat Int-gesture conditions can't poison CVR's Float-driven hand blend trees.
+            SyncBitOptimizer.HarmonizeConditionParamTypes(controller, ctx.Log);
+
             ctx.Avatar.EnableAdvancedSettings();
             ctx.Avatar.BaseController = controller;
 
@@ -179,6 +190,30 @@ namespace CVRFury.Builder
             };
             ctx.Assets.Save(overrides, overrides.name);
             ctx.Avatar.Overrides = overrides;
+
+            // Stamp the GENERATED animator slot and the live Animator too. Setting only baseController
+            // leaves a stale previously-generated animator as what actually ships (the "sometimes my
+            // slider/toggle works" nondeterminism) — mirror what AttachGeneratedController does.
+            Reflect.SetField(ctx.Avatar.AdvancedSettings, CckNames.AdvancedSettings_Animator, controller);
+            var anim = ctx.AvatarRoot.GetComponent<Animator>();
+            if (anim != null) anim.runtimeAnimatorController = controller;
+        }
+
+        /// <summary>Drop duplicate animator parameter declarations (same name), keeping the first. A struct
+        /// array writeback is required for the change to stick.</summary>
+        private static void DedupeParameters(AnimatorController c, BuildLog log)
+        {
+            var seen = new HashSet<string>();
+            var kept = new List<AnimatorControllerParameter>();
+            var dropped = 0;
+            foreach (var p in c.parameters)
+            {
+                if (seen.Add(p.name)) kept.Add(p);
+                else dropped++;
+            }
+            if (dropped == 0) return;
+            c.parameters = kept.ToArray();
+            log?.Info($"Removed {dropped} duplicate animator parameter declaration(s).");
         }
 
         /// <summary>Remove every CVRFury component from the build instance so nothing

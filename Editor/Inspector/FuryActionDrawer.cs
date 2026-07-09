@@ -30,7 +30,7 @@ namespace CVRFury.Builder
                     break;
                 case FuryAction.ActionType.BlendShape:
                     Field(ref r, property, "blendShapeRenderer", "Renderer");
-                    Field(ref r, property, "blendShape", "Blendshape");
+                    BlendshapeField(ref r, property);
                     Field(ref r, property, "blendShapeValue", "Value");
                     break;
                 case FuryAction.ActionType.MaterialSwap:
@@ -73,6 +73,34 @@ namespace CVRFury.Builder
         private static void Field(ref Rect r, SerializedProperty parent, string name, string label)
         {
             EditorGUI.PropertyField(r, parent.FindPropertyRelative(name), new GUIContent(label));
+            r.y += Line + Pad;
+        }
+
+        /// <summary>Blendshape as a pick-from-the-mesh dropdown once a renderer is assigned (falls back to a
+        /// text field when there's no mesh), so nobody has to type shapekey names by hand.</summary>
+        private static void BlendshapeField(ref Rect r, SerializedProperty parent)
+        {
+            var shapeProp = parent.FindPropertyRelative("blendShape");
+            var rendererProp = parent.FindPropertyRelative("blendShapeRenderer");
+            var smr = rendererProp.objectReferenceValue as SkinnedMeshRenderer;
+            var mesh = smr != null ? smr.sharedMesh : null;
+
+            if (mesh == null || mesh.blendShapeCount == 0)
+            {
+                EditorGUI.PropertyField(r, shapeProp, new GUIContent("Blendshape"));
+            }
+            else
+            {
+                var names = new string[mesh.blendShapeCount];
+                var current = 0;
+                for (int i = 0; i < names.Length; i++)
+                {
+                    names[i] = mesh.GetBlendShapeName(i);
+                    if (names[i] == shapeProp.stringValue) current = i;
+                }
+                var picked = EditorGUI.Popup(r, "Blendshape", current, names);
+                if (names[picked] != shapeProp.stringValue) shapeProp.stringValue = names[picked];
+            }
             r.y += Line + Pad;
         }
     }

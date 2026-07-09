@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEditor.Animations;
 using UnityEngine;
 
@@ -53,5 +54,10 @@ namespace CVRFury.Builder
         /// <summary>Reserve a unique, sanitised synced-parameter machine name. If
         /// <paramref name="desired"/> is blank, one is generated.</summary>
         public string AllocateParam(string desired) => _params.Allocate(desired);
+
+        /// <summary>GameObject → the animator parameter of the CVRFury toggle that drives it, recorded by
+        /// ToggleBuilder as it bakes. Later builders (Blendshape Logic) use this to build conditions like
+        /// "coat AND bra are both on" against the real allocated parameter names.</summary>
+        public readonly Dictionary<GameObject, string> ToggleParamByObject = new Dictionary<GameObject, string>();
     }
 }

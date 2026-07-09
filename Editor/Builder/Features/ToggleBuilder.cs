@@ -10,6 +10,14 @@ namespace CVRFury.Builder
             var param = ctx.AllocateParam(
                 !string.IsNullOrEmpty(f.parameterName) ? f.parameterName : displayName);
 
+            // Record which parameter drives each toggled GameObject, so Blendshape Logic rules can build
+            // conditions ("coat AND bra both on") against the real allocated parameter names.
+            if (f.state?.actions != null)
+                foreach (var a in f.state.actions)
+                    if (a.type == FuryAction.ActionType.ObjectToggle && a.targetObject != null &&
+                        !ctx.ToggleParamByObject.ContainsKey(a.targetObject))
+                        ctx.ToggleParamByObject[a.targetObject] = param;
+
             var controller = ctx.GetOrCreateController();
 
             var onClip = ClipBuilder.Build(ctx.RootTransform, f.state, $"{displayName}_On");

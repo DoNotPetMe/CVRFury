@@ -699,6 +699,9 @@ namespace CVRFury.Builder.Convert
                             row.property = EditorGUILayout.TextField(new GUIContent("Shader property",
                                 "The material float property to drive. Defaults are Poiyomi's; check your shader " +
                                 "if the slider does nothing."), row.property);
+                            // Hue/emission are 0..1 properties — the scale defaults (0.5–2) are out of range
+                            // and were a major reason hue sliders "did nothing" or behaved weirdly.
+                            if (row.min == 0.5f && row.max == 2f) { row.min = 0f; row.max = 1f; }
                         }
 
                         using (new EditorGUILayout.HorizontalScope())

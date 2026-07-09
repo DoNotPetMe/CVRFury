@@ -1,3 +1,4 @@
+using System.Linq;
 using UnityEditor;
 using UnityEngine;
 using CVRFury.Components;
@@ -72,8 +73,28 @@ namespace CVRFury.Builder
                             $"m_Materials.Array.data[{a.materialSlot}]", mats[a.materialSlot]);
                     break;
 
-                // MaterialProperty resting is left to write-defaults / material authoring; we
-                // can't reliably read an arbitrary shader property's "rest" value here.
+                case FuryAction.ActionType.MaterialProperty:
+                {
+                    // Capture the material's CURRENT value so toggling OFF restores it. Without this
+                    // (write-defaults off), a toggled shader property (e.g. Poiyomi glitter) stays at the
+                    // ON value forever once enabled.
+                    if (a.propertyRenderer == null || string.IsNullOrEmpty(a.propertyName)) return;
+                    var mat = a.propertyRenderer.sharedMaterials.FirstOrDefault(m => m != null && m.HasProperty(a.propertyName));
+                    if (mat == null) return;
+                    var path2 = Path(root, a.propertyRenderer.transform);
+                    var rt2 = a.propertyRenderer.GetType();
+                    if (a.propertyIsColor)
+                    {
+                        var cur2 = mat.GetColor(a.propertyName);
+                        SetFloat(clip, path2, rt2, $"material.{a.propertyName}.r", cur2.r);
+                        SetFloat(clip, path2, rt2, $"material.{a.propertyName}.g", cur2.g);
+                        SetFloat(clip, path2, rt2, $"material.{a.propertyName}.b", cur2.b);
+                        SetFloat(clip, path2, rt2, $"material.{a.propertyName}.a", cur2.a);
+                    }
+                    else
+                        SetFloat(clip, path2, rt2, $"material.{a.propertyName}", mat.GetFloat(a.propertyName));
+                    break;
+                }
             }
         }
 

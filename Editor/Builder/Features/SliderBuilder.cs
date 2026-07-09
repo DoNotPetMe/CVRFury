@@ -28,7 +28,12 @@ namespace CVRFury.Builder
             AnimatorUtil.AddBlendTreeLayer(controller, $"CVRFury {displayName}", param,
                 zeroClip, oneClip, f.defaultValue, ctx.Assets);
 
-            if (!ctx.Avatar.AddSlider(displayName, param, f.defaultValue, f.localOnly))
+            // CRITICAL: the AAS entry must carry the min/max clips itself. The CCK regenerates the AAS
+            // animator from the entries at upload (nondeterministically), and an entry without clips
+            // regenerates as an instant snap (or nothing) instead of a gradual blend — the "slider jumps
+            // straight to max" / "hue does nothing" bug. With the clips on the entry, whichever animator
+            // survives (ours or the CCK's regenerated one) blends correctly.
+            if (!ctx.Avatar.AddSlider(displayName, param, f.defaultValue, f.localOnly, zeroClip, oneClip))
                 ctx.Log.Warning($"Slider '{displayName}' blends correctly but could not be added to " +
                                 "the in-game menu (AAS write failed).");
         }
