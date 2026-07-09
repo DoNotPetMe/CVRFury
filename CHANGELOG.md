@@ -4,6 +4,17 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.89] - 2026-06-25
+
+### Added
+- **World Converter (Beta)** — Tools ▸ CVRFury ▸ World Converter. The start of VRChat-world → ChilloutVR
+  conversion, on the avatar converter's proven architecture (reflection-based, tolerant member lookup,
+  convert-what-converts + report-the-rest). v1 converts the structural layer: scene descriptor → CVRWorld
+  (spawns, reference camera, respawn height), mirrors → CVRMirror, pickups → CVRPickupObject, chairs →
+  CVRSeat, plus an optional VRChat/Udon strip. Every Udon behaviour is inventoried by program name — the
+  foundation the Udon → CVR interactables/scripting layer builds on next. The scan also explains known
+  harmless Worlds-SDK console spam (EasyEventEditor "drawer type map").
+
 ## [0.9.87 – 0.9.88] - 2026-06-25 — "Big leagues" pass
 
 ### Fixed

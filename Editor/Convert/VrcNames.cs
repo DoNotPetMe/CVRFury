@@ -95,5 +95,20 @@ namespace CVRFury.Builder.Convert
         public const string DBC_Center = "m_Center";
         public const string DBC_Direction = "m_Direction";
         public const string DBC_Bound = "m_Bound";
+
+        // --- Worlds (VRChat Worlds SDK) ---
+        // Field names vary a little across SDK generations, so the world converter tries each
+        // candidate in order and copies the first that exists (see WorldConverter.CopyAny).
+        public const string SceneDescriptorType = "VRC.SDK3.Components.VRCSceneDescriptor";
+        public static readonly string[] World_Spawns = { "spawns", "Spawns" };
+        public static readonly string[] World_ReferenceCamera = { "ReferenceCamera", "referenceCamera" };
+        public static readonly string[] World_RespawnHeight = { "RespawnHeightY", "respawnHeightY" };
+
+        public const string MirrorType = "VRC.SDK3.Components.VRCMirrorReflection";
+        public const string PickupType = "VRC.SDK3.Components.VRCPickup";
+        public const string StationType = "VRC.SDK3.Components.VRCStation";
+        public const string AvatarPedestalType = "VRC.SDK3.Components.VRCAvatarPedestal";
+        public const string UdonBehaviourType = "VRC.Udon.UdonBehaviour";
+        public const string Udon_ProgramSource = "programSource";
     }
 }
