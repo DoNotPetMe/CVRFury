@@ -4,6 +4,17 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.90] - 2026-06-25
+
+### Added
+- **Advanced ▸ Bake avatar-lock keys into the mesh.** For lock systems (Gonso, Kanna Protecc, …) on avatars
+  you OWN with a valid key: bakes the currently-unlocked scene look permanently into NEW mesh assets (the
+  weighted key blendshape deltas are folded into the vertices, key shapes removed, all other blendshapes and
+  their weights preserved) so CVR renders the avatar without the runtime keys VRChat supplies. Inherently
+  key-gated: it can't unlock anything — without the working key applied, there's only scramble to bake.
+  Detect lists exactly what would bake; originals are never modified; revert = reassign the original mesh.
+  The Invisibility Doctor now points here as its escalation step.
+
 ## [0.9.89] - 2026-06-25
 
 ### Added

@@ -116,8 +116,7 @@ namespace CVRFury.Builder.Convert
 
             return $"Pinned {pinned} non-zero blendshape weight(s) as defaults and removed {stripped} generated " +
                    "animation curve(s) that would have reset them in game. Re-upload and check. If it's STILL " +
-                   "invisible, the shader wants its keys as runtime parameters — that needs the key baked into " +
-                   "the mesh itself; tell me and we'll add that step.";
+                   "invisible, bake the keys permanently: Advanced ▸ \"Bake avatar-lock keys into the mesh\".";
         }
 
         private static List<(SkinnedMeshRenderer smr, List<int> keys)> FindKeyedRenderers(GameObject avatar)
