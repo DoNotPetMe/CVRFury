@@ -125,6 +125,28 @@ namespace CVRFury.Builder.Convert
             w.Show();
         }
 
+        [MenuItem("Tools/CVRFury/Invisibility Doctor", false, 3)]
+        public static void OpenDoctor()
+        {
+            var w = GetWindow<CVRFuryWindow>("CVRFury");
+            w.minSize = new Vector2(460, 560);
+            w._catFeatures = true;
+            w._sDoctor = true;
+            w._catConvert = false; // collapse the big category so the doctor is on screen
+            w.Show();
+        }
+
+        [MenuItem("Tools/CVRFury/Bake Avatar-Lock Keys", false, 4)]
+        public static void OpenKeyBaker()
+        {
+            var w = GetWindow<CVRFuryWindow>("CVRFury");
+            w.minSize = new Vector2(460, 560);
+            w._catAdvanced = true;
+            w._sKeyBake = true;
+            w._catConvert = false;
+            w.Show();
+        }
+
         private void OnGUI()
         {
             // Subtle dark backdrop instead of the flat editor gray.
