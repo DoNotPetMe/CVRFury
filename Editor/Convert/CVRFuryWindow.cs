@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using CVRFury.Components;
 using UnityEditor;
 using UnityEditor.Animations;
 using UnityEngine;
@@ -49,7 +50,7 @@ namespace CVRFury.Builder.Convert
         // Strip
         private bool _removeFinalIK = true;
 
-        private bool _sPre = true, _s0, _s1 = true, _s2 = true, _se, _sEmoteWheel, _sDances, _s3, _s4, _s5, _sSps, _sResize, _sCredits;
+        private bool _sPre = true, _s0, _s1 = true, _s2 = true, _se, _sEmoteWheel, _sDances, _sLoco, _sPresets, _sDoctor, _s3, _s4, _s5, _sSps, _sResize, _sCredits;
         private bool _catConvert = true, _catAnim, _catFeatures; // top-level category groups
         private string _preflight = "";
         private bool _preflightOk;
@@ -74,6 +75,19 @@ namespace CVRFury.Builder.Convert
         private string _dancesFolderUsed = "";
         private string _dancesStatus = "";
         private string _resizeStatus = "";
+
+        // Crouch/Prone locomotion styles
+        private sealed class LocoStyleRow { public string name = ""; public Motion motion; public int trigger; }
+        private readonly List<LocoStyleRow> _locoRows = new List<LocoStyleRow>();
+        private string _locoStatus = "";
+
+        // Outfit presets (exclusive dropdown)
+        private sealed class PresetRow { public string name = "Preset"; public readonly List<GameObject> objectsOn = new List<GameObject> { null }; }
+        private readonly List<PresetRow> _presetRows = new List<PresetRow>();
+        private string _presetStatus = "";
+
+        // Invisibility doctor
+        private string _doctorStatus = "";
 
         // Unified slider rows (size / length / hue / emission) — one per control you want.
         private enum SliderKind { Size, Length, Hue, Emission, Blendshape }
@@ -170,9 +184,10 @@ namespace CVRFury.Builder.Convert
                     using (new EditorGUI.DisabledScope(_avatar == null))
                         if (GUILayout.Button("✨ Convert & Verify  (recommended)", GUILayout.Height(28)))
                             if (EditorUtility.DisplayDialog("CVRFury — Convert & Verify",
-                                $"Convert '{_avatar.name}' from VRChat to ChilloutVR now?\n\nThis edits the avatar " +
-                                "in place (undoable). Ideally work on a copy. The VRChat Avatars SDK must be imported " +
-                                "so the source data can be read.", "Convert", "Cancel"))
+                                $"Convert '{_avatar.name}' from VRChat to ChilloutVR now?\n\nA COPY named " +
+                                $"\"{_avatar.name} (CVR)\" is created and converted; your original is kept " +
+                                "untouched (disabled) next to it. The VRChat Avatars SDK must be imported so " +
+                                "the source data can be read.", "Convert", "Cancel"))
                                 RunAndRefresh(RunConvertAndVerify);
                     EditorGUILayout.Space(4);
                     EditorGUILayout.LabelField("… or run the steps manually:", EditorStyles.miniBoldLabel);
@@ -191,6 +206,7 @@ namespace CVRFury.Builder.Convert
                     StepEmotes();
                     StepEmoteWheel();
                     StepDances();
+                    StepLocoStyles();
                 }
 
             _catFeatures = Category("Avatar features  ·  sliders & NSFW", _catFeatures);
@@ -198,7 +214,9 @@ namespace CVRFury.Builder.Convert
                 using (new EditorGUI.IndentLevelScope())
                 {
                     StepResize();
+                    StepPresets();
                     StepSps();
+                    StepDoctor();
                 }
 
             if (!string.IsNullOrEmpty(_log))
@@ -241,7 +259,20 @@ namespace CVRFury.Builder.Convert
         private string RunConvertAndVerify()
         {
             if (_avatar == null) return "Select your avatar first.";
-            var log = VRChatConverter.Convert(_avatar, _convertOpts);
+
+            // Safety first: convert a COPY and keep the original untouched (disabled beside it). If anything
+            // goes wrong, the original is one click away — no undo archaeology needed.
+            var source = _avatar;
+            var copy = Instantiate(source);
+            copy.name = source.name + " (CVR)";
+            copy.transform.SetParent(source.transform.parent, false);
+            copy.transform.localPosition = source.transform.localPosition;
+            Undo.RegisterCreatedObjectUndo(copy, "CVRFury Convert");
+            source.SetActive(false);
+            _avatar = copy;
+            Selection.activeGameObject = copy;
+
+            var log = VRChatConverter.Convert(copy, _convertOpts);
             var lines = log.Entries.Select(e => (e.Level == BuildLog.Level.Error ? "✗ " : e.Level == BuildLog.Level.Warning ? "! " : "• ") + e.Message);
             var pre = PreflightCheck.Report(_avatar, out _);
             return "Convert:\n" + string.Join("\n", lines) + "\n\n" + pre;
@@ -639,6 +670,159 @@ namespace CVRFury.Builder.Convert
                                 return $"Removed {n} broken/missing-script component(s). Re-run pre-flight to confirm.";
                             });
                     }
+            }
+        }
+
+        private void StepLocoStyles()
+        {
+            _sLoco = Foldout(_sLoco, "Crouch / Prone styles (dropdown)");
+            if (!_sLoco) return;
+            using (new EditorGUI.IndentLevelScope())
+            {
+                ThemedBox("An in-game dropdown of custom crouch/prone animations (works with packs like " +
+                    "CCK BaseAnimatorPatch — drop a clip OR a blend-tree asset per style). \"Default\" keeps " +
+                    "CVR's normal locomotion; a style only plays while you're actually crouched/prone.",
+                    MessageType.None);
+                if (GUILayout.Button("+ Add style", GUILayout.Width(100))) _locoRows.Add(new LocoStyleRow());
+                LocoStyleRow removeLoco = null;
+                foreach (var row in _locoRows)
+                    using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+                    {
+                        using (new EditorGUILayout.HorizontalScope())
+                        {
+                            row.name = EditorGUILayout.TextField("Style name", row.name);
+                            if (GUILayout.Button("✕", GUILayout.Width(24))) removeLoco = row;
+                        }
+                        row.motion = (Motion)EditorGUILayout.ObjectField(new GUIContent("Motion",
+                            "An AnimationClip or a blend-tree asset (e.g. Kemono_CrouchingLoco)."),
+                            row.motion, typeof(Motion), false);
+                        if (row.motion != null && string.IsNullOrEmpty(row.name)) row.name = row.motion.name;
+                        row.trigger = EditorGUILayout.Popup("Plays while", row.trigger, new[] { "Crouching", "Prone" });
+                    }
+                if (removeLoco != null) _locoRows.Remove(removeLoco);
+
+                using (new EditorGUI.DisabledScope(_avatar == null || _locoRows.Count == 0))
+                    if (GUILayout.Button("Build style dropdown"))
+                    {
+                        try
+                        {
+                            var styles = _locoRows.Select(r => new LocoStyles.Style
+                            {
+                                name = string.IsNullOrEmpty(r.name) ? "Style" : r.name,
+                                motion = r.motion,
+                                trigger = r.trigger == 1 ? LocoStyles.Trigger.Prone : LocoStyles.Trigger.Crouch,
+                            }).ToList();
+                            _locoStatus = LocoStyles.Build(_avatar, CckAvatar.FindOn(_avatar), EmoteControllers(out _), styles);
+                        }
+                        catch (System.Exception ex) { _locoStatus = "Error: " + ex.Message; Debug.LogException(ex); }
+                        Repaint();
+                    }
+                if (!string.IsNullOrEmpty(_locoStatus))
+                    ThemedBox(_locoStatus, _locoStatus.StartsWith("Error") ? MessageType.Error : MessageType.Info);
+            }
+        }
+
+        private void StepPresets()
+        {
+            _sPresets = Foldout(_sPresets, "Outfit presets (dropdown — picking one un-equips the rest)");
+            if (!_sPresets) return;
+            using (new EditorGUI.IndentLevelScope())
+            {
+                ThemedBox("One in-game dropdown that swaps whole outfits: list what's ON in each preset; " +
+                    "everything mentioned in any preset is turned off unless that preset includes it. " +
+                    "Creates a CVRFury Modes component on the avatar (edit it there later).", MessageType.None);
+                if (GUILayout.Button("+ Add preset", GUILayout.Width(110))) _presetRows.Add(new PresetRow());
+                PresetRow removePreset = null;
+                foreach (var row in _presetRows)
+                    using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+                    {
+                        using (new EditorGUILayout.HorizontalScope())
+                        {
+                            row.name = EditorGUILayout.TextField("Preset name", row.name);
+                            if (GUILayout.Button("✕", GUILayout.Width(24))) removePreset = row;
+                        }
+                        for (int i = 0; i < row.objectsOn.Count; i++)
+                            using (new EditorGUILayout.HorizontalScope())
+                            {
+                                row.objectsOn[i] = (GameObject)EditorGUILayout.ObjectField(i == 0 ? "On in this preset" : " ",
+                                    row.objectsOn[i], typeof(GameObject), true);
+                                if (GUILayout.Button("✕", GUILayout.Width(24)) && row.objectsOn.Count > 1)
+                                { row.objectsOn.RemoveAt(i); break; }
+                            }
+                        if (GUILayout.Button("+ object", EditorStyles.miniButton, GUILayout.Width(80)))
+                            row.objectsOn.Add(null);
+                    }
+                if (removePreset != null) _presetRows.Remove(removePreset);
+
+                using (new EditorGUI.DisabledScope(_avatar == null || _presetRows.Count < 2))
+                    if (GUILayout.Button("Create preset dropdown"))
+                    {
+                        try { _presetStatus = CreatePresets(); }
+                        catch (System.Exception ex) { _presetStatus = "Error: " + ex.Message; Debug.LogException(ex); }
+                        Repaint();
+                    }
+                if (!string.IsNullOrEmpty(_presetStatus))
+                    ThemedBox(_presetStatus, _presetStatus.StartsWith("Error") ? MessageType.Error : MessageType.Info);
+            }
+        }
+
+        private string CreatePresets()
+        {
+            var union = _presetRows.SelectMany(r => r.objectsOn).Where(o => o != null).Distinct().ToList();
+            if (union.Count == 0) return "Add at least one object to a preset.";
+
+            const string label = "Presets";
+            foreach (var existing in _avatar.GetComponents<CVRFuryModes>())
+                if (existing.menuPath == label) DestroyImmediate(existing);
+
+            var modes = Undo.AddComponent<CVRFuryModes>(_avatar);
+            modes.menuPath = label;
+            modes.saved = true;
+            modes.modes = _presetRows.Select(r => new CVRFuryModes.Mode
+            {
+                name = string.IsNullOrEmpty(r.name) ? "Preset" : r.name,
+                state = new FuryState
+                {
+                    actions = union.Select(o => new FuryAction
+                    {
+                        type = FuryAction.ActionType.ObjectToggle,
+                        targetObject = o,
+                        targetState = r.objectsOn.Contains(o),
+                    }).ToList(),
+                },
+            }).ToList();
+            EditorUtility.SetDirty(_avatar);
+            return $"Created a \"{label}\" dropdown with {modes.modes.Count} preset(s) over {union.Count} object(s). " +
+                   "Picking a preset turns its items on and everything else in the list off. Bakes at upload.";
+        }
+
+        private void StepDoctor()
+        {
+            _sDoctor = Foldout(_sDoctor, "🩺 Invisibility doctor (avatar invisible in CVR?)");
+            if (!_sDoctor) return;
+            using (new EditorGUI.IndentLevelScope())
+            {
+                ThemedBox("For avatars that look fine in Unity but are INVISIBLE in CVR — common on protected " +
+                    "avatars (their unlock keys arrive as VRChat parameters, which CVR never supplies). " +
+                    "Diagnose finds the cause; Bake pins the scene's working look so the upload keeps it.",
+                    MessageType.None);
+                using (new EditorGUI.DisabledScope(_avatar == null))
+                {
+                    if (GUILayout.Button("Diagnose"))
+                    {
+                        try { _doctorStatus = InvisibilityDoctor.Diagnose(_avatar); }
+                        catch (System.Exception ex) { _doctorStatus = "Error: " + ex.Message; Debug.LogException(ex); }
+                        Repaint();
+                    }
+                    if (GUILayout.Button("Bake scene look (pin blendshape state)"))
+                    {
+                        try { _doctorStatus = InvisibilityDoctor.BakeSceneLook(_avatar); }
+                        catch (System.Exception ex) { _doctorStatus = "Error: " + ex.Message; Debug.LogException(ex); }
+                        Repaint();
+                    }
+                }
+                if (!string.IsNullOrEmpty(_doctorStatus))
+                    ThemedBox(_doctorStatus, _doctorStatus.StartsWith("Error") ? MessageType.Error : MessageType.Info);
             }
         }
 

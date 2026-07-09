@@ -4,6 +4,38 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.87 – 0.9.88] - 2026-06-25 — "Big leagues" pass
+
+### Fixed
+- **Sliders snap-to-max / dead hue sliders (root cause).** The AAS slider entries carried no min/max clips,
+  so whenever the CCK regenerated the animator the slider lost its blend and snapped (or did nothing) —
+  "sometimes works" was regeneration luck. Entries now carry the clips, so sliders blend gradually after ANY
+  regeneration. Also: the bake now stamps the generated-animator slot + live Animator and persists the AAS
+  data, killing the stale-animator nondeterminism entirely.
+- **Hue/emission sliders defaulted to 0.5–2** — out of range for 0–1 shader properties. Now 0–1. Material
+  sliders also validate the property actually exists, with an exact remedy message for locked Poiyomi
+  materials ("mark the property Animated, re-lock").
+- **Gesture component aborting the upload.** Our controller's GestureLeft/GestureRight could collide with
+  (or carry the wrong type into) the CCK's regeneration → the generic build abort. Parameter declarations are
+  now deduplicated, type-corrected, and the bake runs the same condition-type repair as the converter.
+- **Material-property toggles now restore the original value when toggled off** (e.g. Poiyomi glitter).
+
+### Added
+- **Blendshape Logic component** — plain-English conditional blendshapes: "WHEN coat is ON and bra is ON →
+  set squish blendshape to 100; otherwise back to normal." Rules watch the same menu toggles that drive those
+  objects, so the logic follows the toggles in game. Blendshape fields everywhere are now pick-from-the-mesh
+  dropdowns (no more typing shapekey names).
+- **Crouch/Prone style dropdown** — build an in-game dropdown of custom crouch/prone animations from packs
+  like CCK BaseAnimatorPatch (clips or blend-tree assets), gated on the real pose so "Default" keeps CVR's
+  stock locomotion. No SimpleAAS needed.
+- **Outfit presets dropdown** — list what's ON per preset; picking one un-equips the rest (built on Modes).
+- **🩺 Invisibility Doctor** — for avatars invisible in CVR but fine in Unity (protected/"Gonso" avatars whose
+  unlock keys arrive as VRChat parameters CVR never supplies): diagnoses disabled renderers, zero scale,
+  missing root bones, protection-key blendshapes, and animator clips that reset the working scene state —
+  and "Bake scene look" pins the visible state so the upload keeps it.
+- **Convert & Verify now converts a COPY** ("<name> (CVR)") and keeps the original untouched and disabled
+  beside it — the tool can no longer damage your source avatar.
+
 ## [0.9.81 – 0.9.84] - 2026-06-19 — "Ultracode" pass
 
 Big audit-driven improvement pass (bugs, automation, clarity, features).
