@@ -50,12 +50,8 @@ namespace CVRFury.Builder.Convert
         // Strip
         private bool _removeFinalIK = true;
 
-        private bool _sPre = true, _s0, _s1 = true, _s2 = true, _se, _sEmoteWheel, _sDances, _sLoco, _sPresets, _sDoctor, _sKeyBake, _s3, _s4, _s5, _sSps, _sResize, _sCredits;
-        private bool _catConvert = true, _catAnim, _catFeatures, _catAdvanced; // top-level category groups
-
-        // Advanced: lock-key baking
-        private bool _keyBakeAll;
-        private string _keyBakeStatus = "";
+        private bool _sPre = true, _s0, _s1 = true, _s2 = true, _se, _sEmoteWheel, _sDances, _sLoco, _sPresets, _s3, _s4, _s5, _sSps, _sResize, _sCredits;
+        private bool _catConvert = true, _catAnim, _catFeatures; // top-level category groups
         private string _preflight = "";
         private bool _preflightOk;
         private System.Collections.Generic.List<PreflightCheck.Result> _preflightResults;
@@ -90,9 +86,6 @@ namespace CVRFury.Builder.Convert
         private readonly List<PresetRow> _presetRows = new List<PresetRow>();
         private string _presetStatus = "";
 
-        // Invisibility doctor
-        private string _doctorStatus = "";
-
         // Unified slider rows (size / length / hue / emission) — one per control you want.
         private enum SliderKind { Size, Length, Hue, Emission, Blendshape }
         private sealed class SliderRow
@@ -122,28 +115,6 @@ namespace CVRFury.Builder.Convert
         {
             var w = GetWindow<CVRFuryWindow>("CVRFury");
             w.minSize = new Vector2(460, 560);
-            w.Show();
-        }
-
-        [MenuItem("Tools/CVRFury/Invisibility Doctor", false, 3)]
-        public static void OpenDoctor()
-        {
-            var w = GetWindow<CVRFuryWindow>("CVRFury");
-            w.minSize = new Vector2(460, 560);
-            w._catFeatures = true;
-            w._sDoctor = true;
-            w._catConvert = false; // collapse the big category so the doctor is on screen
-            w.Show();
-        }
-
-        [MenuItem("Tools/CVRFury/Bake Avatar-Lock Keys", false, 4)]
-        public static void OpenKeyBaker()
-        {
-            var w = GetWindow<CVRFuryWindow>("CVRFury");
-            w.minSize = new Vector2(460, 560);
-            w._catAdvanced = true;
-            w._sKeyBake = true;
-            w._catConvert = false;
             w.Show();
         }
 
@@ -242,13 +213,7 @@ namespace CVRFury.Builder.Convert
                     StepResize();
                     StepPresets();
                     StepSps();
-                    StepDoctor();
                 }
-
-            _catAdvanced = Category("Advanced  ·  handle with care", _catAdvanced);
-            if (_catAdvanced)
-                using (new EditorGUI.IndentLevelScope())
-                    StepKeyBake();
 
             if (!string.IsNullOrEmpty(_log))
             {
@@ -825,88 +790,6 @@ namespace CVRFury.Builder.Convert
             EditorUtility.SetDirty(_avatar);
             return $"Created a \"{label}\" dropdown with {modes.modes.Count} preset(s) over {union.Count} object(s). " +
                    "Picking a preset turns its items on and everything else in the list off. Bakes at upload.";
-        }
-
-        private void StepDoctor()
-        {
-            _sDoctor = Foldout(_sDoctor, "🩺 Invisibility doctor (avatar invisible in CVR?)");
-            if (!_sDoctor) return;
-            using (new EditorGUI.IndentLevelScope())
-            {
-                ThemedBox("For avatars that look fine in Unity but are INVISIBLE in CVR — common on protected " +
-                    "avatars (their unlock keys arrive as VRChat parameters, which CVR never supplies). " +
-                    "Diagnose finds the cause; Bake pins the scene's working look so the upload keeps it.",
-                    MessageType.None);
-                using (new EditorGUI.DisabledScope(_avatar == null))
-                {
-                    if (GUILayout.Button("Diagnose"))
-                    {
-                        try { _doctorStatus = InvisibilityDoctor.Diagnose(_avatar); }
-                        catch (System.Exception ex) { _doctorStatus = "Error: " + ex.Message; Debug.LogException(ex); }
-                        Repaint();
-                    }
-                    if (GUILayout.Button("Bake scene look (pin blendshape state)"))
-                    {
-                        try { _doctorStatus = InvisibilityDoctor.BakeSceneLook(_avatar); }
-                        catch (System.Exception ex) { _doctorStatus = "Error: " + ex.Message; Debug.LogException(ex); }
-                        Repaint();
-                    }
-                }
-                if (!string.IsNullOrEmpty(_doctorStatus))
-                    ThemedBox(_doctorStatus, _doctorStatus.StartsWith("Error") ? MessageType.Error : MessageType.Info);
-            }
-        }
-
-        private void StepKeyBake()
-        {
-            _sKeyBake = Foldout(_sKeyBake, "🔐 Bake avatar-lock keys into the mesh");
-            if (!_sKeyBake) return;
-            using (new EditorGUI.IndentLevelScope())
-            {
-                ThemedBox("For avatars with lock systems (Gonso, Kanna Protecc, …) that you OWN with a valid " +
-                    "key: bakes the current (unlocked) look permanently into a NEW mesh asset so CVR renders " +
-                    "it without the runtime keys VRChat supplies. This cannot unlock anything — it only pins " +
-                    "what your key already unlocked in the scene; without the working key applied, there is " +
-                    "nothing but scramble to bake. Originals are never modified.", MessageType.Warning);
-
-                using (new EditorGUI.DisabledScope(_avatar == null))
-                    if (GUILayout.Button("Detect lock keys"))
-                    {
-                        try
-                        {
-                            var found = KeyBaker.Detect(_avatar, !_keyBakeAll);
-                            _keyBakeStatus = found.Count == 0
-                                ? "No key-like non-zero blendshapes detected. If the lock uses ordinary names, " +
-                                  "tick \"bake ALL\" below — but review carefully: that also bakes body shapes."
-                                : "Would bake:\n" + string.Join("\n", found.Select(f =>
-                                      $"  • {f.smr.name}: {string.Join(", ", f.shapes.Take(6).Select(i => f.smr.sharedMesh.GetBlendShapeName(i)))}" +
-                                      (f.shapes.Count > 6 ? $" … ({f.shapes.Count} total)" : "")));
-                        }
-                        catch (System.Exception ex) { _keyBakeStatus = "Error: " + ex.Message; Debug.LogException(ex); }
-                        Repaint();
-                    }
-
-                _keyBakeAll = EditorGUILayout.ToggleLeft(new GUIContent(
-                    "Bake ALL non-zero blendshapes (not just key-like ones)",
-                    "Use only if the lock system's shapes aren't auto-detected. Review the Detect list first — " +
-                    "this also bakes any body/face shape currently non-zero."), _keyBakeAll);
-
-                using (new EditorGUI.DisabledScope(_avatar == null))
-                    if (GUILayout.Button("Bake keys into mesh (creates new mesh assets)"))
-                        if (EditorUtility.DisplayDialog("CVRFury — Bake lock keys",
-                            "Bake the currently-applied key deformation permanently into NEW mesh assets?\n\n" +
-                            "Only do this on an avatar you own with your valid key applied (the scene must " +
-                            "look CORRECT right now — what you see is what gets baked). Originals stay " +
-                            "untouched; revert by reassigning the original mesh.", "Bake", "Cancel"))
-                        {
-                            try { _keyBakeStatus = KeyBaker.Bake(_avatar, !_keyBakeAll); }
-                            catch (System.Exception ex) { _keyBakeStatus = "Error: " + ex.Message; Debug.LogException(ex); }
-                            Repaint();
-                        }
-
-                if (!string.IsNullOrEmpty(_keyBakeStatus))
-                    ThemedBox(_keyBakeStatus, _keyBakeStatus.StartsWith("Error") ? MessageType.Error : MessageType.Info);
-            }
         }
 
         private void StepResize()

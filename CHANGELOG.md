@@ -4,16 +4,31 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.9.90] - 2026-06-25
+## [0.11.0] - 2026-07-10 — World Converter Layer 2
 
 ### Added
-- **Advanced ▸ Bake avatar-lock keys into the mesh.** For lock systems (Gonso, Kanna Protecc, …) on avatars
-  you OWN with a valid key: bakes the currently-unlocked scene look permanently into NEW mesh assets (the
-  weighted key blendshape deltas are folded into the vertices, key shapes removed, all other blendshapes and
-  their weights preserved) so CVR renders the avatar without the runtime keys VRChat supplies. Inherently
-  key-gated: it can't unlock anything — without the working key applied, there's only scramble to bake.
-  Detect lists exactly what would bake; originals are never modified; revert = reassign the original mesh.
-  The Invisibility Doctor now points here as its escalation step.
+- **Udon migration plan.** The Scan no longer stops at "37 Udon behaviours found": every behaviour is
+  classified by INTENT (video player, teleporter, object toggle, door, light control, audio, mirror toggle,
+  pen, portal, ambience, custom logic) using program-name patterns for the prefabs that dominate real worlds
+  (USharpVideo / ProTV / iwaSync / VideoTXL, ToggleObject variants, teleporters…) plus context checks on the
+  object (does it actually carry a VideoPlayer / Light / AudioSource — agreement is marked, guesses flagged).
+  The result is a three-bucket plan — auto-converts · one-component CVR recipe · needs rework — with the
+  concrete CVR path printed per item, and the post-convert log turns the same data into your rebuild list.
+- **More of the world converts itself.** New automatic conversions: VRCObjectSync → CVRObjectSync,
+  VRChat SDK video players (Unity + AVPro) → CVRVideoPlayer, VRCPortalMarker → CVRPortalMarker (destinations
+  need re-linking — world IDs differ), and recognised Udon-based video players get a CVRVideoPlayer placed on
+  the same object so only the screen/audio assignment remains.
+- **World Pre-flight.** The world-side counterpart of the avatar pre-flight: CVRWorld + spawn presence,
+  a raycast under every spawn (players falling forever), spawns below the respawn height (instant respawn
+  loop), leftover VRChat/Udon components, missing scripts, scene-wide shader errors, a lighting sanity check
+  (no lightmaps AND no active light = dark world), and unsaved-scene detection — all before an upload is wasted.
+- **One-click "Convert & Verify" for worlds.** Duplicates the scene asset, opens the COPY, converts it there,
+  strips the VRChat/Udon layer, and pre-flights the result — the original scene is untouched by construction,
+  same safety model as the avatar converter. The report can be copied or saved as a Markdown migration file
+  next to the scene, and the window now matches the main CVRFury look.
+
+### Changed
+- Streamlined the main window to the core avatar workflow.
 
 ## [0.9.89] - 2026-06-25
 
@@ -51,10 +66,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   like CCK BaseAnimatorPatch (clips or blend-tree assets), gated on the real pose so "Default" keeps CVR's
   stock locomotion. No SimpleAAS needed.
 - **Outfit presets dropdown** — list what's ON per preset; picking one un-equips the rest (built on Modes).
-- **🩺 Invisibility Doctor** — for avatars invisible in CVR but fine in Unity (protected/"Gonso" avatars whose
-  unlock keys arrive as VRChat parameters CVR never supplies): diagnoses disabled renderers, zero scale,
-  missing root bones, protection-key blendshapes, and animator clips that reset the working scene state —
-  and "Bake scene look" pins the visible state so the upload keeps it.
 - **Convert & Verify now converts a COPY** ("<name> (CVR)") and keeps the original untouched and disabled
   beside it — the tool can no longer damage your source avatar.
 

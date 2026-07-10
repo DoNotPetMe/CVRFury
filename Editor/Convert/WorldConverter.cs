@@ -24,6 +24,9 @@ namespace CVRFury.Builder.Convert
         private const string CvrMirrorType = "ABI.CCK.Components.CVRMirror";
         private const string CvrPickupType = "ABI.CCK.Components.CVRPickupObject";
         private const string CvrSeatType = "ABI.CCK.Components.CVRSeat";
+        private const string CvrObjectSyncType = "ABI.CCK.Components.CVRObjectSync";
+        private const string CvrVideoPlayerType = "ABI.CCK.Components.CVRVideoPlayer";
+        private const string CvrPortalType = "ABI.CCK.Components.CVRPortalMarker";
 
         /// <summary>Read-only inventory of the open scene: what will convert, what won't (yet).</summary>
         public static string Scan()
@@ -39,23 +42,45 @@ namespace CVRFury.Builder.Convert
             Count(sb, VrcNames.MirrorType, "Mirror(s)", "→ CVRMirror");
             Count(sb, VrcNames.PickupType, "Pickup(s)", "→ CVRPickupObject");
             Count(sb, VrcNames.StationType, "Station/chair(s)", "→ CVRSeat");
+            Count(sb, VrcNames.ObjectSyncType, "Synced object(s)", "→ CVRObjectSync");
+            Count(sb, VrcNames.UnityVideoPlayerType, "SDK video player(s)", "→ CVRVideoPlayer");
+            Count(sb, VrcNames.AVProVideoPlayerType, "AVPro video player(s)", "→ CVRVideoPlayer");
+            Count(sb, VrcNames.PortalMarkerType, "World portal(s)", "→ CVRPortalMarker (re-link destinations — world IDs differ)");
             Count(sb, VrcNames.AvatarPedestalType, "Avatar pedestal(s)", "— skipped (VRChat avatar IDs don't exist in CVR)");
 
-            var udon = FindAll(VrcNames.UdonBehaviourType);
-            if (udon.Count > 0)
-            {
-                var byProgram = udon.GroupBy(u => ProgramName(u)).OrderByDescending(g => g.Count());
-                sb.AppendLine($"  • {udon.Count} Udon behaviour(s) — inventoried, not yet auto-translated:");
-                foreach (var g in byProgram.Take(15))
-                    sb.AppendLine($"      {g.Count()}× {g.Key}");
-                if (byProgram.Count() > 15) sb.AppendLine("      …");
-                sb.AppendLine("    Interactivity needs CVR's interactables/scripting — that's the next layer, " +
-                              "built on this inventory. Simple worlds (geometry, mirrors, chairs, pickups) " +
-                              "already convert fully.");
-            }
+            AppendUdonPlan(sb);
             sb.AppendLine("\nNote: console spam like \"Could not find drawer type map!\" (EasyEventEditor) is a " +
                           "known VRChat-Worlds-SDK editor bug — harmless, not from your world or CVRFury.");
             return sb.ToString().TrimEnd();
+        }
+
+        /// <summary>The Udon migration plan: every behaviour classified by intent, grouped into
+        /// auto-converted / one-component recipe / needs rework, with the concrete CVR path for each.</summary>
+        private static void AppendUdonPlan(System.Text.StringBuilder sb)
+        {
+            var udon = FindAll(VrcNames.UdonBehaviourType);
+            if (udon.Count == 0) return;
+
+            var rows = udon.Select(u => new { Program = ProgramName(u), Intent = UdonIntents.Classify(ProgramName(u), u.gameObject) })
+                           .GroupBy(x => (x.Program, x.Intent.Kind))
+                           .Select(g => new { g.First().Program, g.First().Intent, N = g.Count() })
+                           .OrderBy(x => x.Intent.Auto ? 0 : x.Intent.Kind == "Custom logic" ? 2 : 1)
+                           .ThenByDescending(x => x.N)
+                           .ToList();
+
+            int auto = rows.Where(x => x.Intent.Auto).Sum(x => x.N);
+            int recipe = rows.Where(x => !x.Intent.Auto && x.Intent.Kind != "Custom logic").Sum(x => x.N);
+            int manual = rows.Where(x => x.Intent.Kind == "Custom logic").Sum(x => x.N);
+
+            sb.AppendLine($"  • {udon.Count} Udon behaviour(s) → migration plan: " +
+                          $"{auto} auto-convert · {recipe} have a simple CVR recipe · {manual} need rework:");
+            foreach (var x in rows.Take(25))
+            {
+                var mark = x.Intent.Auto ? "✓" : x.Intent.Kind == "Custom logic" ? "✗" : "→";
+                var sure = x.Intent.Confident ? "" : " (guess — verify)";
+                sb.AppendLine($"      {mark} {x.N}× {x.Program} [{x.Intent.Kind}{sure}]: {x.Intent.CvrPath}");
+            }
+            if (rows.Count > 25) sb.AppendLine($"      … {rows.Count - 25} more program(s)");
         }
 
         /// <summary>Convert the open scene in place (caller is responsible for using a scene COPY).</summary>
@@ -69,15 +94,17 @@ namespace CVRFury.Builder.Convert
                               copy: (src, dst) => CopyAny(src, dst, "m_ReflectLayers"));
             converted += Swap(VrcNames.PickupType, CvrPickupType, "pickup", log, copy: null);
             converted += Swap(VrcNames.StationType, CvrSeatType, "seat", log, copy: null);
+            converted += Swap(VrcNames.ObjectSyncType, CvrObjectSyncType, "synced object", log, copy: null);
+            converted += Swap(VrcNames.UnityVideoPlayerType, CvrVideoPlayerType, "video player", log, copy: null);
+            converted += Swap(VrcNames.AVProVideoPlayerType, CvrVideoPlayerType, "AVPro video player", log, copy: null);
+            converted += Swap(VrcNames.PortalMarkerType, CvrPortalType, "world portal", log, copy: null);
+            converted += ConvertUdonVideoPlayers(log);
 
             var pedestals = FindAll(VrcNames.AvatarPedestalType);
             if (pedestals.Count > 0)
                 log.Warning($"{pedestals.Count} avatar pedestal(s) skipped — VRChat avatar IDs don't exist in CVR.");
 
-            var udon = FindAll(VrcNames.UdonBehaviourType);
-            if (udon.Count > 0)
-                log.Warning($"{udon.Count} Udon behaviour(s) left in place (inventoried, not yet translated). " +
-                            "Their objects keep working as static props; interactivity needs the next layer.");
+            ReportUdonPlan(log);
 
             if (stripAfter)
             {
@@ -102,6 +129,46 @@ namespace CVRFury.Builder.Convert
         }
 
         // --- steps -------------------------------------------------------------------------------
+
+        /// <summary>Udon-based video players (USharpVideo, ProTV, iwaSync, VideoTXL…) have no SDK component
+        /// to swap — recognise them by intent and put a CVRVideoPlayer on the same object, so the user only
+        /// has to assign the screen renderer/audio source in one inspector instead of rebuilding the player.</summary>
+        private static int ConvertUdonVideoPlayers(BuildLog log)
+        {
+            var t = Reflect.FindType(CvrVideoPlayerType);
+            if (t == null) return 0;
+
+            int n = 0;
+            foreach (var u in FindAll(VrcNames.UdonBehaviourType))
+            {
+                var intent = UdonIntents.Classify(ProgramName(u), u.gameObject);
+                if (intent.Kind != "Video player") continue;
+                if (u.GetComponent(t) != null) continue; // one per object even if the prefab stacks scripts
+                Undo.AddComponent(u.gameObject, t);
+                n++;
+            }
+            if (n > 0)
+                log.Info($"{n} Udon video player(s) → CVRVideoPlayer on the same object — open each and assign " +
+                         "its screen renderer / audio source (the Udon script can't be read across platforms).");
+            return n;
+        }
+
+        /// <summary>Post-convert TODO list: what the remaining Udon behaviours were FOR and the CVR recipe
+        /// for each, so "interactivity" stops being a black box.</summary>
+        private static void ReportUdonPlan(BuildLog log)
+        {
+            var udon = FindAll(VrcNames.UdonBehaviourType);
+            if (udon.Count == 0) return;
+
+            var groups = udon.Select(u => UdonIntents.Classify(ProgramName(u), u.gameObject))
+                             .GroupBy(i => i.Kind)
+                             .OrderByDescending(g => g.Count())
+                             .ToList();
+            log.Warning($"{udon.Count} Udon behaviour(s) can't carry over their scripts — your rebuild list " +
+                        "(each has a one-component CVR recipe unless marked otherwise):");
+            foreach (var g in groups)
+                log.Warning($"  {g.Count()}× {g.Key}: {g.First().CvrPath}");
+        }
 
         private static int ConvertDescriptor(BuildLog log)
         {

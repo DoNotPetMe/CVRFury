@@ -108,6 +108,11 @@ namespace CVRFury.Builder.Convert
         public const string PickupType = "VRC.SDK3.Components.VRCPickup";
         public const string StationType = "VRC.SDK3.Components.VRCStation";
         public const string AvatarPedestalType = "VRC.SDK3.Components.VRCAvatarPedestal";
+        public const string ObjectSyncType = "VRC.SDK3.Components.VRCObjectSync";
+        public const string ObjectPoolType = "VRC.SDK3.Components.VRCObjectPool";
+        public const string PortalMarkerType = "VRC.SDK3.Components.VRCPortalMarker";
+        public const string UnityVideoPlayerType = "VRC.SDK3.Video.Components.VRCUnityVideoPlayer";
+        public const string AVProVideoPlayerType = "VRC.SDK3.Video.Components.AVPro.VRCAVProVideoPlayer";
         public const string UdonBehaviourType = "VRC.Udon.UdonBehaviour";
         public const string Udon_ProgramSource = "programSource";
     }
