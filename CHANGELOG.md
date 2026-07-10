@@ -4,6 +4,24 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] - 2026-07-10 — World Converter Layer 3: Udon toggles rebuild themselves
+
+### Added
+- **Udon public-variable extraction.** An Udon behaviour's *program* can't run outside VRChat, but its
+  public variables — which objects a button toggles, where a teleporter points, which Light a switch drives —
+  are plain serialized data. CVRFury now reads them by reflection (tolerant across SDK versions: every
+  variable-table API shape is tried, none assumed) and surfaces the scene references. The Scan's migration
+  plan now prints `targets: …` under every toggle-style behaviour, so the plan reads "this button toggles
+  THAT" instead of "a toggle exists".
+- **Toggle-style Udon buttons rebuild as ready-made CVRInteractables.** At Convert, every behaviour classified
+  as an object/mirror/light/audio toggle gets a `CVRInteractable` on its object with an on-use
+  Set-GameObject-Active operation wired to the SAME targets read from its variables. The action graph is
+  built by SHAPE (lists found by element type, enums by fuzzy member match, targets by field type), so it
+  tolerates CCK field-name drift; when a shape can't be found, the component is still placed and the report
+  prints both the intended targets (a 30-second inspector job) and the actual CCK member layout — one pasted
+  report is enough to tighten the wiring for that CCK version. Runs before the strip so the Udon data is read
+  while it still exists, and it's a window toggle (default ON).
+
 ## [0.11.0] - 2026-07-10 — World Converter Layer 2
 
 ### Added

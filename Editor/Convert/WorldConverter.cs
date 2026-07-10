@@ -61,9 +61,9 @@ namespace CVRFury.Builder.Convert
             var udon = FindAll(VrcNames.UdonBehaviourType);
             if (udon.Count == 0) return;
 
-            var rows = udon.Select(u => new { Program = ProgramName(u), Intent = UdonIntents.Classify(ProgramName(u), u.gameObject) })
+            var rows = udon.Select(u => new { Udon = u, Program = ProgramName(u), Intent = UdonIntents.Classify(ProgramName(u), u.gameObject) })
                            .GroupBy(x => (x.Program, x.Intent.Kind))
-                           .Select(g => new { g.First().Program, g.First().Intent, N = g.Count() })
+                           .Select(g => new { g.First().Program, g.First().Intent, Sample = g.First().Udon, N = g.Count() })
                            .OrderBy(x => x.Intent.Auto ? 0 : x.Intent.Kind == "Custom logic" ? 2 : 1)
                            .ThenByDescending(x => x.N)
                            .ToList();
@@ -72,19 +72,29 @@ namespace CVRFury.Builder.Convert
             int recipe = rows.Where(x => !x.Intent.Auto && x.Intent.Kind != "Custom logic").Sum(x => x.N);
             int manual = rows.Where(x => x.Intent.Kind == "Custom logic").Sum(x => x.N);
 
-            sb.AppendLine($"  • {udon.Count} Udon behaviour(s) → migration plan: " +
-                          $"{auto} auto-convert · {recipe} have a simple CVR recipe · {manual} need rework:");
+            sb.AppendLine($"  • {udon.Count} Udon behaviour(s) → migration plan: {auto} auto-convert · " +
+                          $"{recipe} rebuild as CVRInteractable (toggle-style ones are wired automatically " +
+                          $"at Convert) · {manual} need rework:");
             foreach (var x in rows.Take(25))
             {
                 var mark = x.Intent.Auto ? "✓" : x.Intent.Kind == "Custom logic" ? "✗" : "→";
                 var sure = x.Intent.Confident ? "" : " (guess — verify)";
                 sb.AppendLine($"      {mark} {x.N}× {x.Program} [{x.Intent.Kind}{sure}]: {x.Intent.CvrPath}");
+
+                // For toggle-style behaviours the serialized variables usually name the exact targets —
+                // surface them so the plan reads "this button toggles THAT", not just "a toggle exists".
+                if (ToggleLikeIntents.Contains(x.Intent.Kind))
+                {
+                    var targets = UdonVariables.SceneReferences(x.Sample).Select(r => r.target.name).Distinct().Take(5).ToList();
+                    if (targets.Count > 0)
+                        sb.AppendLine($"          targets: {string.Join(", ", targets)}");
+                }
             }
             if (rows.Count > 25) sb.AppendLine($"      … {rows.Count - 25} more program(s)");
         }
 
         /// <summary>Convert the open scene in place (caller is responsible for using a scene COPY).</summary>
-        public static string Convert(bool stripAfter)
+        public static string Convert(bool stripAfter, bool rebuildToggles = true)
         {
             var log = new BuildLog();
             int converted = 0;
@@ -99,6 +109,7 @@ namespace CVRFury.Builder.Convert
             converted += Swap(VrcNames.AVProVideoPlayerType, CvrVideoPlayerType, "AVPro video player", log, copy: null);
             converted += Swap(VrcNames.PortalMarkerType, CvrPortalType, "world portal", log, copy: null);
             converted += ConvertUdonVideoPlayers(log);
+            if (rebuildToggles) converted += ConvertUdonToggles(log);
 
             var pedestals = FindAll(VrcNames.AvatarPedestalType);
             if (pedestals.Count > 0)
@@ -151,6 +162,50 @@ namespace CVRFury.Builder.Convert
                 log.Info($"{n} Udon video player(s) → CVRVideoPlayer on the same object — open each and assign " +
                          "its screen renderer / audio source (the Udon script can't be read across platforms).");
             return n;
+        }
+
+        // Intents whose behaviour boils down to "set these GameObjects (in)active on use" — the pattern
+        // CVRInteractable's set-active operation reproduces directly.
+        private static readonly string[] ToggleLikeIntents = { "Object toggle", "Mirror toggle", "Light control", "Audio control" };
+
+        /// <summary>Rebuild recognised toggle-style Udon behaviours as ready-made CVRInteractables: the
+        /// target objects are read out of the behaviour's public variables (plain serialized data), so the
+        /// new interactable drives the SAME objects the Udon button did. Anything that can't be fully wired
+        /// still gets its targets printed — turning "recreate this by hand" into a 30-second inspector job.</summary>
+        private static int ConvertUdonToggles(BuildLog log)
+        {
+            if (!InteractableBuilder.Available) return 0;
+
+            int wired = 0, partial = 0;
+            foreach (var u in FindAll(VrcNames.UdonBehaviourType))
+            {
+                var intent = UdonIntents.Classify(ProgramName(u), u.gameObject);
+                if (!ToggleLikeIntents.Contains(intent.Kind)) continue;
+
+                var targets = UdonVariables.SceneReferences(u).Select(r => r.target).Distinct().ToList();
+                if (targets.Count == 0)
+                {
+                    log.Warning($"'{u.gameObject.name}' ({intent.Kind}, {ProgramName(u)}): no scene targets found " +
+                                "in its variables — recreate by hand (CVRInteractable → Set GameObject Active).");
+                    continue;
+                }
+
+                if (InteractableBuilder.AddToggle(u.gameObject, targets, out var detail))
+                {
+                    log.Info($"'{u.gameObject.name}' ({intent.Kind}) → CVRInteractable, {detail}.");
+                    wired++;
+                }
+                else
+                {
+                    log.Warning($"'{u.gameObject.name}' ({intent.Kind}): CVRInteractable placed but not fully " +
+                                $"wired ({detail}). Its targets were: {string.Join(", ", targets.Select(g => g.name))} " +
+                                "— add a Set-GameObject-Active operation with those in the inspector.");
+                    partial++;
+                }
+            }
+            if (wired + partial > 0)
+                log.Info($"Udon toggles → CVRInteractable: {wired} fully wired, {partial} placed for manual finish.");
+            return wired;
         }
 
         /// <summary>Post-convert TODO list: what the remaining Udon behaviours were FOR and the CVR recipe

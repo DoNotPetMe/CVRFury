@@ -19,6 +19,7 @@ namespace CVRFury.Builder.Convert
     {
         private string _report = "";
         private bool _strip = true;
+        private bool _rebuildToggles = true;
         private Vector2 _scroll;
 
         [MenuItem("Tools/CVRFury/World Converter (Beta)", false, 2)]
@@ -44,6 +45,11 @@ namespace CVRFury.Builder.Convert
             _strip = EditorGUILayout.ToggleLeft(new GUIContent(
                 "Strip VRChat + Udon components after converting",
                 "Their scripts don't exist in CVR, so leftovers break the CCK build. Recommended ON."), _strip);
+            _rebuildToggles = EditorGUILayout.ToggleLeft(new GUIContent(
+                "Rebuild toggle-style Udon buttons as CVRInteractables",
+                "Reads each recognised button's target objects out of its Udon variables and wires a " +
+                "ready-made CVRInteractable (Set GameObject Active) on the same object. Runs BEFORE the " +
+                "strip, so the data is read while it still exists."), _rebuildToggles);
 
             if (GUILayout.Button("✨ Convert & Verify  (works on a copy)", GUILayout.Height(30)))
                 RunSafe(ConvertAndVerify);
@@ -66,7 +72,7 @@ namespace CVRFury.Builder.Convert
                     "Verify above if you want the automatic scene copy instead.", "Convert", "Cancel"))
                     RunSafe(() =>
                     {
-                        var result = WorldConverter.Convert(_strip);
+                        var result = WorldConverter.Convert(_strip, _rebuildToggles);
                         EditorSceneManager.MarkSceneDirty(scene);
                         return result;
                     });
@@ -105,7 +111,7 @@ namespace CVRFury.Builder.Convert
                 return "Couldn't duplicate the scene asset.";
 
             var copy = EditorSceneManager.OpenScene(copyPath, OpenSceneMode.Single);
-            var log = WorldConverter.Convert(_strip);
+            var log = WorldConverter.Convert(_strip, _rebuildToggles);
             EditorSceneManager.MarkSceneDirty(copy);
             EditorSceneManager.SaveScene(copy);
             var pre = WorldPreflight.Report(out var ok);
