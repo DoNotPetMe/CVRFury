@@ -50,8 +50,12 @@ namespace CVRFury.Builder.Convert
         // Strip
         private bool _removeFinalIK = true;
 
-        private bool _sPre = true, _s0, _s1 = true, _s2 = true, _se, _sEmoteWheel, _sDances, _sLoco, _sPresets, _s3, _s4, _s5, _sSps, _sResize, _sCredits;
+        private bool _sPre = true, _s0, _s1 = true, _s2 = true, _se, _sEmoteWheel, _sDances, _sLoco, _sPresets, _sReveal, _s3, _s4, _s5, _sSps, _sResize, _sCredits;
         private bool _catConvert = true, _catAnim, _catFeatures; // top-level category groups
+
+        // Reveal invisible clothing (material-animated visibility)
+        private Renderer _revealTarget;
+        private string _revealStatus = "";
         private string _preflight = "";
         private bool _preflightOk;
         private System.Collections.Generic.List<PreflightCheck.Result> _preflightResults;
@@ -212,6 +216,7 @@ namespace CVRFury.Builder.Convert
                 {
                     StepResize();
                     StepPresets();
+                    StepReveal();
                     StepSps();
                 }
 
@@ -790,6 +795,44 @@ namespace CVRFury.Builder.Convert
             EditorUtility.SetDirty(_avatar);
             return $"Created a \"{label}\" dropdown with {modes.modes.Count} preset(s) over {union.Count} object(s). " +
                    "Picking a preset turns its items on and everything else in the list off. Bakes at upload.";
+        }
+
+        private void StepReveal()
+        {
+            _sReveal = Foldout(_sReveal, "👁 Reveal invisible clothing (enabled but not rendering)");
+            if (!_sReveal) return;
+            using (new EditorGUI.IndentLevelScope())
+            {
+                ThemedBox("For items whose GameObject is ON but the mesh doesn't render (the selection outline " +
+                    "shows, the surface doesn't): creators often toggle clothing via an animated MATERIAL " +
+                    "property (Poiyomi dissolve/alpha) instead of the object — with no animator running in the " +
+                    "editor, the material sits at its 'hidden' default. Diagnose reads the animator clips to " +
+                    "find which property the toggle drives; \"Make visible\" bakes the shown value into the " +
+                    "material (unlocking locked Poiyomi first when possible).", MessageType.None);
+
+                _revealTarget = (Renderer)EditorGUILayout.ObjectField(new GUIContent("Invisible mesh",
+                    "The renderer that should be visible but isn't — drop the object from the Hierarchy."),
+                    _revealTarget, typeof(Renderer), true);
+
+                using (new EditorGUI.DisabledScope(_avatar == null || _revealTarget == null))
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button("Diagnose"))
+                    {
+                        try { _revealStatus = MeshRevealer.Diagnose(_avatar, _revealTarget); _log = _revealStatus; }
+                        catch (System.Exception ex) { _revealStatus = "Error: " + ex.Message; Debug.LogException(ex); }
+                        Repaint();
+                    }
+                    if (GUILayout.Button("Make visible (bake shown state)"))
+                    {
+                        try { _revealStatus = MeshRevealer.Reveal(_avatar, _revealTarget); _log = _revealStatus; }
+                        catch (System.Exception ex) { _revealStatus = "Error: " + ex.Message; Debug.LogException(ex); }
+                        Repaint();
+                    }
+                }
+                if (!string.IsNullOrEmpty(_revealStatus))
+                    ThemedBox(_revealStatus, _revealStatus.StartsWith("Error") ? MessageType.Error : MessageType.Info);
+            }
         }
 
         private void StepResize()

@@ -4,6 +4,23 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.1] - 2026-07-11
+
+### Added
+- **👁 Reveal invisible clothing** (Avatar features). Fixes items whose GameObject is ON but the mesh doesn't
+  render (selection outline shows, surface doesn't): creators often toggle clothing via an animated MATERIAL
+  property — a Poiyomi dissolve/alpha float in the FX animator — instead of the GameObject, so with no
+  animator running in the editor the material sits at its baked "hidden" default. The ground truth lives in
+  the animation clips: **Diagnose** scans every animator reachable on the avatar (live Animator, VRChat
+  playable layers, CVR AAS animator) for `material.*` curves on that renderer's path and lists each animated
+  property with its current value vs the clip values; **Make visible** bakes the *shown* state into the
+  material — since the mesh is hidden right now, the clip value farthest from the current one is the visible
+  one, no per-shader knowledge needed. Handles both float properties and color channels, warns about the
+  mundane causes first (disabled renderer, inactive parents, zero scale), and auto-unlocks locked Poiyomi
+  materials via Thry's optimizer when present (locked shaders silently ignore edits otherwise — the reason
+  "messing with the alpha" does nothing). The report also names the property + both values so the item's
+  CVRFury toggle can get a matching Material Property action and keep toggling in CVR.
+
 ## [0.12.0] - 2026-07-10 — World Converter Layer 3: Udon toggles rebuild themselves
 
 ### Added
