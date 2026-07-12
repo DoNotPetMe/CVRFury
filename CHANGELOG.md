@@ -4,51 +4,23 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.14.0] - 2026-07-11 — Adult (18+) pack
-
-Five NSFW-avatar generators in one 🔞 section — CVR supports adult content natively, and these are the
-setups adult avatars rebuild by hand on every model. Same rule as the rest of the pack: everything composes
-the existing Toggle / Slider / Modes components, suggestions are name-heuristic and always land in an
-editable review list first.
+## [0.15.0] - 2026-07-11 — Clothing setup & Reactions
 
 ### Added
-- **🚪 Undress stages.** One click suggests the classic Dressed → Underwear → Nude dropdown from what's on
-  the avatar (underwear detected by name), fully editable stage-by-stage before creating. Deliberately not
-  saved between sessions — you always spawn dressed.
-- **🛡 SFW switch.** One "SFW Mode" toggle — ON by default and saved — that hides the listed NSFW objects
-  (auto-suggested by name, reviewed by you) and optionally shows modesty items while enabled. One press
-  before streaming.
-- **🫦 Touch reactions.** Pick a face blendshape + a touch zone (head/chest/hips/thighs/neck) → a momentary
-  reaction that plays while touched, with a CCK trigger on the bone. "Others can trigger it" is a checkbox —
-  off means only your own hands fire it. Degrades to a menu button when the CCK trigger type is missing.
-- **💧 Wetness slider.** Auto-detects the gloss/wetness property the avatar's materials use and drives it on
-  every carrying renderer: slider 0 = the current look (per-material baseline preserved), 1 = full gloss.
-- **🍑 Jiggle tuner.** Soft / Bouncy / Extra DynamicBone presets applied to any bones in one click — tunes an
-  existing DynamicBone or adds one rooted at the bone. DynamicBone is what CVR actually runs, so it ships as-is.
-
-## [0.13.0] - 2026-07-11 — Avatar features pack
-
-Six new generators in the Avatar features tab. All of them only compose the existing CVRFury components
-(Toggle / Slider / Modes) — the proven builders bake everything at upload, no new bake paths.
-
-### Added
-- **🧥 Wardrobe — instant toggles.** Scan finds every wearable-looking mesh without a toggle (body/face parts
-  skipped), shows a review list (rename, untick, pick defaults — current scene state pre-filled), and creates
-  a menu toggle per item under a folder of your choice. The end of making clothing toggles one by one.
-- **Toggles from selection.** Select any objects in the Hierarchy → one click → one toggle each.
-- **🎨 Material variants dropdown.** Avatars often ship colour/texture editions as extra materials. Pick the
-  mesh + list the materials → an in-game "style" dropdown swaps them live; the currently-applied material
-  becomes the default option.
-- **📏 Height presets.** A "Height" dropdown (Smol 0.5× / Normal 1× / Tall 1.5×, fully editable) that rescales
-  the whole avatar; the preset closest to 1× is the default.
-- **🔦 Flashlight.** One click adds a warm head-mounted spotlight (shadows off — perf-safe) with a menu
-  toggle, default off and deliberately not saved so you rejoin dark worlds dark. It follows your gaze.
-- **🌈 Master hue slider.** Auto-detects the hue-shift property your materials actually use and every renderer
-  carrying it, then creates ONE slider that re-colours the whole outfit together (with the locked-Poiyomi
-  "mark it Animated" remedy in the message when nothing is found).
-- **👉 Boop.** Pick your face mesh + a reaction blendshape → a momentary menu button that plays it while held
-  (with a soft 0.15 s ease), plus — where the CCK's trigger component is available — a small touch trigger on
-  the nose so physically booping fires the same reaction. Degrades to menu-only gracefully.
+- **🧥 Clothing setup (manual).** Drag your clothing items into a list and configure each one in place, then
+  create everything in one click. Per item: a menu toggle (label/default editable), a **Blendshape Link** so
+  the clothing mesh FOLLOWS the body's shape keys — bust/hips/weight sliders deform the outfit instead of the
+  body clipping through it — and **clipping-fix body shapes** (pick from the body's blendshape list + value)
+  that apply only while the item is worn, wired into the item's own toggle state.
+- **🫦 Touch reactions.** Touch a body part (head/chest/hips/thighs/neck — a CCK trigger on the actual bone)
+  → a face blendshape reaction. Two styles: **Instant**, or **Build-up** — a generated animator ramp layer
+  grows the blendshape from 0→100 over N seconds of continuous touch and eases back on release (authored as
+  a real controller asset, merged at upload through the Full Controller pipeline). Optional extra outputs:
+  a **sound** played positionally at the touched spot and a **heart-particle burst** while touched.
+  "Others can trigger it" is a checkbox — off means only your own hands fire it; degrades to a menu button
+  when the CCK trigger type is missing.
+- **🫁 Breathing.** A generated always-on looping layer cycles a chest/breath blendshape forever (cycle
+  length + intensity configurable) — subtle idle life that no toggle or slider can produce.
 
 ## [0.12.1] - 2026-07-11
 

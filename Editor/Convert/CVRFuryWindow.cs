@@ -57,41 +57,34 @@ namespace CVRFury.Builder.Convert
         private Renderer _revealTarget;
         private string _revealStatus = "";
 
-        // Feature pack: wardrobe / variants / height / boop
-        private bool _sWardrobe, _sVariants, _sHeight, _sBoop;
-        private List<AvatarFeaturePack.WardrobeRow> _wardrobeRows;
-        private string _wardrobeFolder = "Clothing";
-        private string _wardrobeStatus = "";
-        private Vector2 _wardrobeScroll;
-        private Renderer _variantRenderer;
-        private int _variantSlot;
-        private string _variantLabel = "";
-        private readonly List<Material> _variantMats = new List<Material> { null, null };
-        private string _variantStatus = "";
-        private sealed class HeightRow { public string name; public float factor; }
-        private readonly List<HeightRow> _heightRows = new List<HeightRow>
-        {
-            new HeightRow { name = "Smol", factor = 0.5f },
-            new HeightRow { name = "Normal", factor = 1f },
-            new HeightRow { name = "Tall", factor = 1.5f },
-        };
-        private string _heightStatus = "";
-        private SkinnedMeshRenderer _boopFace;
-        private int _boopShapeIndex;
-        private string _boopStatus = "";
+        // Clothing setup (manual drag-in)
+        private bool _sClothing;
+        private SkinnedMeshRenderer _clothingBody;
+        private string _clothingFolder = "Clothing";
+        private readonly List<AvatarFeaturePack.ClothingItem> _clothingItems =
+            new List<AvatarFeaturePack.ClothingItem> { new AvatarFeaturePack.ClothingItem() };
+        private string _clothingStatus = "";
 
-        // Adult (18+) pack
-        private bool _sNsfw;
-        private string _nsfwStatus = "";
-        private List<NsfwFeaturePack.StageRow> _stageRows;
-        private readonly List<GameObject> _sfwHide = new List<GameObject>();
-        private readonly List<GameObject> _sfwShow = new List<GameObject> { null };
+        // Touch reactions
+        private bool _sTouch;
         private SkinnedMeshRenderer _touchFace;
         private int _touchShapeIndex;
         private int _touchZone;
         private bool _touchOthers = true;
-        private readonly List<Transform> _jiggleBones = new List<Transform> { null };
-        private int _jigglePreset = 1; // Bouncy
+        private int _touchStyle;              // 0 Instant · 1 Build-up
+        private float _touchBuildSeconds = 6f;
+        private AudioClip _touchSound;
+        private bool _touchParticles;
+        private string _touchStatus = "";
+
+        // Breathing
+        private bool _sBreathing;
+        private SkinnedMeshRenderer _breathMesh;
+        private int _breathShapeIndex;
+        private float _breathCycle = 4f;
+        private float _breathIntensity = 40f;
+        private string _breathStatus = "";
+
         private string _preflight = "";
         private bool _preflightOk;
         private System.Collections.Generic.List<PreflightCheck.Result> _preflightResults;
@@ -250,14 +243,12 @@ namespace CVRFury.Builder.Convert
             if (_catFeatures)
                 using (new EditorGUI.IndentLevelScope())
                 {
-                    StepWardrobe();
+                    StepClothing();
                     StepResize();
                     StepPresets();
-                    StepVariants();
-                    StepHeight();
-                    StepBoop();
+                    StepTouch();
+                    StepBreathing();
                     StepReveal();
-                    StepNsfw();
                     StepSps();
                 }
 
@@ -838,231 +829,104 @@ namespace CVRFury.Builder.Convert
                    "Picking a preset turns its items on and everything else in the list off. Bakes at upload.";
         }
 
-        private void StepWardrobe()
+        private void StepClothing()
         {
-            _sWardrobe = Foldout(_sWardrobe, "🧥 Wardrobe — every clothing item becomes a toggle");
-            if (!_sWardrobe) return;
+            _sClothing = Foldout(_sClothing, "🧥 Clothing setup — toggles + body-shape links + clipping fixes");
+            if (!_sClothing) return;
             using (new EditorGUI.IndentLevelScope())
             {
-                ThemedBox("Scan finds every wearable-looking mesh that doesn't have a toggle yet (body/face " +
-                    "parts are skipped). Untick what you don't want, then one click gives each item a menu " +
-                    "toggle — current scene state becomes the default. Or select objects in the Hierarchy and " +
-                    "use \"Toggles from selection\".", MessageType.None);
-
-                _wardrobeFolder = EditorGUILayout.TextField(new GUIContent("Menu folder",
-                    "Toggles land under this submenu (blank = top level)."), _wardrobeFolder);
-
-                using (new EditorGUILayout.HorizontalScope())
-                using (new EditorGUI.DisabledScope(_avatar == null))
-                {
-                    if (GUILayout.Button("Scan wardrobe"))
-                    { _wardrobeRows = AvatarFeaturePack.ScanWardrobe(_avatar); _wardrobeStatus = ""; }
-                    if (GUILayout.Button("Toggles from selection"))
-                    { _wardrobeStatus = AvatarFeaturePack.TogglesFromSelection(_avatar, _wardrobeFolder); Repaint(); }
-                    if (GUILayout.Button(new GUIContent("🔦 Add flashlight",
-                        "Head-mounted warm spotlight with a menu toggle — for dark worlds.")))
-                    { _wardrobeStatus = AvatarFeaturePack.CreateFlashlight(_avatar); Repaint(); }
-                }
-
-                if (_wardrobeRows != null && _wardrobeRows.Count > 0)
-                {
-                    EditorGUILayout.LabelField($"{_wardrobeRows.Count(r => r.include)} of {_wardrobeRows.Count} selected",
-                        EditorStyles.miniBoldLabel);
-                    _wardrobeScroll = EditorGUILayout.BeginScrollView(_wardrobeScroll, GUILayout.MaxHeight(220));
-                    foreach (var row in _wardrobeRows)
-                        using (new EditorGUILayout.HorizontalScope())
-                        {
-                            row.include = EditorGUILayout.Toggle(row.include, GUILayout.Width(18));
-                            row.label = EditorGUILayout.TextField(row.label);
-                            row.defaultOn = EditorGUILayout.ToggleLeft("on by default", row.defaultOn, GUILayout.Width(100));
-                        }
-                    EditorGUILayout.EndScrollView();
-
-                    using (new EditorGUI.DisabledScope(_avatar == null || !_wardrobeRows.Any(r => r.include)))
-                        if (GUILayout.Button($"Create {_wardrobeRows.Count(r => r.include)} toggle(s)"))
-                        {
-                            _wardrobeStatus = AvatarFeaturePack.CreateWardrobeToggles(_wardrobeRows, _wardrobeFolder);
-                            _wardrobeRows = null;
-                            Repaint();
-                        }
-                }
-                else if (_wardrobeRows != null)
-                    EditorGUILayout.LabelField("Nothing new to toggle — everything wearable already has one.",
-                        EditorStyles.centeredGreyMiniLabel);
-
-                if (!string.IsNullOrEmpty(_wardrobeStatus)) ThemedBox(_wardrobeStatus, MessageType.Info);
-            }
-        }
-
-        private void StepVariants()
-        {
-            _sVariants = Foldout(_sVariants, "🎨 Material variants (in-game style dropdown)");
-            if (!_sVariants) return;
-            using (new EditorGUI.IndentLevelScope())
-            {
-                ThemedBox("Many avatars ship colour/texture editions as extra materials. Pick the mesh, list " +
-                    "the variants, and you get an in-game dropdown that swaps them live — the currently-applied " +
-                    "material becomes the default option.", MessageType.None);
-
-                _variantLabel = EditorGUILayout.TextField(new GUIContent("Menu name",
-                    "Blank = named after the mesh (e.g. \"Skirt Style\")."), _variantLabel);
-                _variantRenderer = (Renderer)EditorGUILayout.ObjectField("Mesh", _variantRenderer, typeof(Renderer), true);
-                if (_variantRenderer != null && _variantRenderer.sharedMaterials.Length > 1)
-                    _variantSlot = EditorGUILayout.IntSlider("Material slot", _variantSlot, 0,
-                        _variantRenderer.sharedMaterials.Length - 1);
-
-                for (int i = 0; i < _variantMats.Count; i++)
-                    using (new EditorGUILayout.HorizontalScope())
-                    {
-                        _variantMats[i] = (Material)EditorGUILayout.ObjectField(i == 0 ? "Variants" : " ",
-                            _variantMats[i], typeof(Material), false);
-                        if (GUILayout.Button("✕", GUILayout.Width(24)) && _variantMats.Count > 2)
-                        { _variantMats.RemoveAt(i); break; }
-                    }
-                if (GUILayout.Button("+ variant", EditorStyles.miniButton, GUILayout.Width(80)))
-                    _variantMats.Add(null);
-
-                using (new EditorGUI.DisabledScope(_avatar == null || _variantRenderer == null))
-                    if (GUILayout.Button("Create style dropdown"))
-                    {
-                        try
-                        {
-                            _variantStatus = AvatarFeaturePack.CreateMaterialVariants(
-                                _avatar, _variantLabel, _variantRenderer, _variantSlot, _variantMats);
-                        }
-                        catch (System.Exception ex) { _variantStatus = "Error: " + ex.Message; Debug.LogException(ex); }
-                        Repaint();
-                    }
-                if (!string.IsNullOrEmpty(_variantStatus))
-                    ThemedBox(_variantStatus, _variantStatus.StartsWith("Error") ? MessageType.Error : MessageType.Info);
-            }
-        }
-
-        private void StepHeight()
-        {
-            _sHeight = Foldout(_sHeight, "📏 Height presets (smol / normal / tall)");
-            if (!_sHeight) return;
-            using (new EditorGUI.IndentLevelScope())
-            {
-                ThemedBox("An in-game \"Height\" dropdown that rescales the whole avatar. The preset closest " +
-                    "to 1× becomes the default. Edit names and factors to taste.", MessageType.None);
-
-                HeightRow removeH = null;
-                foreach (var row in _heightRows)
-                    using (new EditorGUILayout.HorizontalScope())
-                    {
-                        row.name = EditorGUILayout.TextField(row.name);
-                        row.factor = EditorGUILayout.FloatField(row.factor, GUILayout.Width(60));
-                        GUILayout.Label("×", GUILayout.Width(14));
-                        if (GUILayout.Button("✕", GUILayout.Width(24)) && _heightRows.Count > 2) removeH = row;
-                    }
-                if (removeH != null) _heightRows.Remove(removeH);
-                if (GUILayout.Button("+ preset", EditorStyles.miniButton, GUILayout.Width(80)))
-                    _heightRows.Add(new HeightRow { name = "Preset", factor = 1f });
-
-                using (new EditorGUI.DisabledScope(_avatar == null || _heightRows.Count < 2))
-                    if (GUILayout.Button("Create height dropdown"))
-                    {
-                        try
-                        {
-                            _heightStatus = AvatarFeaturePack.CreateHeightPresets(_avatar,
-                                _heightRows.Select(r => (r.name, r.factor)).ToList());
-                        }
-                        catch (System.Exception ex) { _heightStatus = "Error: " + ex.Message; Debug.LogException(ex); }
-                        Repaint();
-                    }
-                if (!string.IsNullOrEmpty(_heightStatus))
-                    ThemedBox(_heightStatus, _heightStatus.StartsWith("Error") ? MessageType.Error : MessageType.Info);
-            }
-        }
-
-        private void StepBoop()
-        {
-            _sBoop = Foldout(_sBoop, "👉 Boop (touch & menu face reaction)");
-            if (!_sBoop) return;
-            using (new EditorGUI.IndentLevelScope())
-            {
-                ThemedBox("Pick your face mesh and a reaction blendshape (blush, squish, heart-eyes…). You get " +
-                    "a momentary \"Boop\" menu button that plays it while held — plus, where the CCK allows, a " +
-                    "small touch trigger on the nose so booping fires it physically too.", MessageType.None);
-
-                _boopFace = (SkinnedMeshRenderer)EditorGUILayout.ObjectField("Face mesh", _boopFace,
-                    typeof(SkinnedMeshRenderer), true);
-                var shapes = BlendshapeNames(_boopFace);
-                if (shapes.Length > 0)
-                    _boopShapeIndex = EditorGUILayout.Popup("Reaction blendshape",
-                        Mathf.Clamp(_boopShapeIndex, 0, shapes.Length - 1), shapes);
-
-                using (new EditorGUI.DisabledScope(_avatar == null || _boopFace == null || shapes.Length == 0))
-                    if (GUILayout.Button("Add boop"))
-                    {
-                        try { _boopStatus = AvatarFeaturePack.CreateBoop(_avatar, _boopFace, shapes[_boopShapeIndex]); }
-                        catch (System.Exception ex) { _boopStatus = "Error: " + ex.Message; Debug.LogException(ex); }
-                        Repaint();
-                    }
-                if (!string.IsNullOrEmpty(_boopStatus))
-                    ThemedBox(_boopStatus, _boopStatus.StartsWith("Error") ? MessageType.Error : MessageType.Info);
-            }
-        }
-
-        private void StepNsfw()
-        {
-            _sNsfw = Foldout(_sNsfw, "🔞 Adult (18+) — undress, SFW switch, touch, wetness, jiggle");
-            if (!_sNsfw) return;
-            using (new EditorGUI.IndentLevelScope())
-            {
-                ThemedBox("CVR supports adult content natively — these are the setups NSFW avatars rebuild by " +
-                    "hand every time. Suggestions are name-based and always land in an editable list first.",
+                ThemedBox("Drag your clothing items in and configure each one: a menu toggle, a Blendshape " +
+                    "Link so the clothes FOLLOW body sliders (bust/hips/weight deform the outfit instead of " +
+                    "clipping through it), and clipping-fix body shapes that apply only while the item is worn " +
+                    "(e.g. Shrink_Torso while the coat is on). Everything is created in one click.",
                     MessageType.None);
 
-                // 🚪 Undress stages -------------------------------------------------------------------
-                EditorGUILayout.LabelField("🚪 Undress stages (Dressed → Underwear → Nude dropdown)", EditorStyles.miniBoldLabel);
-                using (new EditorGUI.DisabledScope(_avatar == null))
-                    if (GUILayout.Button("Suggest stages from this avatar"))
-                        _stageRows = NsfwFeaturePack.SuggestStages(_avatar);
-                if (_stageRows != null)
-                {
-                    NsfwFeaturePack.StageRow removeStage = null;
-                    foreach (var s in _stageRows)
-                        using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
-                        {
-                            using (new EditorGUILayout.HorizontalScope())
-                            {
-                                s.name = EditorGUILayout.TextField("Stage", s.name);
-                                if (GUILayout.Button("✕", GUILayout.Width(24)) && _stageRows.Count > 2) removeStage = s;
-                            }
-                            DrawGoList(s.on, "On in this stage");
-                        }
-                    if (removeStage != null) _stageRows.Remove(removeStage);
-                    if (GUILayout.Button("+ stage", EditorStyles.miniButton, GUILayout.Width(70)))
-                        _stageRows.Add(new NsfwFeaturePack.StageRow { name = "Stage" });
-                    using (new EditorGUI.DisabledScope(_avatar == null || _stageRows.Count < 2))
-                        if (GUILayout.Button("Create undress dropdown"))
-                        { _nsfwStatus = NsfwFeaturePack.CreateUndressStages(_avatar, _stageRows); _stageRows = null; Repaint(); }
-                }
+                _clothingBody = (SkinnedMeshRenderer)EditorGUILayout.ObjectField(new GUIContent("Body mesh",
+                    "The body — the source for shape links and the target for clipping-fix shapes."),
+                    _clothingBody, typeof(SkinnedMeshRenderer), true);
+                _clothingFolder = EditorGUILayout.TextField(new GUIContent("Menu folder",
+                    "Toggles land under this submenu (blank = top level)."), _clothingFolder);
 
-                // 🛡 SFW switch -----------------------------------------------------------------------
-                EditorGUILayout.Space(6);
-                EditorGUILayout.LabelField("🛡 SFW switch (one toggle → stream-safe)", EditorStyles.miniBoldLabel);
-                using (new EditorGUI.DisabledScope(_avatar == null))
-                    if (GUILayout.Button("Suggest NSFW objects to hide"))
+                var bodyShapes = BlendshapeNames(_clothingBody);
+                AvatarFeaturePack.ClothingItem removeItem = null;
+                foreach (var item in _clothingItems)
+                    using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
                     {
-                        _sfwHide.Clear();
-                        _sfwHide.AddRange(NsfwFeaturePack.SuggestNsfwObjects(_avatar));
-                        if (_sfwHide.Count == 0) _sfwHide.Add(null);
-                        _nsfwStatus = _sfwHide.Count(o => o != null) == 0
-                            ? "Nothing auto-detected — drag the objects to hide into the list."
-                            : $"Suggested {_sfwHide.Count(o => o != null)} object(s) — review, then create.";
-                    }
-                DrawGoList(_sfwHide, "Hide while SFW");
-                DrawGoList(_sfwShow, "Show while SFW (modesty, optional)");
-                using (new EditorGUI.DisabledScope(_avatar == null))
-                    if (GUILayout.Button("Create SFW switch (ON by default)"))
-                    { _nsfwStatus = NsfwFeaturePack.CreateSfwSwitch(_avatar, _sfwHide, _sfwShow); Repaint(); }
+                        using (new EditorGUILayout.HorizontalScope())
+                        {
+                            var newGo = (GameObject)EditorGUILayout.ObjectField(item.go, typeof(GameObject), true);
+                            if (newGo != item.go)
+                            {
+                                item.go = newGo;
+                                if (newGo != null && string.IsNullOrEmpty(item.label))
+                                { item.label = AvatarFeaturePack.Prettify(newGo.name); item.defaultOn = newGo.activeSelf; }
+                            }
+                            if (GUILayout.Button("✕", GUILayout.Width(24)) && _clothingItems.Count > 1) removeItem = item;
+                        }
+                        if (item.go == null) continue;
 
-                // 🫦 Touch reactions ------------------------------------------------------------------
-                EditorGUILayout.Space(6);
-                EditorGUILayout.LabelField("🫦 Touch reactions (body part → face reaction)", EditorStyles.miniBoldLabel);
+                        item.label = EditorGUILayout.TextField("Menu name", item.label);
+                        using (new EditorGUILayout.HorizontalScope())
+                        {
+                            item.defaultOn = EditorGUILayout.ToggleLeft("on by default", item.defaultOn, GUILayout.Width(110));
+                            item.linkBodyShapes = EditorGUILayout.ToggleLeft(new GUIContent("follow body sliders",
+                                "Adds a Blendshape Link: the clothing mesh mirrors the body's shape keys."),
+                                item.linkBodyShapes, GUILayout.Width(150));
+                        }
+
+                        if (bodyShapes.Length > 0)
+                        {
+                            AvatarFeaturePack.ClipFix removeFix = null;
+                            foreach (var fix in item.fixes)
+                                using (new EditorGUILayout.HorizontalScope())
+                                {
+                                    fix.shapeIndex = EditorGUILayout.Popup(
+                                        Mathf.Clamp(fix.shapeIndex, 0, bodyShapes.Length - 1), bodyShapes);
+                                    fix.value = EditorGUILayout.Slider(fix.value, 0f, 100f, GUILayout.Width(150));
+                                    if (GUILayout.Button("✕", GUILayout.Width(24))) removeFix = fix;
+                                }
+                            if (removeFix != null) item.fixes.Remove(removeFix);
+                            if (GUILayout.Button(new GUIContent("+ clipping fix (body shape while worn)",
+                                "A body blendshape applied only while this item is ON — the coat/bra clipping fix."),
+                                EditorStyles.miniButton, GUILayout.Width(240)))
+                                item.fixes.Add(new AvatarFeaturePack.ClipFix());
+                        }
+                        else
+                            EditorGUILayout.LabelField(" ", "Assign the Body mesh above to add clipping fixes.",
+                                EditorStyles.miniLabel);
+                    }
+                if (removeItem != null) _clothingItems.Remove(removeItem);
+                if (GUILayout.Button("+ item", EditorStyles.miniButton, GUILayout.Width(70)))
+                    _clothingItems.Add(new AvatarFeaturePack.ClothingItem());
+
+                using (new EditorGUI.DisabledScope(_avatar == null || _clothingItems.All(i => i.go == null)))
+                    if (GUILayout.Button("Set up clothing"))
+                    {
+                        try
+                        {
+                            _clothingStatus = AvatarFeaturePack.CreateClothing(_avatar, _clothingBody, _clothingItems, _clothingFolder);
+                            _clothingItems.Clear();
+                            _clothingItems.Add(new AvatarFeaturePack.ClothingItem());
+                        }
+                        catch (System.Exception ex) { _clothingStatus = "Error: " + ex.Message; Debug.LogException(ex); }
+                        Repaint();
+                    }
+                if (!string.IsNullOrEmpty(_clothingStatus))
+                    ThemedBox(_clothingStatus, _clothingStatus.StartsWith("Error") ? MessageType.Error : MessageType.Info);
+            }
+        }
+
+        private void StepTouch()
+        {
+            _sTouch = Foldout(_sTouch, "🫦 Touch reactions (body part → blendshape / sound / particles)");
+            if (!_sTouch) return;
+            using (new EditorGUI.IndentLevelScope())
+            {
+                ThemedBox("Touch a body part → a face reaction. Instant, or BUILD-UP: the blendshape grows " +
+                    "the longer the touch lasts (a generated ramp layer) and eases back on release. Optional " +
+                    "extras: a sound played at the touched spot and a heart-particle burst. \"Others can " +
+                    "trigger\" off = only your own hands fire it.", MessageType.None);
+
                 _touchFace = (SkinnedMeshRenderer)EditorGUILayout.ObjectField("Face mesh", _touchFace,
                     typeof(SkinnedMeshRenderer), true);
                 var touchShapes = BlendshapeNames(_touchFace);
@@ -1070,69 +934,77 @@ namespace CVRFury.Builder.Convert
                     _touchShapeIndex = EditorGUILayout.Popup("Reaction blendshape",
                         Mathf.Clamp(_touchShapeIndex, 0, touchShapes.Length - 1), touchShapes);
                 _touchZone = EditorGUILayout.Popup("Touch zone", _touchZone,
-                    NsfwFeaturePack.TouchZones.Select(z => z.label).ToArray());
-                _touchOthers = EditorGUILayout.ToggleLeft(new GUIContent("Others can trigger it",
-                    "Off = only your own hands fire the reaction."), _touchOthers);
+                    ReactionPack.TouchZones.Select(z => z.label).ToArray());
+
+                _touchStyle = GUILayout.Toolbar(_touchStyle, new[] { "Instant", "Build-up" });
+                if (_touchStyle == 1)
+                    _touchBuildSeconds = EditorGUILayout.Slider(new GUIContent("Build time (s)",
+                        "How long continuous touch takes to reach the full reaction."), _touchBuildSeconds, 1f, 20f);
+
+                _touchSound = (AudioClip)EditorGUILayout.ObjectField(new GUIContent("Sound (optional)",
+                    "Played positionally at the touched spot each time the touch starts."),
+                    _touchSound, typeof(AudioClip), false);
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    _touchParticles = EditorGUILayout.ToggleLeft("💕 heart particles", _touchParticles, GUILayout.Width(140));
+                    _touchOthers = EditorGUILayout.ToggleLeft("others can trigger it", _touchOthers);
+                }
+
                 using (new EditorGUI.DisabledScope(_avatar == null || _touchFace == null || touchShapes.Length == 0))
                     if (GUILayout.Button("Add touch reaction"))
                     {
-                        var zone = NsfwFeaturePack.TouchZones[Mathf.Clamp(_touchZone, 0, NsfwFeaturePack.TouchZones.Length - 1)];
-                        _nsfwStatus = NsfwFeaturePack.CreateTouchReaction(_avatar, _touchFace,
-                            touchShapes[_touchShapeIndex], zone.bone, zone.label, _touchOthers);
-                        Repaint();
-                    }
-
-                // 💧 Wetness --------------------------------------------------------------------------
-                EditorGUILayout.Space(6);
-                EditorGUILayout.LabelField("💧 Wetness slider (auto-detect gloss property)", EditorStyles.miniBoldLabel);
-                using (new EditorGUI.DisabledScope(_avatar == null))
-                    if (GUILayout.Button("Create wetness slider"))
-                    { _nsfwStatus = NsfwFeaturePack.CreateWetnessSlider(_avatar); Repaint(); }
-
-                // 🍑 Jiggle tuner ---------------------------------------------------------------------
-                EditorGUILayout.Space(6);
-                EditorGUILayout.LabelField("🍑 Jiggle tuner (DynamicBone presets)", EditorStyles.miniBoldLabel);
-                for (int i = 0; i < _jiggleBones.Count; i++)
-                    using (new EditorGUILayout.HorizontalScope())
-                    {
-                        _jiggleBones[i] = (Transform)EditorGUILayout.ObjectField(i == 0 ? "Bones" : " ",
-                            _jiggleBones[i], typeof(Transform), true);
-                        if (GUILayout.Button("✕", GUILayout.Width(24)) && _jiggleBones.Count > 1)
-                        { _jiggleBones.RemoveAt(i); break; }
-                    }
-                if (GUILayout.Button("+ bone", EditorStyles.miniButton, GUILayout.Width(70)))
-                    _jiggleBones.Add(null);
-                _jigglePreset = GUILayout.Toolbar(_jigglePreset, new[] { "Soft", "Bouncy", "Extra" });
-                using (new EditorGUI.DisabledScope(_jiggleBones.All(b => b == null)))
-                    if (GUILayout.Button("Apply jiggle preset"))
-                    {
                         try
                         {
-                            _nsfwStatus = NsfwFeaturePack.ApplyJiggle(_jiggleBones,
-                                (NsfwFeaturePack.JigglePreset)_jigglePreset);
+                            var zone = ReactionPack.TouchZones[Mathf.Clamp(_touchZone, 0, ReactionPack.TouchZones.Length - 1)];
+                            _touchStatus = ReactionPack.CreateTouchReaction(_avatar, _touchFace,
+                                touchShapes[_touchShapeIndex], zone.bone, zone.label, _touchOthers,
+                                _touchStyle == 1 ? ReactionPack.Style.BuildUp : ReactionPack.Style.Instant,
+                                _touchBuildSeconds, _touchSound, _touchParticles);
                         }
-                        catch (System.Exception ex) { _nsfwStatus = "Error: " + ex.Message; Debug.LogException(ex); }
+                        catch (System.Exception ex) { _touchStatus = "Error: " + ex.Message; Debug.LogException(ex); }
                         Repaint();
                     }
-
-                if (!string.IsNullOrEmpty(_nsfwStatus))
-                    ThemedBox(_nsfwStatus, _nsfwStatus.StartsWith("Error") ? MessageType.Error : MessageType.Info);
+                if (!string.IsNullOrEmpty(_touchStatus))
+                    ThemedBox(_touchStatus, _touchStatus.StartsWith("Error") ? MessageType.Error : MessageType.Info);
             }
         }
 
-        /// <summary>Compact editable GameObject list (drag rows in, ✕ to remove, + to extend).</summary>
-        private static void DrawGoList(List<GameObject> list, string label)
+        private void StepBreathing()
         {
-            if (list.Count == 0) list.Add(null);
-            for (int i = 0; i < list.Count; i++)
-                using (new EditorGUILayout.HorizontalScope())
-                {
-                    list[i] = (GameObject)EditorGUILayout.ObjectField(i == 0 ? label : " ",
-                        list[i], typeof(GameObject), true);
-                    if (GUILayout.Button("✕", GUILayout.Width(24)) && list.Count > 1) { list.RemoveAt(i); break; }
-                }
-            if (GUILayout.Button("+ object", EditorStyles.miniButton, GUILayout.Width(80)))
-                list.Add(null);
+            _sBreathing = Foldout(_sBreathing, "🫁 Breathing (always-on idle life)");
+            if (!_sBreathing) return;
+            using (new EditorGUI.IndentLevelScope())
+            {
+                ThemedBox("A generated looping layer cycles a chest/breath blendshape forever — the subtle " +
+                    "idle motion that makes an avatar feel alive. No toggle or slider can produce this; it " +
+                    "needs a looping animation, which is built and merged for you.", MessageType.None);
+
+                _breathMesh = (SkinnedMeshRenderer)EditorGUILayout.ObjectField(new GUIContent("Mesh",
+                    "The mesh with the breath shape — usually the Body (look for Breathe / Chest / Sternum shapes)."),
+                    _breathMesh, typeof(SkinnedMeshRenderer), true);
+                var breathShapes = BlendshapeNames(_breathMesh);
+                if (breathShapes.Length > 0)
+                    _breathShapeIndex = EditorGUILayout.Popup("Breath blendshape",
+                        Mathf.Clamp(_breathShapeIndex, 0, breathShapes.Length - 1), breathShapes);
+                _breathCycle = EditorGUILayout.Slider(new GUIContent("Breath cycle (s)",
+                    "Seconds per full inhale + exhale. ~4s reads calm; ~2s reads worked up."), _breathCycle, 1f, 10f);
+                _breathIntensity = EditorGUILayout.Slider(new GUIContent("Intensity",
+                    "How far the shape moves at full inhale. Subtle (20–50) sells it best."), _breathIntensity, 5f, 100f);
+
+                using (new EditorGUI.DisabledScope(_avatar == null || _breathMesh == null || breathShapes.Length == 0))
+                    if (GUILayout.Button("Add breathing"))
+                    {
+                        try
+                        {
+                            _breathStatus = ReactionPack.CreateBreathing(_avatar, _breathMesh,
+                                breathShapes[_breathShapeIndex], _breathCycle, _breathIntensity);
+                        }
+                        catch (System.Exception ex) { _breathStatus = "Error: " + ex.Message; Debug.LogException(ex); }
+                        Repaint();
+                    }
+                if (!string.IsNullOrEmpty(_breathStatus))
+                    ThemedBox(_breathStatus, _breathStatus.StartsWith("Error") ? MessageType.Error : MessageType.Info);
+            }
         }
 
         private void StepReveal()
@@ -1187,22 +1059,12 @@ namespace CVRFury.Builder.Convert
                 {
                     if (GUILayout.Button("+ Add slider")) _scaleRows.Add(new SliderRow());
                     using (new EditorGUI.DisabledScope(_avatar == null))
-                    {
                         if (GUILayout.Button("+ Whole-avatar size", GUILayout.Width(150)))
                         {
                             var r = new SliderRow { kind = SliderKind.Size, label = "Avatar Size" };
                             r.targets[0] = _avatar.transform;
                             _scaleRows.Add(r);
                         }
-                        if (GUILayout.Button(new GUIContent("+ Master hue (auto)",
-                            "Finds every material with a hue-shift property and makes ONE slider that " +
-                            "re-colours the whole outfit together."), GUILayout.Width(140)))
-                        {
-                            try { _resizeStatus = AvatarFeaturePack.CreateMasterHueSlider(_avatar); }
-                            catch (System.Exception ex) { _resizeStatus = "Error: " + ex.Message; Debug.LogException(ex); }
-                            Repaint();
-                        }
-                    }
                 }
 
                 SliderRow remove = null;
