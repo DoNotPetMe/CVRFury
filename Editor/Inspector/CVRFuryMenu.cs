@@ -162,5 +162,22 @@ namespace CVRFury.Builder
             Menu.SetChecked("Tools/CVRFury/Verbose Logging", CVRFurySettings.VerboseLogging);
             return true;
         }
+
+        [MenuItem("Tools/CVRFury/Bypass CVRFury At Upload (diagnostic)", false, 102)]
+        private static void ToggleBypass()
+        {
+            CVRFurySettings.BypassUpload = !CVRFurySettings.BypassUpload;
+            if (CVRFurySettings.BypassUpload)
+                Debug.LogWarning("[CVRFury] Upload bypass is ON — avatars upload WITHOUT the CVRFury bake " +
+                                 "(no toggles/sliders in those uploads). Use it to diagnose build failures, " +
+                                 "then turn it back off.");
+        }
+
+        [MenuItem("Tools/CVRFury/Bypass CVRFury At Upload (diagnostic)", true)]
+        private static bool ToggleBypassValidate()
+        {
+            Menu.SetChecked("Tools/CVRFury/Bypass CVRFury At Upload (diagnostic)", CVRFurySettings.BypassUpload);
+            return true;
+        }
     }
 }

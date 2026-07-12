@@ -4,6 +4,16 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.2] - 2026-07-11
+
+### Added
+- **Upload diagnostics.** The bake now brackets itself in the Console ("Bake starting…" / "Bake finished —
+  handing back to the CCK"), so when the CCK's pre-build event fails, the position of the error relative to
+  those lines proves whether the thrower is CVRFury's bake or ANOTHER subscriber on the same event (shader
+  tools like Poiyomi/Thry auto-lock hook the identical CCK event). New **Tools ▸ CVRFury ▸ Bypass CVRFury At
+  Upload (diagnostic)** kill-switch skips the bake entirely for one upload — if the upload still fails with
+  bypass on, the failure is definitively not CVRFury's.
+
 ## [0.16.1] - 2026-07-11
 
 ### Fixed

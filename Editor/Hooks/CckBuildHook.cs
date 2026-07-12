@@ -91,6 +91,17 @@ namespace CVRFury.Builder
         {
             if (avatarRoot == null) return;
 
+            // Diagnostic kill-switch (Tools ▸ CVRFury ▸ Bypass CVRFury At Upload): prove whether a failing
+            // upload is CVRFury's bake or another subscriber on the same CCK event.
+            if (CVRFurySettings.BypassUpload)
+            {
+                Debug.LogWarning($"[CVRFury] Bypass is ON — '{avatarRoot.name}' uploads WITHOUT the CVRFury " +
+                                 "bake (toggles/sliders won't work in this upload). Toggle it off under " +
+                                 "Tools ▸ CVRFury when done diagnosing.");
+                return;
+            }
+
+            Debug.Log($"[CVRFury] Bake starting for '{avatarRoot.name}' (v{CckNames.CvrFuryVersion}).");
             try
             {
                 CVRFuryBuilder.Run(avatarRoot, BuildTrigger.CckUpload);
@@ -113,6 +124,10 @@ namespace CVRFury.Builder
             {
                 Debug.LogWarning($"[CVRFury] Locomotion guard skipped for '{avatarRoot.name}': {e.Message}");
             }
+
+            // Brackets the hook: if a pre-build error appears AFTER this line, the thrower is another
+            // subscriber on the same CCK event (e.g. a shader tool's auto-lock hook), not CVRFury.
+            Debug.Log($"[CVRFury] Bake finished for '{avatarRoot.name}' — handing back to the CCK.");
         }
 
         private static void OnPrePropBundle(GameObject propRoot)
