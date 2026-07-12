@@ -37,17 +37,37 @@ namespace CVRFury.Builder.Convert
             ("Neck", HumanBodyBones.Neck),
         };
 
-        public static string CreateTouchReaction(GameObject avatar, SkinnedMeshRenderer face, string blendshape,
-                                                 HumanBodyBones zone, string zoneLabel, bool othersCanTrigger,
+        internal struct ShapeReaction { public string shape; public float value; }
+
+        /// <summary>One touch → any number of blendshapes (each with its own strength), fired from either a
+        /// preset humanoid bone zone or a user-placed CUSTOM zone (a CVRFuryTouchZone box the user positioned
+        /// and sized with the gizmo — e.g. just the nose instead of the whole head). The custom zone object
+        /// becomes the actual CCK trigger, so what was previewed is exactly what fires.</summary>
+        public static string CreateTouchReaction(GameObject avatar, SkinnedMeshRenderer face,
+                                                 List<ShapeReaction> shapes, HumanBodyBones zone, string zoneLabel,
+                                                 CVRFuryTouchZone customZone, bool othersCanTrigger,
                                                  Style style, float buildSeconds, AudioClip sound, bool particles)
         {
-            if (avatar == null || face == null || string.IsNullOrEmpty(blendshape))
-                return "Pick the face mesh and a reaction blendshape.";
-            var anim = avatar.GetComponentInChildren<Animator>();
-            var bone = anim != null && anim.isHuman ? anim.GetBoneTransform(zone) : null;
-            if (bone == null) return $"No humanoid bone found for {zoneLabel}.";
+            shapes = shapes?.Where(s => !string.IsNullOrEmpty(s.shape)).ToList() ?? new List<ShapeReaction>();
+            if (avatar == null || face == null || shapes.Count == 0)
+                return "Pick the face mesh and at least one reaction blendshape.";
 
-            var param = "Touch" + zoneLabel.Replace(" ", "");
+            // Where the touch counts: a user-placed zone box, or a preset humanoid bone.
+            Transform spot;
+            if (customZone != null)
+            {
+                if (!customZone.transform.IsChildOf(avatar.transform))
+                    return "The custom zone isn't inside this avatar's hierarchy.";
+                spot = customZone.transform;
+            }
+            else
+            {
+                var anim = avatar.GetComponentInChildren<Animator>();
+                spot = anim != null && anim.isHuman ? anim.GetBoneTransform(zone) : null;
+                if (spot == null) return $"No humanoid bone found for {zoneLabel}.";
+            }
+
+            var param = "Touch" + new string(zoneLabel.Where(char.IsLetterOrDigit).ToArray());
             var toggle = Undo.AddComponent<CVRFuryToggle>(avatar);
             toggle.menuPath = $"Reactions/{zoneLabel} touch";
             toggle.parameterName = param;
@@ -56,23 +76,26 @@ namespace CVRFury.Builder.Convert
             toggle.transitionSeconds = 0.2f;
 
             var notes = new List<string>();
+            if (shapes.Count > 1) notes.Add($"{shapes.Count} blendshapes together");
 
             if (style == Style.Instant)
-                toggle.state.actions.Add(new FuryAction
-                {
-                    type = FuryAction.ActionType.BlendShape,
-                    blendShapeRenderer = face, blendShape = blendshape, blendShapeValue = 100f,
-                });
+                foreach (var s in shapes)
+                    toggle.state.actions.Add(new FuryAction
+                    {
+                        type = FuryAction.ActionType.BlendShape,
+                        blendShapeRenderer = face, blendShape = s.shape, blendShapeValue = s.value,
+                    });
             else
             {
-                // Build-up: the blendshape is driven by a generated ramp layer instead of the toggle state,
+                // Build-up: the blendshapes are driven by a generated ramp layer instead of the toggle state,
                 // so the reaction GROWS with continuous touch and eases back when it stops.
-                var ctrl = BuildRampController(avatar, face, blendshape, param, Mathf.Max(1f, buildSeconds));
+                var ctrl = BuildRampController(avatar, face, shapes, param, Mathf.Max(1f, buildSeconds));
                 var full = avatar.GetComponent<CVRFuryFullController>();
                 if (full == null) full = Undo.AddComponent<CVRFuryFullController>(avatar);
                 if (!full.controllers.Contains(ctrl)) full.controllers.Add(ctrl);
                 notes.Add($"build-up over {buildSeconds:0.#}s (ramp layer merged at upload)");
             }
+            var bone = spot; // sound/particles attach at the touch spot
 
             if (sound != null)
             {
@@ -102,28 +125,40 @@ namespace CVRFury.Builder.Convert
 
             EditorUtility.SetDirty(avatar);
 
-            var wired = AvatarFeaturePack.TryAddTouchTrigger(param, bone, Vector3.zero, 0.12f, othersCanTrigger);
-            return $"\"{zoneLabel}\" reaction added ({blendshape}" +
+            // Custom zone: the previewed box BECOMES the trigger (same object, same size), and the authoring
+            // component is consumed. Preset zone: a small default box on the bone.
+            bool wired;
+            if (customZone != null)
+            {
+                wired = AvatarFeaturePack.TryAddTouchTriggerOn(customZone.gameObject, param,
+                                                               customZone.size, othersCanTrigger);
+                if (wired) Undo.DestroyObjectImmediate(customZone);
+            }
+            else
+                wired = AvatarFeaturePack.TryAddTouchTrigger(param, bone, Vector3.zero, 0.12f, othersCanTrigger);
+
+            return $"\"{zoneLabel}\" reaction added ({string.Join(" + ", shapes.Select(s => s.shape))}" +
                    (notes.Count > 0 ? "; " + string.Join(", ", notes) : "") + ")." +
                    (wired ? othersCanTrigger ? " Touch trigger placed — anyone's hand fires it."
                                              : " Touch trigger placed — only YOUR hands fire it."
                           : " (No CCK trigger component found — it works as a menu button only.)");
         }
 
-        /// <summary>A one-layer controller: Rest (empty, WriteDefaults restores the shape) ⇄ Build (the
-        /// blendshape eases 0→100 over the given seconds while the touch parameter stays true; releasing
-        /// crossfades back over 0.8s). Merged into the avatar's animator by the Full Controller bake.</summary>
+        /// <summary>A one-layer controller: Rest (empty, WriteDefaults restores the shapes) ⇄ Build (every
+        /// reaction blendshape eases 0→its strength over the given seconds while the touch parameter stays
+        /// true; releasing crossfades back over 0.8s). Merged in by the Full Controller bake.</summary>
         private static AnimatorController BuildRampController(GameObject avatar, SkinnedMeshRenderer face,
-                                                              string blendshape, string param, float seconds)
+                                                              List<ShapeReaction> shapes, string param, float seconds)
         {
             if (!AssetDatabase.IsValidFolder(GenDir)) AssetDatabase.CreateFolder("Assets", "CVRFury Generated");
             if (!AssetDatabase.IsValidFolder(ReactDir)) AssetDatabase.CreateFolder(GenDir, "Reactions");
 
             var clip = new AnimationClip { name = $"{param} Ramp" };
             var path = AnimationUtility.CalculateTransformPath(face.transform, avatar.transform);
-            var curve = AnimationCurve.EaseInOut(0f, 0f, seconds, 100f);
-            AnimationUtility.SetEditorCurve(clip,
-                EditorCurveBinding.FloatCurve(path, typeof(SkinnedMeshRenderer), "blendShape." + blendshape), curve);
+            foreach (var s in shapes)
+                AnimationUtility.SetEditorCurve(clip,
+                    EditorCurveBinding.FloatCurve(path, typeof(SkinnedMeshRenderer), "blendShape." + s.shape),
+                    AnimationCurve.EaseInOut(0f, 0f, seconds, s.value));
             AssetDatabase.CreateAsset(clip, AssetDatabase.GenerateUniqueAssetPath($"{ReactDir}/{param} Ramp.anim"));
 
             var ctrlPath = AssetDatabase.GenerateUniqueAssetPath($"{ReactDir}/{param} BuildUp.controller");

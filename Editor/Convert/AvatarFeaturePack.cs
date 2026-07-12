@@ -99,19 +99,30 @@ namespace CVRFury.Builder.Convert
         internal static bool TryAddTouchTrigger(string parameter, Transform parent, Vector3 offset,
                                                 float size, bool othersCanTrigger)
         {
+            if (parent == null) return false;
+            var go = new GameObject($"CVRFury Touch Trigger ({parameter})");
+            Undo.RegisterCreatedObjectUndo(go, "Touch trigger");
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = offset;
+            if (TryAddTouchTriggerOn(go, parameter, new Vector3(size, size, size), othersCanTrigger)) return true;
+            Object.DestroyImmediate(go);
+            return false;
+        }
+
+        /// <summary>Wires the CCK trigger onto an EXISTING GameObject — used by custom (user-placed) touch
+        /// zones, whose position/size the user already confirmed visually.</summary>
+        internal static bool TryAddTouchTriggerOn(GameObject go, string parameter, Vector3 size, bool othersCanTrigger)
+        {
             var t = Reflect.FindType("ABI.CCK.Components.CVRAdvancedAvatarSettingsTrigger");
-            if (t == null || parent == null) return false;
+            if (t == null || go == null) return false;
             try
             {
-                var go = new GameObject($"CVRFury Touch Trigger ({parameter})");
-                Undo.RegisterCreatedObjectUndo(go, "Touch trigger");
-                go.transform.SetParent(parent, false);
-                go.transform.localPosition = offset;
-                var comp = go.AddComponent(t);
+                var comp = go.GetComponent(t);
+                if (comp == null) comp = Undo.AddComponent(go, t); // '??' breaks on Unity's fake-null
 
                 Reflect.SetField(comp, "settingName", parameter);
                 Reflect.SetField(comp, "settingValue", 1f);
-                Reflect.SetField(comp, "areaSize", new Vector3(size, size, size));
+                Reflect.SetField(comp, "areaSize", size);
                 Reflect.SetField(comp, "allowOthersToTrigger", othersCanTrigger);
                 Reflect.SetField(comp, "networkInteraction", othersCanTrigger);
                 EditorUtility.SetDirty(go);

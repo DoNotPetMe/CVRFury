@@ -68,8 +68,11 @@ namespace CVRFury.Builder.Convert
         // Touch reactions
         private bool _sTouch;
         private SkinnedMeshRenderer _touchFace;
-        private int _touchShapeIndex;
+        private sealed class TouchShapeRow { public int shape; public float value = 100f; }
+        private readonly List<TouchShapeRow> _touchShapes = new List<TouchShapeRow> { new TouchShapeRow() };
         private int _touchZone;
+        private string _touchCustomName = "Nose";
+        private CVRFuryTouchZone _touchCustomZone;
         private bool _touchOthers = true;
         private int _touchStyle;              // 0 Instant · 1 Build-up
         private float _touchBuildSeconds = 6f;
@@ -922,19 +925,65 @@ namespace CVRFury.Builder.Convert
             if (!_sTouch) return;
             using (new EditorGUI.IndentLevelScope())
             {
-                ThemedBox("Touch a body part → a face reaction. Instant, or BUILD-UP: the blendshape grows " +
-                    "the longer the touch lasts (a generated ramp layer) and eases back on release. Optional " +
-                    "extras: a sound played at the touched spot and a heart-particle burst. \"Others can " +
-                    "trigger\" off = only your own hands fire it.", MessageType.None);
+                ThemedBox("Touch a body part → face reactions. Stack as MANY blendshapes as you want on one " +
+                    "touch, each with its own strength. Zones: presets, or CUSTOM — place a box exactly where " +
+                    "the touch should count (just the nose, not the whole head), sized and positioned visually " +
+                    "with the magenta gizmo. Instant, or BUILD-UP (grows the longer the touch lasts). Optional: " +
+                    "sound at the touched spot, heart particles.", MessageType.None);
 
                 _touchFace = (SkinnedMeshRenderer)EditorGUILayout.ObjectField("Face mesh", _touchFace,
                     typeof(SkinnedMeshRenderer), true);
+
+                // Any number of blendshapes fire together on the one touch.
                 var touchShapes = BlendshapeNames(_touchFace);
                 if (touchShapes.Length > 0)
-                    _touchShapeIndex = EditorGUILayout.Popup("Reaction blendshape",
-                        Mathf.Clamp(_touchShapeIndex, 0, touchShapes.Length - 1), touchShapes);
-                _touchZone = EditorGUILayout.Popup("Touch zone", _touchZone,
-                    ReactionPack.TouchZones.Select(z => z.label).ToArray());
+                {
+                    TouchShapeRow removeShape = null;
+                    foreach (var row in _touchShapes)
+                        using (new EditorGUILayout.HorizontalScope())
+                        {
+                            row.shape = EditorGUILayout.Popup(Mathf.Clamp(row.shape, 0, touchShapes.Length - 1), touchShapes);
+                            row.value = EditorGUILayout.Slider(row.value, 0f, 100f, GUILayout.Width(150));
+                            if (GUILayout.Button("✕", GUILayout.Width(24)) && _touchShapes.Count > 1) removeShape = row;
+                        }
+                    if (removeShape != null) _touchShapes.Remove(removeShape);
+                    if (GUILayout.Button("+ blendshape", EditorStyles.miniButton, GUILayout.Width(100)))
+                        _touchShapes.Add(new TouchShapeRow());
+                }
+
+                // Preset bone zones + "Custom": a box the user places and sizes with the scene gizmo.
+                var zoneLabels = ReactionPack.TouchZones.Select(z => z.label).Append("Custom (place a box)").ToArray();
+                _touchZone = EditorGUILayout.Popup("Touch zone", Mathf.Clamp(_touchZone, 0, zoneLabels.Length - 1), zoneLabels);
+                bool custom = _touchZone == zoneLabels.Length - 1;
+                if (custom)
+                {
+                    _touchCustomName = EditorGUILayout.TextField(new GUIContent("Zone name",
+                        "Names the parameter and menu entry — e.g. \"Nose\"."), _touchCustomName);
+                    _touchCustomZone = (CVRFuryTouchZone)EditorGUILayout.ObjectField(new GUIContent("Zone box",
+                        "The placed touch area. Move it with the transform tools; edit Size on the component. " +
+                        "The magenta box in the Scene view IS the trigger area."),
+                        _touchCustomZone, typeof(CVRFuryTouchZone), true);
+                    using (new EditorGUI.DisabledScope(_avatar == null))
+                        if (_touchCustomZone == null && GUILayout.Button("Place zone box (starts at the head — drag it onto the spot)"))
+                        {
+                            var anim = _avatar.GetComponentInChildren<Animator>();
+                            var head = anim != null && anim.isHuman ? anim.GetBoneTransform(HumanBodyBones.Head) : null;
+                            var go = new GameObject($"CVRFury Touch Zone ({_touchCustomName})");
+                            Undo.RegisterCreatedObjectUndo(go, "Touch zone");
+                            go.transform.SetParent(head != null ? head : _avatar.transform, false);
+                            go.transform.localPosition = new Vector3(0f, 0f, 0.1f);
+                            _touchCustomZone = go.AddComponent<CVRFuryTouchZone>();
+                            Selection.activeGameObject = go;
+                            if (SceneView.lastActiveSceneView != null) SceneView.lastActiveSceneView.FrameSelected();
+                            _touchStatus = "Zone placed (magenta box in the Scene view = the exact trigger area). " +
+                                           "Drag it over the spot, set Size on its component, then add the reaction.";
+                        }
+                    if (_touchCustomZone != null)
+                        ThemedBox("Zone box parented to '" +
+                                  (_touchCustomZone.transform.parent != null ? _touchCustomZone.transform.parent.name : "scene root") +
+                                  "' — it follows that bone. What the magenta gizmo covers is exactly what will trigger.",
+                                  MessageType.None);
+                }
 
                 _touchStyle = GUILayout.Toolbar(_touchStyle, new[] { "Instant", "Build-up" });
                 if (_touchStyle == 1)
@@ -950,16 +999,33 @@ namespace CVRFury.Builder.Convert
                     _touchOthers = EditorGUILayout.ToggleLeft("others can trigger it", _touchOthers);
                 }
 
-                using (new EditorGUI.DisabledScope(_avatar == null || _touchFace == null || touchShapes.Length == 0))
+                using (new EditorGUI.DisabledScope(_avatar == null || _touchFace == null || touchShapes.Length == 0 ||
+                                                   (custom && _touchCustomZone == null)))
                     if (GUILayout.Button("Add touch reaction"))
                     {
                         try
                         {
-                            var zone = ReactionPack.TouchZones[Mathf.Clamp(_touchZone, 0, ReactionPack.TouchZones.Length - 1)];
-                            _touchStatus = ReactionPack.CreateTouchReaction(_avatar, _touchFace,
-                                touchShapes[_touchShapeIndex], zone.bone, zone.label, _touchOthers,
-                                _touchStyle == 1 ? ReactionPack.Style.BuildUp : ReactionPack.Style.Instant,
-                                _touchBuildSeconds, _touchSound, _touchParticles);
+                            var shapes = _touchShapes
+                                .Select(r => new ReactionPack.ShapeReaction
+                                { shape = touchShapes[Mathf.Clamp(r.shape, 0, touchShapes.Length - 1)], value = r.value })
+                                .ToList();
+                            if (custom)
+                            {
+                                _touchStatus = ReactionPack.CreateTouchReaction(_avatar, _touchFace, shapes,
+                                    HumanBodyBones.Head, string.IsNullOrEmpty(_touchCustomName) ? "Custom" : _touchCustomName,
+                                    _touchCustomZone, _touchOthers,
+                                    _touchStyle == 1 ? ReactionPack.Style.BuildUp : ReactionPack.Style.Instant,
+                                    _touchBuildSeconds, _touchSound, _touchParticles);
+                                _touchCustomZone = null; // consumed — it became the trigger
+                            }
+                            else
+                            {
+                                var zone = ReactionPack.TouchZones[Mathf.Clamp(_touchZone, 0, ReactionPack.TouchZones.Length - 1)];
+                                _touchStatus = ReactionPack.CreateTouchReaction(_avatar, _touchFace, shapes,
+                                    zone.bone, zone.label, null, _touchOthers,
+                                    _touchStyle == 1 ? ReactionPack.Style.BuildUp : ReactionPack.Style.Instant,
+                                    _touchBuildSeconds, _touchSound, _touchParticles);
+                            }
                         }
                         catch (System.Exception ex) { _touchStatus = "Error: " + ex.Message; Debug.LogException(ex); }
                         Repaint();

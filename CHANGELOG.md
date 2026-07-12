@@ -4,6 +4,22 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.0] - 2026-07-11 — Touch reactions: multiple blendshapes + custom zones
+
+### Added
+- **Multiple blendshapes per touch.** One touch now fires any number of blendshapes together, each with its
+  own strength (add/remove rows in the window). Works in both styles: Instant applies them all at once;
+  Build-up ramps every shape to its own target value over the build time in one generated clip.
+- **Custom touch zones — put the trigger exactly where you mean.** The zone menu gains "Custom (place a
+  box)": click Place and a `CVRFury Touch Zone` box appears (parented to the head so it follows), drawn as a
+  **magenta gizmo in the Scene view** — move it with the normal transform tools and set its Size on the
+  component; what the gizmo covers is *exactly* what will trigger. Name it ("Nose") and create: the previewed
+  box itself becomes the CCK trigger (same object, same size — zero drift between preview and reality), and
+  the authoring component is consumed. Solves the "touching anywhere on my head fires my nose boop" problem:
+  a nose-sized box on the nose triggers only on the nose.
+- A zone that's placed but never turned into a reaction is stripped at upload with a friendly note (it's
+  editor-only intent, like every CVRFury component).
+
 ## [0.15.0] - 2026-07-11 — Clothing setup & Reactions
 
 ### Added
