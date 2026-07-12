@@ -4,6 +4,30 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] - 2026-07-11 — Avatar features pack
+
+Six new generators in the Avatar features tab. All of them only compose the existing CVRFury components
+(Toggle / Slider / Modes) — the proven builders bake everything at upload, no new bake paths.
+
+### Added
+- **🧥 Wardrobe — instant toggles.** Scan finds every wearable-looking mesh without a toggle (body/face parts
+  skipped), shows a review list (rename, untick, pick defaults — current scene state pre-filled), and creates
+  a menu toggle per item under a folder of your choice. The end of making clothing toggles one by one.
+- **Toggles from selection.** Select any objects in the Hierarchy → one click → one toggle each.
+- **🎨 Material variants dropdown.** Avatars often ship colour/texture editions as extra materials. Pick the
+  mesh + list the materials → an in-game "style" dropdown swaps them live; the currently-applied material
+  becomes the default option.
+- **📏 Height presets.** A "Height" dropdown (Smol 0.5× / Normal 1× / Tall 1.5×, fully editable) that rescales
+  the whole avatar; the preset closest to 1× is the default.
+- **🔦 Flashlight.** One click adds a warm head-mounted spotlight (shadows off — perf-safe) with a menu
+  toggle, default off and deliberately not saved so you rejoin dark worlds dark. It follows your gaze.
+- **🌈 Master hue slider.** Auto-detects the hue-shift property your materials actually use and every renderer
+  carrying it, then creates ONE slider that re-colours the whole outfit together (with the locked-Poiyomi
+  "mark it Animated" remedy in the message when nothing is found).
+- **👉 Boop.** Pick your face mesh + a reaction blendshape → a momentary menu button that plays it while held
+  (with a soft 0.15 s ease), plus — where the CCK's trigger component is available — a small touch trigger on
+  the nose so physically booping fires the same reaction. Degrades to menu-only gracefully.
+
 ## [0.12.1] - 2026-07-11
 
 ### Added

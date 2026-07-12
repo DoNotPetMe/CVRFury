@@ -56,6 +56,29 @@ namespace CVRFury.Builder.Convert
         // Reveal invisible clothing (material-animated visibility)
         private Renderer _revealTarget;
         private string _revealStatus = "";
+
+        // Feature pack: wardrobe / variants / height / boop
+        private bool _sWardrobe, _sVariants, _sHeight, _sBoop;
+        private List<AvatarFeaturePack.WardrobeRow> _wardrobeRows;
+        private string _wardrobeFolder = "Clothing";
+        private string _wardrobeStatus = "";
+        private Vector2 _wardrobeScroll;
+        private Renderer _variantRenderer;
+        private int _variantSlot;
+        private string _variantLabel = "";
+        private readonly List<Material> _variantMats = new List<Material> { null, null };
+        private string _variantStatus = "";
+        private sealed class HeightRow { public string name; public float factor; }
+        private readonly List<HeightRow> _heightRows = new List<HeightRow>
+        {
+            new HeightRow { name = "Smol", factor = 0.5f },
+            new HeightRow { name = "Normal", factor = 1f },
+            new HeightRow { name = "Tall", factor = 1.5f },
+        };
+        private string _heightStatus = "";
+        private SkinnedMeshRenderer _boopFace;
+        private int _boopShapeIndex;
+        private string _boopStatus = "";
         private string _preflight = "";
         private bool _preflightOk;
         private System.Collections.Generic.List<PreflightCheck.Result> _preflightResults;
@@ -214,8 +237,12 @@ namespace CVRFury.Builder.Convert
             if (_catFeatures)
                 using (new EditorGUI.IndentLevelScope())
                 {
+                    StepWardrobe();
                     StepResize();
                     StepPresets();
+                    StepVariants();
+                    StepHeight();
+                    StepBoop();
                     StepReveal();
                     StepSps();
                 }
@@ -797,6 +824,173 @@ namespace CVRFury.Builder.Convert
                    "Picking a preset turns its items on and everything else in the list off. Bakes at upload.";
         }
 
+        private void StepWardrobe()
+        {
+            _sWardrobe = Foldout(_sWardrobe, "🧥 Wardrobe — every clothing item becomes a toggle");
+            if (!_sWardrobe) return;
+            using (new EditorGUI.IndentLevelScope())
+            {
+                ThemedBox("Scan finds every wearable-looking mesh that doesn't have a toggle yet (body/face " +
+                    "parts are skipped). Untick what you don't want, then one click gives each item a menu " +
+                    "toggle — current scene state becomes the default. Or select objects in the Hierarchy and " +
+                    "use \"Toggles from selection\".", MessageType.None);
+
+                _wardrobeFolder = EditorGUILayout.TextField(new GUIContent("Menu folder",
+                    "Toggles land under this submenu (blank = top level)."), _wardrobeFolder);
+
+                using (new EditorGUILayout.HorizontalScope())
+                using (new EditorGUI.DisabledScope(_avatar == null))
+                {
+                    if (GUILayout.Button("Scan wardrobe"))
+                    { _wardrobeRows = AvatarFeaturePack.ScanWardrobe(_avatar); _wardrobeStatus = ""; }
+                    if (GUILayout.Button("Toggles from selection"))
+                    { _wardrobeStatus = AvatarFeaturePack.TogglesFromSelection(_avatar, _wardrobeFolder); Repaint(); }
+                    if (GUILayout.Button(new GUIContent("🔦 Add flashlight",
+                        "Head-mounted warm spotlight with a menu toggle — for dark worlds.")))
+                    { _wardrobeStatus = AvatarFeaturePack.CreateFlashlight(_avatar); Repaint(); }
+                }
+
+                if (_wardrobeRows != null && _wardrobeRows.Count > 0)
+                {
+                    EditorGUILayout.LabelField($"{_wardrobeRows.Count(r => r.include)} of {_wardrobeRows.Count} selected",
+                        EditorStyles.miniBoldLabel);
+                    _wardrobeScroll = EditorGUILayout.BeginScrollView(_wardrobeScroll, GUILayout.MaxHeight(220));
+                    foreach (var row in _wardrobeRows)
+                        using (new EditorGUILayout.HorizontalScope())
+                        {
+                            row.include = EditorGUILayout.Toggle(row.include, GUILayout.Width(18));
+                            row.label = EditorGUILayout.TextField(row.label);
+                            row.defaultOn = EditorGUILayout.ToggleLeft("on by default", row.defaultOn, GUILayout.Width(100));
+                        }
+                    EditorGUILayout.EndScrollView();
+
+                    using (new EditorGUI.DisabledScope(_avatar == null || !_wardrobeRows.Any(r => r.include)))
+                        if (GUILayout.Button($"Create {_wardrobeRows.Count(r => r.include)} toggle(s)"))
+                        {
+                            _wardrobeStatus = AvatarFeaturePack.CreateWardrobeToggles(_wardrobeRows, _wardrobeFolder);
+                            _wardrobeRows = null;
+                            Repaint();
+                        }
+                }
+                else if (_wardrobeRows != null)
+                    EditorGUILayout.LabelField("Nothing new to toggle — everything wearable already has one.",
+                        EditorStyles.centeredGreyMiniLabel);
+
+                if (!string.IsNullOrEmpty(_wardrobeStatus)) ThemedBox(_wardrobeStatus, MessageType.Info);
+            }
+        }
+
+        private void StepVariants()
+        {
+            _sVariants = Foldout(_sVariants, "🎨 Material variants (in-game style dropdown)");
+            if (!_sVariants) return;
+            using (new EditorGUI.IndentLevelScope())
+            {
+                ThemedBox("Many avatars ship colour/texture editions as extra materials. Pick the mesh, list " +
+                    "the variants, and you get an in-game dropdown that swaps them live — the currently-applied " +
+                    "material becomes the default option.", MessageType.None);
+
+                _variantLabel = EditorGUILayout.TextField(new GUIContent("Menu name",
+                    "Blank = named after the mesh (e.g. \"Skirt Style\")."), _variantLabel);
+                _variantRenderer = (Renderer)EditorGUILayout.ObjectField("Mesh", _variantRenderer, typeof(Renderer), true);
+                if (_variantRenderer != null && _variantRenderer.sharedMaterials.Length > 1)
+                    _variantSlot = EditorGUILayout.IntSlider("Material slot", _variantSlot, 0,
+                        _variantRenderer.sharedMaterials.Length - 1);
+
+                for (int i = 0; i < _variantMats.Count; i++)
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        _variantMats[i] = (Material)EditorGUILayout.ObjectField(i == 0 ? "Variants" : " ",
+                            _variantMats[i], typeof(Material), false);
+                        if (GUILayout.Button("✕", GUILayout.Width(24)) && _variantMats.Count > 2)
+                        { _variantMats.RemoveAt(i); break; }
+                    }
+                if (GUILayout.Button("+ variant", EditorStyles.miniButton, GUILayout.Width(80)))
+                    _variantMats.Add(null);
+
+                using (new EditorGUI.DisabledScope(_avatar == null || _variantRenderer == null))
+                    if (GUILayout.Button("Create style dropdown"))
+                    {
+                        try
+                        {
+                            _variantStatus = AvatarFeaturePack.CreateMaterialVariants(
+                                _avatar, _variantLabel, _variantRenderer, _variantSlot, _variantMats);
+                        }
+                        catch (System.Exception ex) { _variantStatus = "Error: " + ex.Message; Debug.LogException(ex); }
+                        Repaint();
+                    }
+                if (!string.IsNullOrEmpty(_variantStatus))
+                    ThemedBox(_variantStatus, _variantStatus.StartsWith("Error") ? MessageType.Error : MessageType.Info);
+            }
+        }
+
+        private void StepHeight()
+        {
+            _sHeight = Foldout(_sHeight, "📏 Height presets (smol / normal / tall)");
+            if (!_sHeight) return;
+            using (new EditorGUI.IndentLevelScope())
+            {
+                ThemedBox("An in-game \"Height\" dropdown that rescales the whole avatar. The preset closest " +
+                    "to 1× becomes the default. Edit names and factors to taste.", MessageType.None);
+
+                HeightRow removeH = null;
+                foreach (var row in _heightRows)
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        row.name = EditorGUILayout.TextField(row.name);
+                        row.factor = EditorGUILayout.FloatField(row.factor, GUILayout.Width(60));
+                        GUILayout.Label("×", GUILayout.Width(14));
+                        if (GUILayout.Button("✕", GUILayout.Width(24)) && _heightRows.Count > 2) removeH = row;
+                    }
+                if (removeH != null) _heightRows.Remove(removeH);
+                if (GUILayout.Button("+ preset", EditorStyles.miniButton, GUILayout.Width(80)))
+                    _heightRows.Add(new HeightRow { name = "Preset", factor = 1f });
+
+                using (new EditorGUI.DisabledScope(_avatar == null || _heightRows.Count < 2))
+                    if (GUILayout.Button("Create height dropdown"))
+                    {
+                        try
+                        {
+                            _heightStatus = AvatarFeaturePack.CreateHeightPresets(_avatar,
+                                _heightRows.Select(r => (r.name, r.factor)).ToList());
+                        }
+                        catch (System.Exception ex) { _heightStatus = "Error: " + ex.Message; Debug.LogException(ex); }
+                        Repaint();
+                    }
+                if (!string.IsNullOrEmpty(_heightStatus))
+                    ThemedBox(_heightStatus, _heightStatus.StartsWith("Error") ? MessageType.Error : MessageType.Info);
+            }
+        }
+
+        private void StepBoop()
+        {
+            _sBoop = Foldout(_sBoop, "👉 Boop (touch & menu face reaction)");
+            if (!_sBoop) return;
+            using (new EditorGUI.IndentLevelScope())
+            {
+                ThemedBox("Pick your face mesh and a reaction blendshape (blush, squish, heart-eyes…). You get " +
+                    "a momentary \"Boop\" menu button that plays it while held — plus, where the CCK allows, a " +
+                    "small touch trigger on the nose so booping fires it physically too.", MessageType.None);
+
+                _boopFace = (SkinnedMeshRenderer)EditorGUILayout.ObjectField("Face mesh", _boopFace,
+                    typeof(SkinnedMeshRenderer), true);
+                var shapes = BlendshapeNames(_boopFace);
+                if (shapes.Length > 0)
+                    _boopShapeIndex = EditorGUILayout.Popup("Reaction blendshape",
+                        Mathf.Clamp(_boopShapeIndex, 0, shapes.Length - 1), shapes);
+
+                using (new EditorGUI.DisabledScope(_avatar == null || _boopFace == null || shapes.Length == 0))
+                    if (GUILayout.Button("Add boop"))
+                    {
+                        try { _boopStatus = AvatarFeaturePack.CreateBoop(_avatar, _boopFace, shapes[_boopShapeIndex]); }
+                        catch (System.Exception ex) { _boopStatus = "Error: " + ex.Message; Debug.LogException(ex); }
+                        Repaint();
+                    }
+                if (!string.IsNullOrEmpty(_boopStatus))
+                    ThemedBox(_boopStatus, _boopStatus.StartsWith("Error") ? MessageType.Error : MessageType.Info);
+            }
+        }
+
         private void StepReveal()
         {
             _sReveal = Foldout(_sReveal, "👁 Reveal invisible clothing (enabled but not rendering)");
@@ -849,12 +1043,22 @@ namespace CVRFury.Builder.Convert
                 {
                     if (GUILayout.Button("+ Add slider")) _scaleRows.Add(new SliderRow());
                     using (new EditorGUI.DisabledScope(_avatar == null))
+                    {
                         if (GUILayout.Button("+ Whole-avatar size", GUILayout.Width(150)))
                         {
                             var r = new SliderRow { kind = SliderKind.Size, label = "Avatar Size" };
                             r.targets[0] = _avatar.transform;
                             _scaleRows.Add(r);
                         }
+                        if (GUILayout.Button(new GUIContent("+ Master hue (auto)",
+                            "Finds every material with a hue-shift property and makes ONE slider that " +
+                            "re-colours the whole outfit together."), GUILayout.Width(140)))
+                        {
+                            try { _resizeStatus = AvatarFeaturePack.CreateMasterHueSlider(_avatar); }
+                            catch (System.Exception ex) { _resizeStatus = "Error: " + ex.Message; Debug.LogException(ex); }
+                            Repaint();
+                        }
+                    }
                 }
 
                 SliderRow remove = null;
