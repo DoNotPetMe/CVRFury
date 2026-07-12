@@ -4,6 +4,17 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.1] - 2026-07-11
+
+### Fixed
+- **Touch-permission wiring adapts to the installed CCK.** The trigger's core fields (setting name/value,
+  area size) wire fine, but the "others can trigger" fields are named differently across CCK versions and
+  produced console warnings. They're now found by name shape (any bool field matching allow-other /
+  others-to-trigger / network patterns, quietly skipped when absent), and when nothing matches, ONE console
+  line prints the trigger component's actual field layout — paste it and the exact names get pinned. The
+  trigger itself was always created and functional; only the permission checkbox could fall back to the
+  CCK's default.
+
 ## [0.16.0] - 2026-07-11 — Touch reactions: multiple blendshapes + custom zones
 
 ### Added

@@ -120,16 +120,48 @@ namespace CVRFury.Builder.Convert
                 var comp = go.GetComponent(t);
                 if (comp == null) comp = Undo.AddComponent(go, t); // '??' breaks on Unity's fake-null
 
+                // These three are the trigger's core and stable across CCK versions.
                 Reflect.SetField(comp, "settingName", parameter);
                 Reflect.SetField(comp, "settingValue", 1f);
                 Reflect.SetField(comp, "areaSize", size);
-                Reflect.SetField(comp, "allowOthersToTrigger", othersCanTrigger);
-                Reflect.SetField(comp, "networkInteraction", othersCanTrigger);
+
+                // Touch-permission fields drift between CCK versions — find them by name shape instead of
+                // exact name, and when nothing matches, log the REAL field layout so one console paste is
+                // enough to pin the correct names.
+                bool permissionSet =
+                    SetBoolFieldFuzzy(comp, new[] { "allowother", "otherstotrigger", "othersinteract" }, othersCanTrigger) |
+                    SetBoolFieldFuzzy(comp, new[] { "network" }, othersCanTrigger);
+                if (!permissionSet)
+                    Debug.Log("[CVRFury] Touch trigger: no others-can-trigger field recognised on this CCK's " +
+                              "trigger — it was created with the CCK's default touch permissions. Its actual " +
+                              "fields are: " + DumpFields(t) + " — share this line to get the toggle wired.");
+
                 EditorUtility.SetDirty(go);
                 return true;
             }
             catch { return false; }
         }
+
+        /// <summary>Sets the first bool field whose normalized name contains any candidate. Quiet on miss —
+        /// optional fields must not spam the console like a missing required field would.</summary>
+        private static bool SetBoolFieldFuzzy(object obj, string[] candidates, bool value)
+        {
+            foreach (var f in obj.GetType().GetFields(System.Reflection.BindingFlags.Public |
+                                                      System.Reflection.BindingFlags.Instance))
+            {
+                if (f.FieldType != typeof(bool)) continue;
+                var n = f.Name.ToLowerInvariant().Replace("_", "");
+                if (!candidates.Any(c => n.Contains(c))) continue;
+                f.SetValue(obj, value);
+                return true;
+            }
+            return false;
+        }
+
+        private static string DumpFields(System.Type t) =>
+            "[" + string.Join(", ", t.GetFields(System.Reflection.BindingFlags.Public |
+                                                System.Reflection.BindingFlags.Instance)
+                                     .Select(f => $"{f.FieldType.Name} {f.Name}")) + "]";
 
         // "AS_Fishnet_top" → "Fishnet top"
         internal static string Prettify(string name)
