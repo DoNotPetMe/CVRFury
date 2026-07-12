@@ -24,7 +24,7 @@ namespace CVRFury.Builder.Convert
         }
 
         // Parts of the avatar itself — not clothing, never auto-toggled.
-        private static readonly string[] BodyWords =
+        internal static readonly string[] BodyWords =
             { "body", "head", "face", "eye", "lash", "brow", "teeth", "tongue", "mouth", "viseme", "armature" };
 
         /// <summary>Every renderer-bearing object that looks like a wearable and isn't already covered by a
@@ -279,34 +279,35 @@ namespace CVRFury.Builder.Convert
 
             // Best-effort physical trigger: a small CCK trigger volume on the nose that drives the same
             // parameter when someone's hand enters it. Shape-based so CCK field drift degrades to menu-only.
-            var trigger = TryAddTouchTrigger(avatar, "Boop");
+            var anim = avatar.GetComponentInChildren<Animator>();
+            var head = anim != null && anim.isHuman ? anim.GetBoneTransform(HumanBodyBones.Head) : null;
+            var trigger = head != null &&
+                          TryAddTouchTrigger("Boop", head, new Vector3(0f, 0f, 0.11f), 0.06f, true);
             return "Boop added as a momentary menu button (press = face reaction)." +
                    (trigger ? " A touch trigger was also placed on the head — booping the nose fires it too."
                             : " (No touch trigger — the CCK's trigger component wasn't found; menu-only.)");
         }
 
-        private static bool TryAddTouchTrigger(GameObject avatar, string parameter)
+        /// <summary>Small CCK trigger volume that writes 1 into an AAS parameter while something is inside
+        /// it. Fuzzy field wiring — names drift across CCK versions, every set is best-effort.</summary>
+        internal static bool TryAddTouchTrigger(string parameter, Transform parent, Vector3 offset,
+                                                float size, bool othersCanTrigger)
         {
             var t = Reflect.FindType("ABI.CCK.Components.CVRAdvancedAvatarSettingsTrigger");
-            if (t == null) return false;
-            var anim = avatar.GetComponentInChildren<Animator>();
-            var head = anim != null && anim.isHuman ? anim.GetBoneTransform(HumanBodyBones.Head) : null;
-            if (head == null) return false;
-
+            if (t == null || parent == null) return false;
             try
             {
-                var go = new GameObject("CVRFury Boop Trigger");
-                Undo.RegisterCreatedObjectUndo(go, "Boop trigger");
-                go.transform.SetParent(head, false);
-                go.transform.localPosition = new Vector3(0f, 0f, 0.11f); // nose-ish
+                var go = new GameObject($"CVRFury Touch Trigger ({parameter})");
+                Undo.RegisterCreatedObjectUndo(go, "Touch trigger");
+                go.transform.SetParent(parent, false);
+                go.transform.localPosition = offset;
                 var comp = go.AddComponent(t);
 
-                // Fuzzy field wiring — names drift across CCK versions, all sets are best-effort.
                 Reflect.SetField(comp, "settingName", parameter);
                 Reflect.SetField(comp, "settingValue", 1f);
-                Reflect.SetField(comp, "areaSize", new Vector3(0.06f, 0.06f, 0.06f));
-                Reflect.SetField(comp, "allowOthersToTrigger", true);
-                Reflect.SetField(comp, "networkInteraction", true);
+                Reflect.SetField(comp, "areaSize", new Vector3(size, size, size));
+                Reflect.SetField(comp, "allowOthersToTrigger", othersCanTrigger);
+                Reflect.SetField(comp, "networkInteraction", othersCanTrigger);
                 EditorUtility.SetDirty(go);
                 return true;
             }
@@ -314,7 +315,7 @@ namespace CVRFury.Builder.Convert
         }
 
         // "AS_Fishnet_top" → "Fishnet top"
-        private static string Prettify(string name)
+        internal static string Prettify(string name)
         {
             var s = name.Trim();
             foreach (var prefix in new[] { "AS_", "AS ", "T_", "C_" })

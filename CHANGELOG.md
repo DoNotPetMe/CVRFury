@@ -4,6 +4,28 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] - 2026-07-11 — Adult (18+) pack
+
+Five NSFW-avatar generators in one 🔞 section — CVR supports adult content natively, and these are the
+setups adult avatars rebuild by hand on every model. Same rule as the rest of the pack: everything composes
+the existing Toggle / Slider / Modes components, suggestions are name-heuristic and always land in an
+editable review list first.
+
+### Added
+- **🚪 Undress stages.** One click suggests the classic Dressed → Underwear → Nude dropdown from what's on
+  the avatar (underwear detected by name), fully editable stage-by-stage before creating. Deliberately not
+  saved between sessions — you always spawn dressed.
+- **🛡 SFW switch.** One "SFW Mode" toggle — ON by default and saved — that hides the listed NSFW objects
+  (auto-suggested by name, reviewed by you) and optionally shows modesty items while enabled. One press
+  before streaming.
+- **🫦 Touch reactions.** Pick a face blendshape + a touch zone (head/chest/hips/thighs/neck) → a momentary
+  reaction that plays while touched, with a CCK trigger on the bone. "Others can trigger it" is a checkbox —
+  off means only your own hands fire it. Degrades to a menu button when the CCK trigger type is missing.
+- **💧 Wetness slider.** Auto-detects the gloss/wetness property the avatar's materials use and drives it on
+  every carrying renderer: slider 0 = the current look (per-material baseline preserved), 1 = full gloss.
+- **🍑 Jiggle tuner.** Soft / Bouncy / Extra DynamicBone presets applied to any bones in one click — tunes an
+  existing DynamicBone or adds one rooted at the bone. DynamicBone is what CVR actually runs, so it ships as-is.
+
 ## [0.13.0] - 2026-07-11 — Avatar features pack
 
 Six new generators in the Avatar features tab. All of them only compose the existing CVRFury components

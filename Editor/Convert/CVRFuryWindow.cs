@@ -79,6 +79,19 @@ namespace CVRFury.Builder.Convert
         private SkinnedMeshRenderer _boopFace;
         private int _boopShapeIndex;
         private string _boopStatus = "";
+
+        // Adult (18+) pack
+        private bool _sNsfw;
+        private string _nsfwStatus = "";
+        private List<NsfwFeaturePack.StageRow> _stageRows;
+        private readonly List<GameObject> _sfwHide = new List<GameObject>();
+        private readonly List<GameObject> _sfwShow = new List<GameObject> { null };
+        private SkinnedMeshRenderer _touchFace;
+        private int _touchShapeIndex;
+        private int _touchZone;
+        private bool _touchOthers = true;
+        private readonly List<Transform> _jiggleBones = new List<Transform> { null };
+        private int _jigglePreset = 1; // Bouncy
         private string _preflight = "";
         private bool _preflightOk;
         private System.Collections.Generic.List<PreflightCheck.Result> _preflightResults;
@@ -244,6 +257,7 @@ namespace CVRFury.Builder.Convert
                     StepHeight();
                     StepBoop();
                     StepReveal();
+                    StepNsfw();
                     StepSps();
                 }
 
@@ -989,6 +1003,136 @@ namespace CVRFury.Builder.Convert
                 if (!string.IsNullOrEmpty(_boopStatus))
                     ThemedBox(_boopStatus, _boopStatus.StartsWith("Error") ? MessageType.Error : MessageType.Info);
             }
+        }
+
+        private void StepNsfw()
+        {
+            _sNsfw = Foldout(_sNsfw, "🔞 Adult (18+) — undress, SFW switch, touch, wetness, jiggle");
+            if (!_sNsfw) return;
+            using (new EditorGUI.IndentLevelScope())
+            {
+                ThemedBox("CVR supports adult content natively — these are the setups NSFW avatars rebuild by " +
+                    "hand every time. Suggestions are name-based and always land in an editable list first.",
+                    MessageType.None);
+
+                // 🚪 Undress stages -------------------------------------------------------------------
+                EditorGUILayout.LabelField("🚪 Undress stages (Dressed → Underwear → Nude dropdown)", EditorStyles.miniBoldLabel);
+                using (new EditorGUI.DisabledScope(_avatar == null))
+                    if (GUILayout.Button("Suggest stages from this avatar"))
+                        _stageRows = NsfwFeaturePack.SuggestStages(_avatar);
+                if (_stageRows != null)
+                {
+                    NsfwFeaturePack.StageRow removeStage = null;
+                    foreach (var s in _stageRows)
+                        using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+                        {
+                            using (new EditorGUILayout.HorizontalScope())
+                            {
+                                s.name = EditorGUILayout.TextField("Stage", s.name);
+                                if (GUILayout.Button("✕", GUILayout.Width(24)) && _stageRows.Count > 2) removeStage = s;
+                            }
+                            DrawGoList(s.on, "On in this stage");
+                        }
+                    if (removeStage != null) _stageRows.Remove(removeStage);
+                    if (GUILayout.Button("+ stage", EditorStyles.miniButton, GUILayout.Width(70)))
+                        _stageRows.Add(new NsfwFeaturePack.StageRow { name = "Stage" });
+                    using (new EditorGUI.DisabledScope(_avatar == null || _stageRows.Count < 2))
+                        if (GUILayout.Button("Create undress dropdown"))
+                        { _nsfwStatus = NsfwFeaturePack.CreateUndressStages(_avatar, _stageRows); _stageRows = null; Repaint(); }
+                }
+
+                // 🛡 SFW switch -----------------------------------------------------------------------
+                EditorGUILayout.Space(6);
+                EditorGUILayout.LabelField("🛡 SFW switch (one toggle → stream-safe)", EditorStyles.miniBoldLabel);
+                using (new EditorGUI.DisabledScope(_avatar == null))
+                    if (GUILayout.Button("Suggest NSFW objects to hide"))
+                    {
+                        _sfwHide.Clear();
+                        _sfwHide.AddRange(NsfwFeaturePack.SuggestNsfwObjects(_avatar));
+                        if (_sfwHide.Count == 0) _sfwHide.Add(null);
+                        _nsfwStatus = _sfwHide.Count(o => o != null) == 0
+                            ? "Nothing auto-detected — drag the objects to hide into the list."
+                            : $"Suggested {_sfwHide.Count(o => o != null)} object(s) — review, then create.";
+                    }
+                DrawGoList(_sfwHide, "Hide while SFW");
+                DrawGoList(_sfwShow, "Show while SFW (modesty, optional)");
+                using (new EditorGUI.DisabledScope(_avatar == null))
+                    if (GUILayout.Button("Create SFW switch (ON by default)"))
+                    { _nsfwStatus = NsfwFeaturePack.CreateSfwSwitch(_avatar, _sfwHide, _sfwShow); Repaint(); }
+
+                // 🫦 Touch reactions ------------------------------------------------------------------
+                EditorGUILayout.Space(6);
+                EditorGUILayout.LabelField("🫦 Touch reactions (body part → face reaction)", EditorStyles.miniBoldLabel);
+                _touchFace = (SkinnedMeshRenderer)EditorGUILayout.ObjectField("Face mesh", _touchFace,
+                    typeof(SkinnedMeshRenderer), true);
+                var touchShapes = BlendshapeNames(_touchFace);
+                if (touchShapes.Length > 0)
+                    _touchShapeIndex = EditorGUILayout.Popup("Reaction blendshape",
+                        Mathf.Clamp(_touchShapeIndex, 0, touchShapes.Length - 1), touchShapes);
+                _touchZone = EditorGUILayout.Popup("Touch zone", _touchZone,
+                    NsfwFeaturePack.TouchZones.Select(z => z.label).ToArray());
+                _touchOthers = EditorGUILayout.ToggleLeft(new GUIContent("Others can trigger it",
+                    "Off = only your own hands fire the reaction."), _touchOthers);
+                using (new EditorGUI.DisabledScope(_avatar == null || _touchFace == null || touchShapes.Length == 0))
+                    if (GUILayout.Button("Add touch reaction"))
+                    {
+                        var zone = NsfwFeaturePack.TouchZones[Mathf.Clamp(_touchZone, 0, NsfwFeaturePack.TouchZones.Length - 1)];
+                        _nsfwStatus = NsfwFeaturePack.CreateTouchReaction(_avatar, _touchFace,
+                            touchShapes[_touchShapeIndex], zone.bone, zone.label, _touchOthers);
+                        Repaint();
+                    }
+
+                // 💧 Wetness --------------------------------------------------------------------------
+                EditorGUILayout.Space(6);
+                EditorGUILayout.LabelField("💧 Wetness slider (auto-detect gloss property)", EditorStyles.miniBoldLabel);
+                using (new EditorGUI.DisabledScope(_avatar == null))
+                    if (GUILayout.Button("Create wetness slider"))
+                    { _nsfwStatus = NsfwFeaturePack.CreateWetnessSlider(_avatar); Repaint(); }
+
+                // 🍑 Jiggle tuner ---------------------------------------------------------------------
+                EditorGUILayout.Space(6);
+                EditorGUILayout.LabelField("🍑 Jiggle tuner (DynamicBone presets)", EditorStyles.miniBoldLabel);
+                for (int i = 0; i < _jiggleBones.Count; i++)
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        _jiggleBones[i] = (Transform)EditorGUILayout.ObjectField(i == 0 ? "Bones" : " ",
+                            _jiggleBones[i], typeof(Transform), true);
+                        if (GUILayout.Button("✕", GUILayout.Width(24)) && _jiggleBones.Count > 1)
+                        { _jiggleBones.RemoveAt(i); break; }
+                    }
+                if (GUILayout.Button("+ bone", EditorStyles.miniButton, GUILayout.Width(70)))
+                    _jiggleBones.Add(null);
+                _jigglePreset = GUILayout.Toolbar(_jigglePreset, new[] { "Soft", "Bouncy", "Extra" });
+                using (new EditorGUI.DisabledScope(_jiggleBones.All(b => b == null)))
+                    if (GUILayout.Button("Apply jiggle preset"))
+                    {
+                        try
+                        {
+                            _nsfwStatus = NsfwFeaturePack.ApplyJiggle(_jiggleBones,
+                                (NsfwFeaturePack.JigglePreset)_jigglePreset);
+                        }
+                        catch (System.Exception ex) { _nsfwStatus = "Error: " + ex.Message; Debug.LogException(ex); }
+                        Repaint();
+                    }
+
+                if (!string.IsNullOrEmpty(_nsfwStatus))
+                    ThemedBox(_nsfwStatus, _nsfwStatus.StartsWith("Error") ? MessageType.Error : MessageType.Info);
+            }
+        }
+
+        /// <summary>Compact editable GameObject list (drag rows in, ✕ to remove, + to extend).</summary>
+        private static void DrawGoList(List<GameObject> list, string label)
+        {
+            if (list.Count == 0) list.Add(null);
+            for (int i = 0; i < list.Count; i++)
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    list[i] = (GameObject)EditorGUILayout.ObjectField(i == 0 ? label : " ",
+                        list[i], typeof(GameObject), true);
+                    if (GUILayout.Button("✕", GUILayout.Width(24)) && list.Count > 1) { list.RemoveAt(i); break; }
+                }
+            if (GUILayout.Button("+ object", EditorStyles.miniButton, GUILayout.Width(80)))
+                list.Add(null);
         }
 
         private void StepReveal()
