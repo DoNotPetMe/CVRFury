@@ -33,6 +33,17 @@ namespace CVRFury.Builder
         {
             if (_subscribed) return;
 
+            // With bypass ON, don't subscribe AT ALL (takes effect after a recompile/domain reload). This
+            // distinguishes "a listener's body crashes" from "the CCK's legacy event bridge crashes when any
+            // runtime listener exists" — the latter fails even with a listener that does nothing.
+            if (CVRFurySettings.BypassUpload)
+            {
+                Debug.LogWarning("[CVRFury] Upload bypass is ON — CVRFury did not attach to the CCK build " +
+                                 "events at all this session. Toggle it off (Tools ▸ CVRFury) and let scripts " +
+                                 "recompile to re-enable.");
+                return;
+            }
+
             // Is the CCK even present? If not, stay silent — CVRFury is harmless without it and the
             // user may import the CCK later, triggering another domain reload.
             if (Reflect.FindType(CckNames.AvatarType) == null &&

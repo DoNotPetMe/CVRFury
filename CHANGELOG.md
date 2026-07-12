@@ -4,6 +4,14 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.4] - 2026-07-12
+
+### Changed
+- **Bypass now unhooks CVRFury from the CCK build events entirely** (after a recompile), instead of
+  attaching a listener that returns early. This cleanly separates two failure modes of the CCK's legacy
+  pre-build bridge: a listener whose body crashes vs. a bridge that crashes when ANY runtime listener is
+  attached — the latter fails even for a listener that does nothing.
+
 ## [0.16.3] - 2026-07-11
 
 ### Fixed
