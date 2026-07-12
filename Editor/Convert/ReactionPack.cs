@@ -141,7 +141,10 @@ namespace CVRFury.Builder.Convert
                    (notes.Count > 0 ? "; " + string.Join(", ", notes) : "") + ")." +
                    (wired ? othersCanTrigger ? " Touch trigger placed — anyone's hand fires it."
                                              : " Touch trigger placed — only YOUR hands fire it."
-                          : " (No CCK trigger component found — it works as a menu button only.)");
+                          : " (No CCK trigger component found — it works as a menu button only.)") +
+                   $"\nNote: the trigger's Setting Name ('{param}') shows RED in the CCK inspector — that's " +
+                   "normal. CVRFury is non-destructive, so the AAS setting is created during the upload bake; " +
+                   "the name resolves the moment it's built.";
         }
 
         /// <summary>A one-layer controller: Rest (empty, WriteDefaults restores the shapes) ⇄ Build (every

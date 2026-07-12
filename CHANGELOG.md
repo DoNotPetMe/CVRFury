@@ -4,6 +4,19 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.3] - 2026-07-11
+
+### Fixed
+- **Uploads can no longer be aborted by unguarded third-party hooks (the "Index was outside the bounds of
+  the array" PreBuildEvent failure).** Root cause, verified in source: Poiyomi/Thry's `AbiAutoLock`
+  subscribes to the CCK's pre-build event with NO try/catch and runs the full shader-lock parser over every
+  material and animation clip on the avatar — content-dependent, which is why the failure appeared whenever
+  clip-generating features (gesture blendshapes, touch reactions) were added, and vanished when they were
+  removed. One uncaught throw from any listener kills the whole upload. CVRFury now SANDBOXES every foreign
+  listener on those events: the hook runs normally, but if it throws, the exception is logged (naming the
+  hook) and the upload continues. Thry's own AutoAnchor and CVRFury were already self-guarded; nothing
+  changes for well-behaved hooks.
+
 ## [0.16.2] - 2026-07-11
 
 ### Added

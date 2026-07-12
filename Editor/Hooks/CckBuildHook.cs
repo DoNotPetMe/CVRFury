@@ -70,6 +70,13 @@ namespace CVRFury.Builder
             if (hookedAvatar || hookedProp)
                 _subscribed = true;
 
+            // Crash-proof the events: rewrap unguarded third-party listeners (e.g. Poiyomi/Thry AutoLock)
+            // in try/catch so their exceptions can't abort the whole upload. Runs after everyone's
+            // [InitializeOnLoad] subscriptions (we're on the first editor tick).
+            foreach (var e in events)
+                if (e.EventInstance != null && (e.IsAvatar || e.IsProp))
+                    HookSandbox.SandboxForeignListeners(e.EventInstance, e.IsAvatar ? "avatar" : "prop");
+
             // Warn if AVATAR uploads specifically won't get CVRFury — even when a prop event hooked (which
             // would otherwise flip _subscribed and hide the problem). Missing the avatar hook silently ships
             // avatars with none of CVRFury's toggles / locomotion / sync-bit fixes.
