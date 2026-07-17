@@ -4,6 +4,17 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.5] - 2026-07-12
+
+### Fixed
+- **Touch reactions no longer trip the CCK's content validation.** The trigger references its AAS setting by
+  NAME, but the non-destructive model created that setting only at bake-time — so in-scene the reference was
+  dangling (the red ❗ in the trigger inspector), and the CCK's upload validator can reject the asset for it
+  ("Build asset failed content validation"). Creating a reaction now pre-registers the AAS entry immediately
+  and persists it, so the reference is valid from the moment it exists. AAS entry creation is now
+  replace-by-machine-name (no duplicate entries when the bake recreates it — duplicates are another validator
+  trip-wire), and re-adding a reaction for the same zone reuses its toggle instead of stacking a second one.
+
 ## [0.16.4] - 2026-07-12
 
 ### Changed

@@ -418,6 +418,12 @@ namespace CVRFury.Builder
             var entry = Reflect.New(entryType);
             if (entry == null) return false;
 
+            // Replace-by-machine-name: re-running a generator, or pre-registering an entry the bake will
+            // recreate, must never yield duplicate machine names — the CCK's upload validator rejects those.
+            for (int i = list.Count - 1; i >= 0; i--)
+                if ((Reflect.GetField(list[i], CckNames.Entry_MachineName) as string) == machineName)
+                    list.RemoveAt(i);
+
             Reflect.SetField(entry, CckNames.Entry_Name, displayName);
             Reflect.SetField(entry, CckNames.Entry_MachineName, machineName);
             Reflect.SetEnumFieldByName(entry, CckNames.Entry_Type, settingsTypeEnumMember);

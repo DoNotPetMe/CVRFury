@@ -68,7 +68,11 @@ namespace CVRFury.Builder.Convert
             }
 
             var param = "Touch" + new string(zoneLabel.Where(char.IsLetterOrDigit).ToArray());
-            var toggle = Undo.AddComponent<CVRFuryToggle>(avatar);
+            // Idempotent: re-running for the same zone reuses (and reconfigures) the existing toggle
+            // instead of stacking a second component with a colliding parameter name.
+            var toggle = avatar.GetComponents<CVRFuryToggle>().FirstOrDefault(t => t.parameterName == param);
+            if (toggle == null) toggle = Undo.AddComponent<CVRFuryToggle>(avatar);
+            toggle.state.actions.Clear();
             toggle.menuPath = $"Reactions/{zoneLabel} touch";
             toggle.parameterName = param;
             toggle.momentary = true;
@@ -124,6 +128,17 @@ namespace CVRFury.Builder.Convert
             }
 
             EditorUtility.SetDirty(avatar);
+
+            // Pre-register the AAS setting NOW. The CCK trigger references this setting by NAME: with the
+            // entry absent until bake-time, the trigger inspector flags it red and the CCK's upload
+            // validator can reject the whole asset ("failed content validation"). The bake replaces this
+            // entry by machine name, so pre-registering is safe and idempotent.
+            var cck = CckAvatar.EnsureOn(avatar);
+            if (cck != null)
+            {
+                cck.AddToggle($"{zoneLabel} touch", param, false, false);
+                cck.Persist();
+            }
 
             // Custom zone: the previewed box BECOMES the trigger (same object, same size), and the authoring
             // component is consumed. Preset zone: a small default box on the bone.
