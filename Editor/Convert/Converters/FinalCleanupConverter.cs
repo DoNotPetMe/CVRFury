@@ -28,6 +28,13 @@ namespace CVRFury.Builder.Convert
                     Object.DestroyImmediate(c, true);
                     removed++;
                 }
+                else if (fn == "VF.Model.VRCFury")
+                {
+                    // A VRCFury FEATURE component still carries unconverted intent (toggles, full
+                    // controllers, armature links). Don't destroy the data — point at the converter.
+                    ctx.Log.Warning($"VRCFury feature component on '{c.gameObject.name}' left in place — run " +
+                                    "the Prefab Converter (Convert ▸ 🧰) BEFORE stripping to keep its function.");
+                }
                 else if (fn.StartsWith("VF.") && (fn.Contains("Haptic") || fn.Contains("Sps") || fn.Contains("SPS")))
                 {
                     // VRCFury SPS/haptic components are VRChat-editor-only and do nothing in CVR (their

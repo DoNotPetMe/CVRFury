@@ -4,6 +4,29 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.0] - 2026-07-12 — The Prefab Converter
+
+### Added
+- **🧰 Prefab Converter (VRCFury → CVRFury).** Import a VRCFury-based .unitypackage (toys, clothing, avatar
+  additions), put the prefab on your avatar as its instructions say, and convert: every VRCFury feature is
+  read BY REFLECTION (no compile dependency; field names verified against VRCFury's published source,
+  including the modern one-feature-per-component `content` storage, the legacy `config.features` list, and
+  GuidWrapper asset references with guid:fileID fallback) and recreated as CVRFury components:
+  - **Toggles** → CVRFury Toggle (object on/off with TurnOn/TurnOff/Toggle semantics, blendshapes incl.
+    all-renderers expansion, material swaps with slot + resolved material, scale, shader float/color
+    properties, hold-to-press → momentary, transitions → transition seconds, submenu paths, global params);
+    slider-style toggles → CVRFury Slider.
+  - **Full Controllers** (the standard prefab wiring) → CVRFury Full Controller: animator controllers merged
+    at bake, every VRC expression parameter exposed as a CVR menu control with a best-fit type
+    (Bool→Toggle, Float→Slider, Int→Dropdown), and `toggleParam` props get a real menu toggle.
+  - **Armature Links** → CVRFury Armature Link (Reparent), resolving humanoid-bone / object / path link
+    targets, bone suffix and offsets settings carried.
+  - Delete-during-upload markers → CVRFury Object State (delete). SPS/haptic components are pointed at the
+    SPS step. VRChat-only features (security pins, MMD, HeadChop, parameter compression…) and build-hygiene
+    features are each listed with a reason — nothing is dropped silently.
+  - **Scan** gives the full read-only plan first; converting can remove the VRCFury components afterwards
+    (default on). Step 5 Strip now warns instead of losing data when unconverted VRCFury features remain.
+
 ## [0.16.7] - 2026-07-12
 
 ### Added

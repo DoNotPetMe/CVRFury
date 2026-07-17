@@ -57,6 +57,11 @@ namespace CVRFury.Builder.Convert
         private Renderer _revealTarget;
         private string _revealStatus = "";
 
+        // Prefab Converter (VRCFury → CVRFury)
+        private bool _sPrefabConv;
+        private bool _prefabRemoveAfter = true;
+        private string _prefabStatus = "";
+
         // Clothing setup (manual drag-in)
         private bool _sClothing;
         private SkinnedMeshRenderer _clothingBody;
@@ -230,6 +235,7 @@ namespace CVRFury.Builder.Convert
                     Step3PhysBones();
                     Step4Magica();
                     Step5Strip();
+                    StepPrefabConv();
                 }
 
             _catAnim = Category("Emotes, Dances & Poses", _catAnim);
@@ -830,6 +836,46 @@ namespace CVRFury.Builder.Convert
             EditorUtility.SetDirty(_avatar);
             return $"Created a \"{label}\" dropdown with {modes.modes.Count} preset(s) over {union.Count} object(s). " +
                    "Picking a preset turns its items on and everything else in the list off. Bakes at upload.";
+        }
+
+        private void StepPrefabConv()
+        {
+            _sPrefabConv = Foldout(_sPrefabConv, "🧰 Prefab Converter (VRCFury prefabs → CVRFury)");
+            if (!_sPrefabConv) return;
+            using (new EditorGUI.IndentLevelScope())
+            {
+                ThemedBox("For toys, clothing and avatar additions built on VRCFury: import the .unitypackage, " +
+                    "put the prefab on your avatar as its instructions say, then convert here. Every VRCFury " +
+                    "feature is read and recreated as CVRFury components — toggles (objects, blendshapes, " +
+                    "material swaps, scale, shader properties), Full Controllers (animators + menu parameters), " +
+                    "and Armature Links (how it attaches to your skeleton). What can't convert is listed with " +
+                    "the reason, never dropped silently. VRCFury itself must be imported so the data is readable.",
+                    MessageType.None);
+
+                _prefabRemoveAfter = EditorGUILayout.ToggleLeft(new GUIContent(
+                    "Remove the VRCFury components after converting",
+                    "Recommended — they'd trigger VRChat's build hooks in Play mode and get stripped at upload anyway."),
+                    _prefabRemoveAfter);
+
+                using (new EditorGUI.DisabledScope(_avatar == null))
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button("Scan (read-only)"))
+                    {
+                        try { _prefabStatus = PrefabConverter.Scan(_avatar); _log = _prefabStatus; }
+                        catch (System.Exception ex) { _prefabStatus = "Error: " + ex.Message; Debug.LogException(ex); }
+                        Repaint();
+                    }
+                    if (GUILayout.Button("Convert VRCFury → CVRFury"))
+                    {
+                        try { _prefabStatus = PrefabConverter.Convert(_avatar, _prefabRemoveAfter); _log = _prefabStatus; }
+                        catch (System.Exception ex) { _prefabStatus = "Error: " + ex.Message; Debug.LogException(ex); }
+                        Repaint();
+                    }
+                }
+                if (!string.IsNullOrEmpty(_prefabStatus))
+                    ThemedBox(_prefabStatus, _prefabStatus.StartsWith("Error") ? MessageType.Error : MessageType.Info);
+            }
         }
 
         private void StepClothing()
