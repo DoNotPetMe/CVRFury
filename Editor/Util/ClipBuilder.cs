@@ -66,12 +66,18 @@ namespace CVRFury.Builder
                     break;
 
                 case FuryAction.ActionType.MaterialSwap:
+                {
                     if (a.materialRenderer == null) return;
                     var mats = a.materialRenderer.sharedMaterials;
-                    if (a.materialSlot >= 0 && a.materialSlot < mats.Length)
-                        SetObjectRef(clip, Path(root, a.materialRenderer.transform), a.materialRenderer.GetType(),
-                            $"m_Materials.Array.data[{a.materialSlot}]", mats[a.materialSlot]);
+                    if (a.materialSlot < 0 || a.materialSlot >= mats.Length) return;
+                    var current = mats[a.materialSlot];
+                    // A null or scene-instance material can't ship inside a bundled clip — the CCK's content
+                    // validation rejects the whole build over it. Skip the restore curve rather than block.
+                    if (current == null || !UnityEditor.EditorUtility.IsPersistent(current)) return;
+                    SetObjectRef(clip, Path(root, a.materialRenderer.transform), a.materialRenderer.GetType(),
+                        $"m_Materials.Array.data[{a.materialSlot}]", current);
                     break;
+                }
 
                 case FuryAction.ActionType.MaterialProperty:
                 {
@@ -167,6 +173,9 @@ namespace CVRFury.Builder
 
                 case FuryAction.ActionType.MaterialSwap:
                     if (a.materialRenderer == null || a.material == null) return;
+                    // Scene-instance materials can't ship in a bundle — SwapMaterialGuard reports these
+                    // loudly at bake; skipping here keeps the clip (and the upload) valid.
+                    if (!UnityEditor.EditorUtility.IsPersistent(a.material)) return;
                     SetObjectRef(clip, Path(root, a.materialRenderer.transform), a.materialRenderer.GetType(),
                         $"m_Materials.Array.data[{a.materialSlot}]", a.material);
                     break;

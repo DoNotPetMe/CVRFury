@@ -4,6 +4,19 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.6] - 2026-07-12
+
+### Fixed
+- **Material swaps no longer fail the CCK's content validation.** Root cause (matched against CVR's own
+  validation docs): a swap-target material was never ON a renderer, so its import settings were never
+  checked — but the swap clip pulls it into the build, where two ERROR-level validators reject the upload:
+  "Requires Streaming Mipmaps" (every used texture must have them) and "Missing or Broken Shaders". The bake
+  now runs a SwapMaterialGuard over every MaterialSwap target (toggles, slider states, modes): it
+  auto-enables streaming mipmaps on their textures (mirroring the CCK's own autofix) and reports broken/
+  missing shaders by material name. Pre-flight gains a "Swap materials" line so the problem is visible
+  before an upload is spent. Clip generation also skips null and scene-instance materials (they can't ship
+  in a bundle) instead of writing keyframes that poison the build.
+
 ## [0.16.5] - 2026-07-12
 
 ### Fixed

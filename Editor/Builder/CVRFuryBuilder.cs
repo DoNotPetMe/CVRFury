@@ -35,6 +35,11 @@ namespace CVRFury.Builder
 
             ctx.Log.Info($"Baking {features.Count} feature(s) on '{avatarRoot.name}'.");
 
+            // Material-swap targets enter the build through our clips without ever passing the CCK's
+            // renderer-based checks — fix/flag them or two ERROR validators reject the whole upload.
+            try { SwapMaterialGuard.Run(avatarRoot, ctx.Log); }
+            catch (System.Exception e) { ctx.Log.Warning("Swap-material guard skipped: " + e.Message); }
+
             // Strip inert/broken VRChat-and-friends components before anything else, so the upload
             // is clean and later steps see a tidy hierarchy.
             if (CVRFurySettings.CleanMissingScriptsOnBuild)

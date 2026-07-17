@@ -42,6 +42,36 @@ namespace CVRFury.Builder.Convert
             else
                 r.Add(Ok("Locomotion", "CVR locomotion present"));
 
+            // Material-swap targets: pulled into the build by swap clips without ever passing the CCK's
+            // renderer-based checks — textures without streaming mipmaps or broken shaders on them fail the
+            // CCK's ERROR-level validation and block the build. (The bake auto-enables mipmaps at upload;
+            // broken shaders can't be auto-fixed.)
+            var swapMats = SwapMaterialGuard.CollectSwapMaterials(avatar);
+            if (swapMats.Count > 0)
+            {
+                int badTex = 0;
+                var broken = new List<string>();
+                foreach (var m in swapMats)
+                {
+                    if (m.shader == null || m.shader.name == "Hidden/InternalErrorShader" ||
+                        ShaderUtil.GetShaderMessages(m.shader).Any(msg =>
+                            msg.severity == UnityEditor.Rendering.ShaderCompilerMessageSeverity.Error))
+                        broken.Add(m.name);
+                    foreach (var prop in m.GetTexturePropertyNames())
+                        if (m.GetTexture(prop) is Texture2D tex &&
+                            AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(tex)) is TextureImporter imp &&
+                            (!imp.streamingMipmaps || !imp.mipmapEnabled))
+                            badTex++;
+                }
+                if (broken.Count > 0)
+                    r.Add(Bad("Swap materials", $"broken/missing shader on: {string.Join(", ", broken.Take(3))} — " +
+                              "the CCK validator will reject the build; fix or re-lock these materials"));
+                else if (badTex > 0)
+                    r.Add(Ok("Swap materials", $"{badTex} texture(s) lack streaming mipmaps — auto-fixed at upload"));
+                else
+                    r.Add(Ok("Swap materials", $"{swapMats.Count} swap material(s), all pass CCK validation"));
+            }
+
             // Missing scripts.
             int missing = 0;
             foreach (var t in avatar.GetComponentsInChildren<Transform>(true))
