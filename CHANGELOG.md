@@ -4,6 +4,18 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.7] - 2026-07-12
+
+### Added
+- **Dead-swap lint.** The two silent ways a material swap "does nothing" in-game are now caught at
+  pre-flight and in the bake log, with plain-English remedies:
+  - a slot index that doesn't exist on the target renderer (slot = the 0-based position in THAT renderer's
+    Materials list, not a unique ID across swaps — a one-material hair mesh is slot 0), which animates
+    nothing at all;
+  - several independent toggles/sliders animating the SAME renderer+slot — each control is its own animator
+    layer writing constantly, the topmost always wins, and the rest appear dead. The lint names the fighting
+    controls and points at the fix: exclusive variants belong in ONE Modes dropdown.
+
 ## [0.16.6] - 2026-07-12
 
 ### Fixed

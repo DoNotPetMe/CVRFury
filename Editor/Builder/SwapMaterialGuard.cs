@@ -22,6 +22,9 @@ namespace CVRFury.Builder
     {
         public static void Run(GameObject root, BuildLog log)
         {
+            foreach (var problem in FindSlotProblems(root))
+                log.Warning("Material swap: " + problem);
+
             var mats = CollectSwapMaterials(root);
             if (mats.Count == 0) return;
 
@@ -65,6 +68,57 @@ namespace CVRFury.Builder
             if (notAssets.Count > 0)
                 log.Error("Material-swap target(s) that are not saved assets (scene instances can't ship in a " +
                           "bundle): " + string.Join("; ", notAssets) + ". Save them as .mat assets and re-pick them.");
+        }
+
+        /// <summary>The two silent ways a material swap "does nothing" in-game:
+        ///  • the slot index doesn't exist on that renderer (slot = 0-based index into ITS Materials list,
+        ///    not a unique ID across swaps — a one-material hair mesh is slot 0), so the animation writes
+        ///    to nothing;
+        ///  • several independent toggles/sliders animate the SAME renderer+slot — each is its own animator
+        ///    layer writing constantly, the topmost wins, and the rest appear dead. Exclusive variants
+        ///    belong in ONE Modes dropdown.</summary>
+        public static List<string> FindSlotProblems(GameObject root)
+        {
+            var problems = new List<string>();
+            var writers = new Dictionary<(Renderer r, int slot), List<string>>();
+
+            void Inspect(FuryState s, string who)
+            {
+                if (s?.actions == null) return;
+                foreach (var a in s.actions)
+                {
+                    if (a.type != FuryAction.ActionType.MaterialSwap || a.materialRenderer == null) continue;
+                    int slots = a.materialRenderer.sharedMaterials.Length;
+                    if (a.materialSlot < 0 || a.materialSlot >= slots)
+                    {
+                        problems.Add($"{who}: slot {a.materialSlot} doesn't exist on '{a.materialRenderer.name}' " +
+                                     $"(it has {slots} slot(s), numbered 0–{slots - 1}) — this swap animates NOTHING. " +
+                                     "Slot = the position in THAT renderer's Materials list, not a unique ID.");
+                        continue;
+                    }
+                    var key = (a.materialRenderer, a.materialSlot);
+                    if (!writers.TryGetValue(key, out var l)) writers[key] = l = new List<string>();
+                    if (!l.Contains(who)) l.Add(who);
+                }
+            }
+
+            foreach (var t in root.GetComponentsInChildren<CVRFuryToggle>(true))
+                Inspect(t.state, $"Toggle '{(string.IsNullOrEmpty(t.menuPath) ? t.gameObject.name : t.menuPath)}'");
+            foreach (var s in root.GetComponentsInChildren<CVRFurySlider>(true))
+            {
+                Inspect(s.minState, $"Slider '{s.menuPath}'");
+                Inspect(s.maxState, $"Slider '{s.menuPath}'");
+            }
+            foreach (var m in root.GetComponentsInChildren<CVRFuryModes>(true))
+                foreach (var mode in m.modes)
+                    Inspect(mode.state, $"Dropdown '{m.menuPath}'");
+
+            foreach (var kv in writers.Where(kv => kv.Value.Count > 1))
+                problems.Add($"'{kv.Key.r.name}' slot {kv.Key.slot} is animated by {kv.Value.Count} separate " +
+                             $"controls ({string.Join(" + ", kv.Value)}) — each is its own animator layer, the " +
+                             "topmost always wins, and the others appear DEAD. Put exclusive variants in ONE " +
+                             "Modes dropdown instead.");
+            return problems;
         }
 
         /// <summary>Every distinct material referenced by a MaterialSwap action anywhere on the avatar

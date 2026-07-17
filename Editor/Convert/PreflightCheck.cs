@@ -46,6 +46,12 @@ namespace CVRFury.Builder.Convert
             // renderer-based checks — textures without streaming mipmaps or broken shaders on them fail the
             // CCK's ERROR-level validation and block the build. (The bake auto-enables mipmaps at upload;
             // broken shaders can't be auto-fixed.)
+            // Dead-swap lint: nonexistent slot indices and multiple controls fighting over one slot are the
+            // two silent ways a material swap "does nothing" in-game.
+            var slotProblems = SwapMaterialGuard.FindSlotProblems(avatar);
+            foreach (var problem in slotProblems.Take(4))
+                r.Add(Bad("Material swap", problem));
+
             var swapMats = SwapMaterialGuard.CollectSwapMaterials(avatar);
             if (swapMats.Count > 0)
             {
