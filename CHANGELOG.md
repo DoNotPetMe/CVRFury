@@ -4,6 +4,17 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.2] - 2026-07-13
+
+### Fixed
+- **Menu Wizard now builds and attaches the animator — the red ❗ actually clears.** The red mark on AAS
+  entries means "this parameter doesn't exist in the attached animator yet"; on main that was always cleared
+  by Step 2's controller build, which the wizard flow skipped — so every wizard/linker entry stayed red and
+  nothing would have animated. Apply now finishes with the exact Step 2 machinery (`BuildAndAttach`): a
+  locomotion-carrying controller (stock CVR base), a parameter for every entry, humanoid-masked toggle
+  layers from the on/off clips, and 1D blend-tree layers for sliders — attached and stamped into the AAS.
+  Since it walks the entire settings list, it also repairs entries created earlier by Link Parameters.
+
 ## [0.18.1] - 2026-07-13
 
 ### Fixed

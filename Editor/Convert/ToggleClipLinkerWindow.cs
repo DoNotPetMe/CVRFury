@@ -81,7 +81,7 @@ namespace CVRFury.Builder.Convert
             return sb.ToString();
         }
 
-        private static string BuildAndAttach(CckAvatar cvr, GameObject avatar, System.Collections.IList entries,
+        public static string BuildAndAttach(CckAvatar cvr, GameObject avatar, System.Collections.IList entries,
                                              AnimatorController provided)
         {
             // CVR's movement (walk / run / jump / crouch / fly / swim) lives in the stock CCK

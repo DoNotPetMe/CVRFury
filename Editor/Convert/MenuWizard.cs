@@ -276,8 +276,15 @@ namespace CVRFury.Builder.Convert
             }
 
             cvr.Persist();
+
+            // The other half Step 2 always did: build the animator parameters + masked layers for every
+            // entry into a locomotion-carrying controller and attach it. Without this the entries stay
+            // red (❗ = "parameter doesn't exist in the animator") and nothing animates in-game.
+            var buildReport = ToggleClipLinker.BuildAndAttach(cvr, avatar, cvr.SettingsList, null);
+
             return $"Applied from the FX graph: {native} native object toggle(s), {toggles} clip toggle(s), " +
-                   $"{sliders} slider(s), {skipped} without clips.\n" + string.Join("\n", log);
+                   $"{sliders} slider(s), {skipped} without clips.\n" + string.Join("\n", log) +
+                   "\n\nController: " + buildReport;
         }
 
         // ---------------------------------------------------------------- plumbing ------------------
