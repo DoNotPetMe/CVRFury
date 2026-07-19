@@ -4,6 +4,23 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.0] - 2026-07-12 — Rework: find-anything search + the Menu Wizard
+
+### Added
+- **🔍 Find-anything search.** A search box at the top of the window: type a word ("slider", "hue",
+  "clothing", "wizard"…) and only matching sections render — pulled from EVERY category, forced open. No
+  more digging through tabs to find the one thing you want. Quick-nav chips (Convert / Features / Emotes /
+  Collapse all) when the search is empty.
+- **🪄 Menu Wizard — the replacement for clip-name scanning.** The old Step 2 guesses which animation belongs
+  to which toggle from FILE NAMES in a folder — heuristic, tedious, sometimes flat wrong. The wizard reads
+  the FX ANIMATOR GRAPH instead: VRChat stores exactly which parameter plays exactly which clip (toggle
+  states behind If/IfNot/Equals/Greater transitions, radial 1D blend trees, VRCFury direct-blend-tree
+  children), so extraction is deterministic — including the Bool- and Int-conditioned toggles the old finder
+  missed entirely. Every preview row shows its PROVENANCE (which layer, which states, which tree), clips are
+  editable before applying, and toggles whose clip only flips GameObject actives become **CVR-native object
+  toggles with no clips at all** — nothing to regenerate, nothing to mismatch. Parameters keep VRChat's
+  synced/local and default values. The folder scanner stays as a fallback for avatars with no FX controller.
+
 ## [0.17.0] - 2026-07-12 — The Prefab Converter
 
 ### Added

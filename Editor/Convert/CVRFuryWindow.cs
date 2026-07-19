@@ -57,6 +57,13 @@ namespace CVRFury.Builder.Convert
         private Renderer _revealTarget;
         private string _revealStatus = "";
 
+        // Rework: find-anything search + Menu Wizard
+        private string _search = "";
+        private bool _sWizard = true;
+        private List<MenuWizard.Row> _wizardRows;
+        private Vector2 _wizardScroll;
+        private string _wizardStatus = "";
+
         // Prefab Converter (VRCFury → CVRFury)
         private bool _sPrefabConv;
         private bool _prefabRemoveAfter = true;
@@ -189,6 +196,30 @@ namespace CVRFury.Builder.Convert
                 return;
             }
 
+            // Find-anything search: type a word ("slider", "hue", "clothing", "wizard"…) and only matching
+            // sections show, from EVERY category, forced open. The cure for "too many tabs".
+            EditorGUILayout.Space(2);
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                GUILayout.Label("🔍", GUILayout.Width(18));
+                _search = EditorGUILayout.TextField(_search ?? "");
+                if (GUILayout.Button("✕", GUILayout.Width(22))) { _search = ""; GUI.FocusControl(null); }
+            }
+            if (string.IsNullOrEmpty(_search))
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (GUILayout.Button("🪄 Convert", EditorStyles.miniButtonLeft))
+                    { _catConvert = true; _catAnim = _catFeatures = false; }
+                    if (GUILayout.Button("🎛 Features", EditorStyles.miniButtonMid))
+                    { _catFeatures = true; _catConvert = _catAnim = false; }
+                    if (GUILayout.Button("💃 Emotes", EditorStyles.miniButtonMid))
+                    { _catAnim = true; _catConvert = _catFeatures = false; }
+                    if (GUILayout.Button("⬍ Collapse all", EditorStyles.miniButtonRight))
+                    { _catConvert = _catAnim = _catFeatures = false; }
+                }
+            else
+                ThemedBox($"Showing every section matching “{_search}” (all categories searched).", MessageType.None);
+
             EditorGUILayout.Space(2);
             StepPreflight();
 
@@ -227,6 +258,8 @@ namespace CVRFury.Builder.Convert
                                 "untouched (disabled) next to it. The VRChat Avatars SDK must be imported so " +
                                 "the source data can be read.", "Convert", "Cancel"))
                                 RunAndRefresh(RunConvertAndVerify);
+                    EditorGUILayout.Space(4);
+                    StepMenuWizard();
                     EditorGUILayout.Space(4);
                     EditorGUILayout.LabelField("… or run the steps manually:", EditorStyles.miniBoldLabel);
                     Step0Basics();
@@ -381,6 +414,8 @@ namespace CVRFury.Builder.Convert
         /// <summary>A coloured, clickable category header. Returns the (possibly toggled) open state.</summary>
         private bool Category(string title, bool open)
         {
+            // Search mode: categories stop gating — matching sections from anywhere show directly.
+            if (!string.IsNullOrEmpty(_search)) return true;
             EditorGUILayout.Space(5);
             var rect = EditorGUILayout.GetControlRect(false, 24);
             EditorGUI.DrawRect(rect, BrandHeader);
@@ -836,6 +871,65 @@ namespace CVRFury.Builder.Convert
             EditorUtility.SetDirty(_avatar);
             return $"Created a \"{label}\" dropdown with {modes.modes.Count} preset(s) over {union.Count} object(s). " +
                    "Picking a preset turns its items on and everything else in the list off. Bakes at upload.";
+        }
+
+        private void StepMenuWizard()
+        {
+            _sWizard = Foldout(_sWizard, "🪄 Menu Wizard — convert the VRChat menu from the FX graph");
+            if (!_sWizard) return;
+            using (new EditorGUI.IndentLevelScope())
+            {
+                ThemedBox("No clip folders, no name guessing: the FX animator graph stores exactly which " +
+                    "parameter plays which clip, and the wizard reads it directly. Every row shows WHERE its " +
+                    "clips came from (layer / states / blend tree) so a wrong pick is visible BEFORE you apply. " +
+                    "Toggles that only switch objects on/off become CVR-NATIVE toggles — no clips at all. " +
+                    "Run this on the avatar BEFORE stripping VRChat components.", MessageType.None);
+
+                using (new EditorGUI.DisabledScope(_avatar == null))
+                    if (GUILayout.Button("🪄 Preview from FX graph", GUILayout.Height(26)))
+                    {
+                        try { _wizardRows = MenuWizard.Preview(_avatar, out _wizardStatus); }
+                        catch (System.Exception ex) { _wizardStatus = "Error: " + ex.Message; Debug.LogException(ex); }
+                        Repaint();
+                    }
+
+                if (_wizardRows != null && _wizardRows.Count > 0)
+                {
+                    _wizardScroll = EditorGUILayout.BeginScrollView(_wizardScroll, GUILayout.MinHeight(150), GUILayout.MaxHeight(320));
+                    foreach (var row in _wizardRows)
+                    {
+                        using (new EditorGUILayout.HorizontalScope())
+                        {
+                            row.include = EditorGUILayout.Toggle(row.include, GUILayout.Width(18));
+                            var tag = row.NativeOnly ? "  [native — no clips needed]" : row.isSlider ? "  [slider]" : "";
+                            EditorGUILayout.LabelField($"{row.display}  ({row.param}){tag}", EditorStyles.boldLabel);
+                        }
+                        using (new EditorGUI.IndentLevelScope())
+                        {
+                            EditorGUILayout.LabelField(row.provenance, EditorStyles.miniLabel);
+                            if (!row.NativeOnly)
+                            {
+                                row.on = (AnimationClip)EditorGUILayout.ObjectField(row.isSlider ? "Max (1)" : "ON",
+                                    row.on, typeof(AnimationClip), false);
+                                row.off = (AnimationClip)EditorGUILayout.ObjectField(row.isSlider ? "Min (0)" : "OFF",
+                                    row.off, typeof(AnimationClip), false);
+                            }
+                        }
+                    }
+                    EditorGUILayout.EndScrollView();
+
+                    using (new EditorGUI.DisabledScope(_avatar == null || !_wizardRows.Any(r => r.include)))
+                        if (GUILayout.Button($"Apply {_wizardRows.Count(r => r.include)} menu entr(ies)"))
+                        {
+                            try { _wizardStatus = MenuWizard.Apply(_avatar, _wizardRows); _log = _wizardStatus; _wizardRows = null; }
+                            catch (System.Exception ex) { _wizardStatus = "Error: " + ex.Message; Debug.LogException(ex); }
+                            Repaint();
+                        }
+                }
+
+                if (!string.IsNullOrEmpty(_wizardStatus))
+                    ThemedBox(_wizardStatus, _wizardStatus.StartsWith("Error") ? MessageType.Error : MessageType.Info);
+            }
         }
 
         private void StepPrefabConv()
@@ -1977,6 +2071,12 @@ namespace CVRFury.Builder.Convert
         /// category headers (just quieter), instead of Unity's clashing grey foldout box.</summary>
         private bool Foldout(bool state, string label)
         {
+            // Search mode: only matching sections render, and they render OPEN.
+            if (!string.IsNullOrEmpty(_search))
+            {
+                if (label.IndexOf(_search, System.StringComparison.OrdinalIgnoreCase) < 0) return false;
+                state = true;
+            }
             EditorGUILayout.Space(2);
             var rect = EditorGUILayout.GetControlRect(false, 20);
             EditorGUI.DrawRect(rect, new Color(0.185f, 0.165f, 0.215f));
