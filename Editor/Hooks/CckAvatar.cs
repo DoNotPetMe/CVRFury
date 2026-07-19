@@ -401,10 +401,27 @@ namespace CVRFury.Builder
         public void SetUseVisemes(bool b) => Reflect.SetField(Component, CckNames.Avatar_UseVisemeLipsync, b);
         public void SetUseEyeMovement(bool b) => Reflect.SetField(Component, CckNames.Avatar_UseEyeMovement, b);
 
+        /// <summary>CCK machine names only tolerate letters, digits and underscores (plus the leading '#'
+        /// local marker). VRCFury-style parameter names ("Nsfw/Toy/(s-f)Scale") carry slashes/parens and the
+        /// CCK flags every such entry invalid (red ❗) — sanitize at this single choke point so every writer
+        /// (wizard, components, converters) produces names the CCK accepts.</summary>
+        public static string SanitizeMachineName(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return name;
+            var local = name[0] == '#';
+            var body = local ? name.Substring(1) : name;
+            var chars = body.ToCharArray();
+            for (var i = 0; i < chars.Length; i++)
+                if (!char.IsLetterOrDigit(chars[i]) && chars[i] != '_')
+                    chars[i] = '_';
+            return (local ? "#" : "") + new string(chars);
+        }
+
         private bool AddEntry(string displayName, string machineName,
                               string settingsTypeEnumMember, string settingFieldName, string settingClassName,
                               Action<object> configureSetting)
         {
+            machineName = SanitizeMachineName(machineName);
             EnsureAdvancedSettingsContainer();
 
             var list = SettingsList;
@@ -420,8 +437,10 @@ namespace CVRFury.Builder
 
             // Replace-by-machine-name: re-running a generator, or pre-registering an entry the bake will
             // recreate, must never yield duplicate machine names — the CCK's upload validator rejects those.
+            // Compared SANITIZED-to-sanitized so re-running also replaces older entries created before
+            // sanitization existed (the red-❗ ones with slashes/parens).
             for (int i = list.Count - 1; i >= 0; i--)
-                if ((Reflect.GetField(list[i], CckNames.Entry_MachineName) as string) == machineName)
+                if (SanitizeMachineName(Reflect.GetField(list[i], CckNames.Entry_MachineName) as string) == machineName)
                     list.RemoveAt(i);
 
             Reflect.SetField(entry, CckNames.Entry_Name, displayName);

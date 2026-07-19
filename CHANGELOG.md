@@ -4,6 +4,17 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.1] - 2026-07-13
+
+### Fixed
+- **Red-❗ menu entries from VRCFury-style parameter names.** VRCFury names parameters with menu paths and
+  sync markers ("Nsfw/Toy/(s-f)Scale") — slashes and parentheses the CCK rejects as invalid machine names,
+  flagging every such entry red. All AAS entry creation now sanitizes machine names at the single choke
+  point (letters/digits/underscore, leading '#' preserved), the Full Controller bake renames merged animator
+  parameters through the SAME sanitizer so menu entries and animator layers stay wired to each other, and
+  the replace-by-name dedupe compares sanitized names — so re-running the wizard/converter automatically
+  replaces the old red entries instead of stacking beside them.
+
 ## [0.18.0] - 2026-07-12 — Rework: find-anything search + the Menu Wizard
 
 ### Added

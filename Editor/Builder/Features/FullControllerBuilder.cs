@@ -19,7 +19,11 @@ namespace CVRFury.Builder
                     ctx.Log.Warning("Full Controller entry is empty or not an AnimatorController; skipped.");
                     continue;
                 }
-                ControllerMerger.Merge(dst, src, ctx.Assets, f.parameterPrefix, ctx.Log);
+                // Rename merged params through the SAME sanitizer the AAS entries use — VRCFury-style names
+                // ("Nsfw/(s-b)Toy") are invalid CCK machine names, and the menu entry and the animator param
+                // must stay identical for the toggle to drive the layer.
+                ControllerMerger.Merge(dst, src, ctx.Assets, f.parameterPrefix, ctx.Log,
+                                       renameParameter: CckAvatar.SanitizeMachineName);
             }
 
             // Expose requested parameters in the in-game menu.
@@ -27,7 +31,8 @@ namespace CVRFury.Builder
             {
                 if (!po.exposeToMenu || string.IsNullOrEmpty(po.name)) continue;
 
-                var machine = string.IsNullOrEmpty(f.parameterPrefix) ? po.name : f.parameterPrefix + po.name;
+                var machine = CckAvatar.SanitizeMachineName(
+                    string.IsNullOrEmpty(f.parameterPrefix) ? po.name : f.parameterPrefix + po.name);
                 if (f.createMissingParameters && !dst.parameters.Any(p => p.name == machine))
                     AnimatorUtil.EnsureFloatParam(dst, machine);
 
