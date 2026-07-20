@@ -82,7 +82,8 @@ namespace CVRFury.Builder.Convert
         }
 
         public static string BuildAndAttach(CckAvatar cvr, GameObject avatar, System.Collections.IList entries,
-                                             AnimatorController provided)
+                                             AnimatorController provided,
+                                             System.Collections.Generic.Dictionary<string, System.Collections.Generic.IList<AnimationClip>> dropdownClips = null)
         {
             // CVR's movement (walk / run / jump / crouch / fly / swim) lives in the stock CCK
             // AvatarAnimator's locomotion layers. We FORCE that as the foundation: the generated AAS
@@ -174,7 +175,19 @@ namespace CVRFury.Builder.Convert
                 }
                 else if (dropdown != null)
                 {
-                    AnimatorUtil.EnsureIntParam(gen, machine, ToInt(Reflect.GetField(dropdown, CckNames.Setting_DefaultInt)));
+                    var defIdx = ToInt(Reflect.GetField(dropdown, CckNames.Setting_DefaultInt));
+                    // With per-option clips (Menu Wizard outfit dropdowns) build a real multi-state Int
+                    // layer — one state per option, Equals transitions — so selecting an option actually
+                    // plays its clip. Without clips, the parameter alone keeps the entry valid.
+                    if (dropdownClips != null && dropdownClips.TryGetValue(machine, out var optionClips) &&
+                        optionClips != null && optionClips.Count > 0)
+                    {
+                        AnimatorUtil.AddIntDropdownLayer(gen, "CVRFury: " + Leaf(machine), machine,
+                                                         optionClips, defIdx, noHumanoidMask);
+                        layersBuilt++;
+                    }
+                    else
+                        AnimatorUtil.EnsureIntParam(gen, machine, defIdx);
                     paramsAdded++;
                 }
                 existing.Add(machine);

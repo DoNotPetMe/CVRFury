@@ -901,13 +901,13 @@ namespace CVRFury.Builder.Convert
                         using (new EditorGUILayout.HorizontalScope())
                         {
                             row.include = EditorGUILayout.Toggle(row.include, GUILayout.Width(18));
-                            var tag = row.NativeOnly ? "  [native — no clips needed]" : row.isSlider ? "  [slider]" : "";
+                            var tag = row.options != null ? $"  [dropdown — {row.options.Count} options]" : row.isSlider ? "  [slider]" : "";
                             EditorGUILayout.LabelField($"{row.display}  ({row.param}){tag}", EditorStyles.boldLabel);
                         }
                         using (new EditorGUI.IndentLevelScope())
                         {
                             EditorGUILayout.LabelField(row.provenance, EditorStyles.miniLabel);
-                            if (!row.NativeOnly)
+                            if (row.options == null)
                             {
                                 row.on = (AnimationClip)EditorGUILayout.ObjectField(row.isSlider ? "Max (1)" : "ON",
                                     row.on, typeof(AnimationClip), false);

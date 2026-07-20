@@ -16,8 +16,9 @@ namespace CVRFury.Builder.Convert
     /// direct-blend-tree children weighted by the parameter. The wizard walks the menu, follows each
     /// control's parameter into that graph, and extracts the exact clips — with PROVENANCE (which layer,
     /// which states/tree) shown for every row, so a wrong pick is visible before it's applied instead of a
-    /// mystery after. Toggles whose clip only flips GameObject active states are converted to CVR-NATIVE
-    /// object toggles (no clip at all — nothing to regenerate, nothing to break).
+    /// mystery after. Both toggle states are always explicit: missing OFF clips are synthesized (object actives
+    /// inverted, everything else restored to scene values), and shared-parameter outfit systems fold into
+    /// real Int dropdowns with per-option layers.
     /// </summary>
     internal static class MenuWizard
     {
@@ -31,9 +32,18 @@ namespace CVRFury.Builder.Convert
             public AnimationClip off;    // toggle OFF / slider MIN
             public string provenance = "not found in the FX graph";
             public bool include = true;
-            public List<(GameObject go, string path)> nativeOn = new List<(GameObject, string)>();
-            public List<(GameObject go, string path)> nativeOff = new List<(GameObject, string)>();
-            public bool NativeOnly => on != null && (nativeOn.Count > 0 || nativeOff.Count > 0);
+
+            // Set when several menu controls share ONE parameter with different values (the classic
+            // one-Int outfit system): this row becomes a single DROPDOWN and `options` replaces on/off.
+            public List<Option> options;
+        }
+
+        internal sealed class Option
+        {
+            public string label;
+            public float value;          // the VRChat value this option selected (extraction only)
+            public AnimationClip clip;   // plays while this option is selected
+            public string provenance = "";
         }
 
         // ---------------------------------------------------------------- preview -------------------
@@ -55,12 +65,13 @@ namespace CVRFury.Builder.Convert
             if (menu == null) { summary = "The descriptor has no expressions menu."; return rows; }
 
             WalkMenu(menu, "", fx, avatar, rows, new HashSet<object>());
+            rows = GroupSharedParams(rows);
 
-            int found = rows.Count(r => r.on != null || r.off != null);
-            int native = rows.Count(r => r.NativeOnly);
-            summary = $"{rows.Count} menu control(s) · {found} matched in the FX graph · {native} convert to " +
-                      "CVR-native object toggles (no clips needed)" +
-                      (fx == null ? " · ⚠ NO FX controller found — only native/no-clip info available" : "") +
+            int found = rows.Count(r => r.on != null || r.off != null || r.options != null);
+            int dropdowns = rows.Count(r => r.options != null);
+            summary = $"{rows.Count} menu entr(ies) · {found} matched in the FX graph · {dropdowns} shared-" +
+                      "parameter group(s) folded into dropdowns (one-Int outfit systems)" +
+                      (fx == null ? " · ⚠ NO FX controller found" : "") +
                       "\nEvery row shows WHERE its clips came from. Fix anything that looks wrong, then Apply.";
             return rows;
         }
@@ -108,6 +119,42 @@ namespace CVRFury.Builder.Convert
             }
         }
 
+        /// <summary>Several menu controls sharing ONE parameter with different values (the classic one-Int
+        /// outfit system) must become a SINGLE dropdown — one Bool entry per control would both collapse to
+        /// one AAS entry (machine names collide) and mistype the Int as Bool, which is exactly why clothing
+        /// menus died. Each control becomes an option carrying the clip extracted for ITS value; a value-0
+        /// "Off" option is prepended when none of the controls covers 0.</summary>
+        private static List<Row> GroupSharedParams(List<Row> rows)
+        {
+            var res = new List<Row>();
+            foreach (var group in rows.GroupBy(r => (r.param, r.isSlider)))
+            {
+                var list = group.ToList();
+                if (group.Key.isSlider || list.Count == 1) { res.AddRange(list); continue; }
+
+                var options = list.OrderBy(r => r.menuValue).Select(r => new Option
+                {
+                    label = r.display.Split('/').Last(),
+                    value = r.menuValue,
+                    clip = r.on,
+                    provenance = r.provenance,
+                }).ToList();
+                if (!options.Any(o => Mathf.Approximately(o.value, 0f)))
+                    options.Insert(0, new Option { label = "Off", value = 0f, provenance = "default state (resting)" });
+
+                res.Add(new Row
+                {
+                    display = list[0].display.Contains("/")
+                        ? list[0].display.Substring(0, list[0].display.LastIndexOf('/'))
+                        : group.Key.param,
+                    param = group.Key.param,
+                    options = options,
+                    provenance = $"{list.Count} controls share parameter '{group.Key.param}' → one dropdown",
+                });
+            }
+            return res;
+        }
+
         // ------------------------------------------------- FX graph extraction ----------------------
 
         /// <summary>Toggle clips straight from the graph, most-authoritative shape first. The three shapes
@@ -124,7 +171,6 @@ namespace CVRFury.Builder.Convert
                     var (lo, hi) = MinMax(tree);
                     row.off = lo; row.on = hi;
                     row.provenance = $"1D blend tree '{tree.name}' in layer '{layer}'";
-                    DetectNative(row, avatar);
                     return;
                 }
                 if (tree.blendType == BlendTreeType.Direct)
@@ -133,13 +179,12 @@ namespace CVRFury.Builder.Convert
                         {
                             row.on = on;
                             row.provenance = $"direct blend tree '{tree.name}' in layer '{layer}' (off = resting)";
-                            DetectNative(row, avatar);
                             return;
                         }
             }
 
             foreach (var layer in fx.layers)
-                if (ExtractFromTransitions(layer.stateMachine, layer.name, row)) { DetectNative(row, avatar); return; }
+                if (ExtractFromTransitions(layer.stateMachine, layer.name, row)) return;
         }
 
         private static bool ExtractFromTransitions(AnimatorStateMachine sm, string layerName, Row row)
@@ -206,24 +251,6 @@ namespace CVRFury.Builder.Convert
             }
         }
 
-        /// <summary>A toggle whose ON clip only flips GameObject actives needs NO clips in CVR — the AAS
-        /// GameObject toggle drives the objects natively, so there is nothing to regenerate or mismatch.</summary>
-        private static void DetectNative(Row row, GameObject avatar)
-        {
-            if (row.on == null) return;
-            if (AnimationUtility.GetObjectReferenceCurveBindings(row.on).Length > 0) return;
-            foreach (var b in AnimationUtility.GetCurveBindings(row.on))
-            {
-                if (b.propertyName != "m_IsActive") { row.nativeOn.Clear(); row.nativeOff.Clear(); return; }
-                var t = avatar.transform.Find(b.path);
-                if (t == null) continue;
-                var curve = AnimationUtility.GetEditorCurve(row.on, b);
-                if (curve == null || curve.length == 0) continue;
-                if (curve.keys[0].value > 0.5f) row.nativeOn.Add((t.gameObject, b.path));
-                else row.nativeOff.Add((t.gameObject, b.path));
-            }
-        }
-
         // ---------------------------------------------------------------- apply ---------------------
 
         public static string Apply(GameObject avatar, List<Row> rows)
@@ -233,58 +260,142 @@ namespace CVRFury.Builder.Convert
             if (cvr == null) return "Couldn't create/find the CVRAvatar (is the CCK imported?).";
 
             var sync = ReadParamInfo(avatar);
-            int toggles = 0, sliders = 0, native = 0, skipped = 0;
+            var dropdownClips = new Dictionary<string, IList<AnimationClip>>();
+            int toggles = 0, sliders = 0, dropdowns = 0, bare = 0;
             var log = new List<string>();
 
             foreach (var row in rows.Where(r => r.include))
             {
                 var info = sync.TryGetValue(row.param, out var i) ? i : (synced: false, def: 0f);
-                var machine = info.synced ? row.param : "#" + row.param;
+                var machine = CckAvatar.SanitizeMachineName(info.synced ? row.param : "#" + row.param);
                 bool local = machine[0] == '#';
+                var leaf = row.display.Split('/').Last();
 
-                if (row.isSlider)
+                if (row.options != null)
                 {
-                    cvr.AddSlider(row.display.Split('/').Last(), machine, Mathf.Clamp01(info.def), local, row.off, row.on);
+                    // One-Int outfit system → ONE dropdown. Options missing a clip (usually "Off") get a
+                    // synthesized resting clip covering everything the other options animate, so selecting
+                    // them explicitly restores the default look instead of leaving the last outfit stuck.
+                    var union = row.options.Where(o => o.clip != null).Select(o => o.clip).ToList();
+                    var clips = new List<AnimationClip>();
+                    foreach (var o in row.options)
+                        clips.Add(o.clip != null ? o.clip : SynthesizeResting(avatar, union, $"{leaf} {o.label}"));
+                    int defIdx = 0;
+                    for (int k = 0; k < row.options.Count; k++)
+                        if (Mathf.Approximately(row.options[k].value, info.def)) { defIdx = k; break; }
+
+                    cvr.AddDropdown(leaf, machine, row.options.Select(o => o.label).ToArray(), defIdx, local);
+                    dropdownClips[machine] = clips;
+                    dropdowns++;
+                    log.Add($"✓ dropdown '{row.display}' — {row.options.Count} option(s): " +
+                            string.Join(", ", row.options.Select(o => o.label)) + $" [{row.provenance}]");
+                }
+                else if (row.isSlider)
+                {
+                    cvr.AddSlider(leaf, machine, Mathf.Clamp01(info.def), local, row.off, row.on);
                     sliders++;
                     log.Add($"✓ slider '{row.display}' [{row.provenance}]");
                 }
-                else if (row.NativeOnly)
-                {
-                    var targets = row.nativeOn.Select(x => (x.go, x.path)).ToList();
-                    cvr.AddGameObjectToggle(row.display.Split('/').Last(), machine, info.def > 0.5f, targets);
-                    // Objects the ON clip turns OFF can't ride the native entry — keep them via clips instead.
-                    if (row.nativeOff.Count > 0)
-                        log.Add($"✓ native toggle '{row.display}' ({targets.Count} object(s)) — note: " +
-                                $"{row.nativeOff.Count} object(s) the clip turns OFF were skipped (invert them manually)");
-                    else
-                        log.Add($"✓ native toggle '{row.display}' ({targets.Count} object(s)) [{row.provenance}]");
-                    native++;
-                }
-                else if (row.on != null || row.off != null)
-                {
-                    cvr.AddToggle(row.display.Split('/').Last(), machine, info.def > 0.5f, local, row.on, row.off);
-                    toggles++;
-                    log.Add($"✓ toggle '{row.display}' [{row.provenance}]");
-                }
                 else
                 {
-                    cvr.AddToggle(row.display.Split('/').Last(), machine, info.def > 0.5f, local);
-                    skipped++;
-                    log.Add($"→ '{row.display}': no clips found in the FX graph — entry created without " +
-                            "animation (drive it via a CVRFury component or assign clips on the CVRAvatar).");
+                    var on = row.on;
+                    var off = row.off;
+                    if (on == null && off != null) { on = off; off = null; } // odd graphs: found clip = ON
+                    // BOTH states must always exist explicitly: with WriteDefaults off, an empty Off state
+                    // writes nothing and the toggle is one-way or dead. Missing OFF is synthesized —
+                    // object actives get the INVERSE of the ON value, everything else the current scene value.
+                    if (on != null && off == null) off = SynthesizeOff(avatar, on);
+
+                    if (on != null)
+                    {
+                        cvr.AddToggle(leaf, machine, info.def > 0.5f, local, on, off);
+                        toggles++;
+                        log.Add($"✓ toggle '{row.display}' [{row.provenance}]" +
+                                (row.off == null ? " (off clip synthesized)" : ""));
+                    }
+                    else
+                    {
+                        cvr.AddToggle(leaf, machine, info.def > 0.5f, local);
+                        bare++;
+                        log.Add($"→ '{row.display}': no clips found in the FX graph — entry created without " +
+                                "animation (drive it via a CVRFury component or assign clips manually).");
+                    }
                 }
             }
 
             cvr.Persist();
 
             // The other half Step 2 always did: build the animator parameters + masked layers for every
-            // entry into a locomotion-carrying controller and attach it. Without this the entries stay
-            // red (❗ = "parameter doesn't exist in the animator") and nothing animates in-game.
-            var buildReport = ToggleClipLinker.BuildAndAttach(cvr, avatar, cvr.SettingsList, null);
+            // entry into a locomotion-carrying controller and attach it. Dropdown groups get real
+            // multi-state Int layers from the per-option clips.
+            var buildReport = ToggleClipLinker.BuildAndAttach(cvr, avatar, cvr.SettingsList, null, dropdownClips);
 
-            return $"Applied from the FX graph: {native} native object toggle(s), {toggles} clip toggle(s), " +
-                   $"{sliders} slider(s), {skipped} without clips.\n" + string.Join("\n", log) +
+            return $"Applied from the FX graph: {toggles} toggle(s), {dropdowns} dropdown(s), {sliders} " +
+                   $"slider(s), {bare} without clips.\n" + string.Join("\n", log) +
                    "\n\nController: " + buildReport;
+        }
+
+        // ------------------------------------------------- clip synthesis ---------------------------
+
+        private const string WizardDir = "Assets/CVRFury Generated/Wizard";
+
+        /// <summary>OFF clip for a toggle: object actives inverted (a clip that shows the jacket gets an off
+        /// clip that hides it), every other property restored to its current scene value, material swaps
+        /// restored to the current material.</summary>
+        private static AnimationClip SynthesizeOff(GameObject avatar, AnimationClip on)
+        {
+            var off = new AnimationClip { name = on.name + " Off (CVRFury)" };
+            FillResting(off, avatar, new[] { on });
+            return SaveClip(off);
+        }
+
+        /// <summary>Resting clip covering every property the given clips animate — the explicit "none of
+        /// these outfits" state for dropdown Off options.</summary>
+        private static AnimationClip SynthesizeResting(GameObject avatar, IEnumerable<AnimationClip> union, string name)
+        {
+            var clip = new AnimationClip { name = name + " (CVRFury resting)" };
+            FillResting(clip, avatar, union);
+            return SaveClip(clip);
+        }
+
+        private static void FillResting(AnimationClip dst, GameObject avatar, IEnumerable<AnimationClip> sources)
+        {
+            var done = new HashSet<(string, string)>();
+            foreach (var src in sources)
+            {
+                if (src == null) continue;
+                foreach (var b in AnimationUtility.GetCurveBindings(src))
+                {
+                    if (!done.Add((b.path, b.propertyName))) continue;
+                    float rest;
+                    if (b.propertyName == "m_IsActive")
+                    {
+                        var c = AnimationUtility.GetEditorCurve(src, b);
+                        if (c == null || c.length == 0) continue;
+                        rest = c.keys[c.length - 1].value > 0.5f ? 0f : 1f; // inverse of the ON state
+                    }
+                    else if (!AnimationUtility.GetFloatValue(avatar, b, out rest)) continue;
+                    AnimationUtility.SetEditorCurve(dst, b, AnimationCurve.Constant(0f, 1f / 60f, rest));
+                }
+                foreach (var b in AnimationUtility.GetObjectReferenceCurveBindings(src))
+                {
+                    if (!done.Add((b.path, b.propertyName))) continue;
+                    if (!AnimationUtility.GetObjectReferenceValue(avatar, b, out var cur) || cur == null) continue;
+                    AnimationUtility.SetObjectReferenceCurve(dst, b,
+                        new[] { new ObjectReferenceKeyframe { time = 0f, value = cur } });
+                }
+            }
+        }
+
+        private static AnimationClip SaveClip(AnimationClip clip)
+        {
+            if (!AssetDatabase.IsValidFolder("Assets/CVRFury Generated"))
+                AssetDatabase.CreateFolder("Assets", "CVRFury Generated");
+            if (!AssetDatabase.IsValidFolder(WizardDir))
+                AssetDatabase.CreateFolder("Assets/CVRFury Generated", "Wizard");
+            var file = string.Join("_", clip.name.Split(System.IO.Path.GetInvalidFileNameChars()));
+            AssetDatabase.CreateAsset(clip, AssetDatabase.GenerateUniqueAssetPath($"{WizardDir}/{file}.anim"));
+            return clip;
         }
 
         // ---------------------------------------------------------------- plumbing ------------------

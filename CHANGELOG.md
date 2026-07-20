@@ -4,6 +4,28 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.0] - 2026-07-13 — Bulletproof menu conversion
+
+The Menu Wizard rebuilt around one principle: CVRFury builds every animator layer itself, both states are
+always explicit, and nothing depends on CCK generation or native handling. Root causes found by adversarial
+code verification of a real avatar's failure (clothing dead, materials fine):
+
+### Fixed
+- **One-Int outfit systems** (many menu controls sharing one parameter with different values — how most
+  commercial avatars wire clothing): previously each control became a Bool entry with the SAME machine name,
+  so they collapsed to a single mistyped entry and the whole clothing menu died. Now they fold into **one
+  real Int dropdown**: per-option clips extracted via the Equals conditions for each value, a synthesized
+  "Off" option when none covers zero, and a proper multi-state Int layer (one state per option, Equals
+  transitions, humanoid-masked) built by the new `AnimatorUtil.AddIntDropdownLayer`.
+- **The native-toggle path is gone from Apply.** m_IsActive-only clips (= all clothing) used to become
+  "native" entries with no clips and no layer — and the parameter pre-created for them even suppressed the
+  CCK's own generation. Double-dead. Every toggle now takes the proven clip path.
+- **Missing OFF clips are synthesized, always.** With WriteDefaults off, an empty Off state writes nothing —
+  one-way or dead toggles (all direct-blend-tree extractions, and any transition graph without an explicit
+  off state). Synthesis rule: object actives get the INVERSE of the ON value, every other property is
+  captured from the current scene state, material swaps restore the current material. Saved as real assets
+  under `CVRFury Generated/Wizard`.
+
 ## [0.18.2] - 2026-07-13
 
 ### Fixed

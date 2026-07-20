@@ -373,6 +373,41 @@ namespace CVRFury.Builder
             toOff.AddCondition(AnimatorConditionMode.IfNot, 0f, param);
         }
 
+        /// <summary>Int-dropdown layer: one state per option (its clip plays while that option is selected),
+        /// AnyState → option transitions on Equals(index). Same mask/WD discipline as the bool toggle layer —
+        /// masked so it can never pose the rig, WD off so options only drive what their clips write.</summary>
+        public static void AddIntDropdownLayer(AnimatorController c, string layerName, string param,
+                                               System.Collections.Generic.IList<AnimationClip> optionClips,
+                                               int defaultIndex, AvatarMask mask = null)
+        {
+            EnsureIntParam(c, param, defaultIndex);
+
+            var name = UniqueLayerName(c, layerName);
+            c.AddLayer(name);
+            var layers = c.layers;
+            var idx = layers.Length - 1;
+            layers[idx].defaultWeight = 1f;
+            if (mask != null) layers[idx].avatarMask = mask;
+            c.layers = layers;
+
+            var sm = c.layers[idx].stateMachine;
+            var states = new AnimatorState[optionClips.Count];
+            for (int i = 0; i < optionClips.Count; i++)
+            {
+                states[i] = sm.AddState($"Option {i}");
+                states[i].motion = optionClips[i];
+                states[i].writeDefaultValues = false;
+                var t = sm.AddAnyStateTransition(states[i]);
+                t.hasExitTime = false;
+                t.hasFixedDuration = true;
+                t.duration = 0f;
+                t.canTransitionToSelf = false;
+                t.AddCondition(AnimatorConditionMode.Equals, i, param);
+            }
+            if (optionClips.Count > 0)
+                sm.defaultState = states[Mathf.Clamp(defaultIndex, 0, optionClips.Count - 1)];
+        }
+
         /// <summary>Create an AvatarMask that disables every humanoid body part (muscles + IK goals),
         /// leaving the Transform section empty so generic transform/GameObject curves still apply. Assigned
         /// to CVRFury's clip-toggle layers so they can never pose the humanoid rig (the "motorbike pose").
