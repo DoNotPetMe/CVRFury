@@ -4,6 +4,24 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.2] - 2026-07-13 — Verifier-driven fixes: synthesized OFF clips + material reading
+
+The Menu Verifier immediately earned its keep: run on a heavily-VRCFury commercial avatar it mapped every
+failure precisely, revealing two real bugs behind the mass of dead clothing toggles.
+
+### Fixed
+- **Synthesized OFF clips were coming out EMPTY.** Off-clip synthesis used `AnimationUtility.GetFloatValue`,
+  which cannot read `material.*` shader properties (GPU uniforms, not serialized fields) and silently skipped
+  those bindings — so a synthesized OFF that couldn't read the property produced an empty clip, and with
+  WriteDefaults off that toggle is dead. Synthesis now NEVER skips a binding: actives/enabled invert,
+  readable properties take their live scene value via the new `SceneBindingReader` (which reads material
+  floats/color-channels, blendshapes, enabled flags, active states, and material-slot object refs that
+  Unity's API can't), and the last-resort fallback flips the ON value. Every property the ON clip writes now
+  has a matching OFF.
+- **The verifier's own "changes NOTHING" false alarms.** It read scene state with the same limited API, so
+  material-driven toggles (wetness/glitter) were wrongly flagged. It now uses `SceneBindingReader` too, and
+  treats an unreadable property as possibly-visible rather than dead. `SceneBindingReader` is shared by both.
+
 ## [0.19.1] - 2026-07-13 — 🔬 The Menu Verifier: no more upload-and-pray
 
 ### Added

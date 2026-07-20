@@ -177,22 +177,24 @@ namespace CVRFury.Builder.Convert
             foreach (var b in AnimationUtility.GetCurveBindings(clip))
             {
                 bindings++;
-                if (avatar.transform.Find(b.path) == null && !string.IsNullOrEmpty(b.path))
+                if (!string.IsNullOrEmpty(b.path) && avatar.transform.Find(b.path) == null)
                 { unresolved++; if (exampleBadPath == "") exampleBadPath = b.path; continue; }
                 var curve = AnimationUtility.GetEditorCurve(clip, b);
                 if (curve == null || curve.length == 0) continue;
                 var target = curve.keys[curve.length - 1].value;
-                if (AnimationUtility.GetFloatValue(avatar, b, out var current) &&
+                // Unreadable property (rare) counts as POSSIBLY-visible rather than a false "dead" — we can't
+                // prove it's a no-op, so don't punish it. Readable + different = definitely visible.
+                if (!SceneBindingReader.TryReadFloat(avatar, b, out var current) ||
                     Mathf.Abs(current - target) > 0.001f) visible++;
             }
             foreach (var b in AnimationUtility.GetObjectReferenceCurveBindings(clip))
             {
                 bindings++;
-                if (avatar.transform.Find(b.path) == null && !string.IsNullOrEmpty(b.path))
+                if (!string.IsNullOrEmpty(b.path) && avatar.transform.Find(b.path) == null)
                 { unresolved++; if (exampleBadPath == "") exampleBadPath = b.path; continue; }
                 var keys = AnimationUtility.GetObjectReferenceCurve(clip, b);
                 if (keys == null || keys.Length == 0) continue;
-                if (AnimationUtility.GetObjectReferenceValue(avatar, b, out var current) &&
+                if (!SceneBindingReader.TryReadObject(avatar, b, out var current) ||
                     current != keys[keys.Length - 1].value) visible++;
             }
         }

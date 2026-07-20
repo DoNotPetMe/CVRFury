@@ -360,6 +360,10 @@ namespace CVRFury.Builder.Convert
 
         private static void FillResting(AnimationClip dst, GameObject avatar, IEnumerable<AnimationClip> sources)
         {
+            // NEVER skip a binding: an OFF state that misses even one property the ON clip writes leaves
+            // that property stuck forever (WD off). Rules: actives/enabled invert; anything readable takes
+            // its current scene value (SceneBindingReader covers material.* and friends that Unity's
+            // GetFloatValue can't); the last-resort fallback flips the ON value.
             var done = new HashSet<(string, string)>();
             foreach (var src in sources)
             {
@@ -367,20 +371,20 @@ namespace CVRFury.Builder.Convert
                 foreach (var b in AnimationUtility.GetCurveBindings(src))
                 {
                     if (!done.Add((b.path, b.propertyName))) continue;
+                    var curve = AnimationUtility.GetEditorCurve(src, b);
+                    if (curve == null || curve.length == 0) continue;
+                    var onVal = curve.keys[curve.length - 1].value;
                     float rest;
-                    if (b.propertyName == "m_IsActive")
-                    {
-                        var c = AnimationUtility.GetEditorCurve(src, b);
-                        if (c == null || c.length == 0) continue;
-                        rest = c.keys[c.length - 1].value > 0.5f ? 0f : 1f; // inverse of the ON state
-                    }
-                    else if (!AnimationUtility.GetFloatValue(avatar, b, out rest)) continue;
+                    if (b.propertyName == "m_IsActive" || b.propertyName == "m_Enabled")
+                        rest = onVal > 0.5f ? 0f : 1f;
+                    else if (!SceneBindingReader.TryReadFloat(avatar, b, out rest))
+                        rest = Mathf.Abs(onVal) > 0.001f ? 0f : 1f;
                     AnimationUtility.SetEditorCurve(dst, b, AnimationCurve.Constant(0f, 1f / 60f, rest));
                 }
                 foreach (var b in AnimationUtility.GetObjectReferenceCurveBindings(src))
                 {
                     if (!done.Add((b.path, b.propertyName))) continue;
-                    if (!AnimationUtility.GetObjectReferenceValue(avatar, b, out var cur) || cur == null) continue;
+                    if (!SceneBindingReader.TryReadObject(avatar, b, out var cur)) continue;
                     AnimationUtility.SetObjectReferenceCurve(dst, b,
                         new[] { new ObjectReferenceKeyframe { time = 0f, value = cur } });
                 }
