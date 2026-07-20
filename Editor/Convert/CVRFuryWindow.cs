@@ -921,11 +921,26 @@ namespace CVRFury.Builder.Convert
                     using (new EditorGUI.DisabledScope(_avatar == null || !_wizardRows.Any(r => r.include)))
                         if (GUILayout.Button($"Apply {_wizardRows.Count(r => r.include)} menu entr(ies)"))
                         {
-                            try { _wizardStatus = MenuWizard.Apply(_avatar, _wizardRows); _log = _wizardStatus; _wizardRows = null; }
+                            try
+                            {
+                                _wizardStatus = MenuWizard.Apply(_avatar, _wizardRows);
+                                // Immediately verify the full causal chain — dead entries are named NOW,
+                                // not after an upload.
+                                _wizardStatus += "\n\n" + MenuVerifier.Verify(_avatar);
+                                _log = _wizardStatus; _wizardRows = null;
+                            }
                             catch (System.Exception ex) { _wizardStatus = "Error: " + ex.Message; Debug.LogException(ex); }
                             Repaint();
                         }
                 }
+
+                using (new EditorGUI.DisabledScope(_avatar == null))
+                    if (GUILayout.Button("🔬 Verify menu (no upload needed)"))
+                    {
+                        try { _wizardStatus = MenuVerifier.Verify(_avatar); _log = _wizardStatus; }
+                        catch (System.Exception ex) { _wizardStatus = "Error: " + ex.Message; Debug.LogException(ex); }
+                        Repaint();
+                    }
 
                 if (!string.IsNullOrEmpty(_wizardStatus))
                     ThemedBox(_wizardStatus, _wizardStatus.StartsWith("Error") ? MessageType.Error : MessageType.Info);

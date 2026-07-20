@@ -4,6 +4,18 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.1] - 2026-07-13 — 🔬 The Menu Verifier: no more upload-and-pray
+
+### Added
+- **Menu Verifier** — verifies EVERY menu entry in the editor, deterministically, before any upload. It
+  checks the complete causal chain per entry: parameter exists in the attached controller → a layer actually
+  LISTENS to it → the states have clips → every clip binding path RESOLVES to a real object on THIS avatar →
+  the clip produces a VISIBLE change vs the current scene state. Any break = a dead toggle in-game, and the
+  report names the exact broken link ("NONE of the clip's 14 paths exist on this avatar (e.g.
+  'Armature/Hips/Skirt') — wrong hierarchy"). Runs automatically after every wizard Apply, plus a
+  standalone "🔬 Verify menu" button. A menu that verifies green here works in ChilloutVR — and when
+  something is red, the fix is named instead of guessed.
+
 ## [0.19.0] - 2026-07-13 — Bulletproof menu conversion
 
 The Menu Wizard rebuilt around one principle: CVRFury builds every animator layer itself, both states are
