@@ -190,7 +190,7 @@ namespace CVRFury.Builder
         /// or more GameObjects (CVR-native — no animation clip needed). Each target is stored with its
         /// tree path and an <c>onState</c> of true (object visible when the toggle is on). Encoded Bool.</summary>
         public bool AddGameObjectToggle(string displayName, string machineName, bool defaultOn,
-                                        System.Collections.Generic.List<(GameObject go, string path)> targets)
+                                        System.Collections.Generic.List<(GameObject go, string path, bool onState)> targets)
         {
             return AddEntry(
                 displayName, machineName,
@@ -221,7 +221,7 @@ namespace CVRFury.Builder
                         if (te == null) continue;
                         Reflect.SetField(te, CckNames.Target_GameObject, t.go);
                         Reflect.SetField(te, CckNames.Target_TreePath, t.path);
-                        Reflect.SetField(te, CckNames.Target_OnState, true);
+                        Reflect.SetField(te, CckNames.Target_OnState, t.onState); // active-when-toggle-ON
                         list.Add(te);
                     }
                 });

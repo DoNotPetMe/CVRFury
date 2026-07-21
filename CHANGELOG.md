@@ -4,6 +4,22 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.0] - 2026-07-13 — Clothing toggles go native (no clips, no animator, no breakage)
+
+The verifier report on a real avatar proved the ON clips resolved and only the synthesized OFF clips were
+broken. Conclusion: clothing toggles should never have used clips at all.
+
+### Changed
+- **Object toggles now convert to CVR-NATIVE GameObject toggles.** Any menu toggle whose clip only switches
+  GameObjects on/off (i.e. all clothing/accessories) becomes a native CVR GameObject toggle: the game engine
+  drives the objects directly from the setting — **no animation clip, no animator layer, no synthesized off,
+  nothing that can be broken by a clip/parameter/regeneration bug.** Targets (with correct per-object
+  on-state, including objects the toggle HIDES) are read from the ON clip's `m_IsActive` curves, which the
+  verifier confirmed resolve. Material/blendshape/transform toggles keep the clip path (both states explicit
+  via the fixed synthesizer); shared-parameter outfits stay Int dropdowns.
+- `AddGameObjectToggle` carries per-target on-state; the Verifier recognizes native toggles as valid without
+  a layer (checking only that their target objects resolve) instead of false-flagging them.
+
 ## [0.19.2] - 2026-07-13 — Verifier-driven fixes: synthesized OFF clips + material reading
 
 The Menu Verifier immediately earned its keep: run on a heavily-VRCFury commercial avatar it mapped every

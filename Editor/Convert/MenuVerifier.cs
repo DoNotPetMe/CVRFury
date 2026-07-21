@@ -44,6 +44,28 @@ namespace CVRFury.Builder.Convert
                 var display = Reflect.GetField(entry, CckNames.Entry_Name) as string ?? machine;
                 if (string.IsNullOrEmpty(machine)) { lines.Add($"✗ '{display}': entry has NO parameter."); dead++; continue; }
 
+                // NATIVE GameObject toggle: no clips, no layer — the engine drives gameObjectTargets
+                // directly. Valid as long as its target paths resolve on this avatar.
+                var toggleSetting = Reflect.GetField(entry, CckNames.Entry_ToggleSettings);
+                var nativeTargets = toggleSetting != null
+                    ? Reflect.AsList(Reflect.GetField(toggleSetting, CckNames.Setting_GameObjectTargets)) : null;
+                if (nativeTargets != null && nativeTargets.Count > 0)
+                {
+                    int bad = 0; string egPath = "";
+                    foreach (var te in nativeTargets)
+                    {
+                        var go = Reflect.GetField(te, CckNames.Target_GameObject) as GameObject;
+                        var tp = Reflect.GetField(te, CckNames.Target_TreePath) as string;
+                        if (go == null && (string.IsNullOrEmpty(tp) || avatar.transform.Find(tp) == null))
+                        { bad++; if (egPath == "") egPath = tp ?? "(null)"; }
+                    }
+                    if (bad == nativeTargets.Count)
+                    { lines.Add($"✗ '{display}': native toggle but NONE of its {nativeTargets.Count} target object(s) resolve (e.g. '{egPath}')."); dead++; }
+                    else
+                    { lines.Add($"✓ '{display}': native GameObject toggle — {nativeTargets.Count - bad} object(s), engine-driven, no animator needed" + (bad > 0 ? $" ({bad} missing)" : "") + "."); ok++; }
+                    continue;
+                }
+
                 // Link 1+2: parameter declared, and a layer actually listening to it.
                 bool paramExists = ctrl != null && ctrl.parameters.Any(p => p.name == machine);
                 bool layerListens = ctrl != null && LayerListensTo(ctrl, machine);

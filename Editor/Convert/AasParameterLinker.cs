@@ -107,11 +107,11 @@ namespace CVRFury.Builder.Convert
                         var p = ParamName(control);
                         if (string.IsNullOrEmpty(p) || !seen.Add(p)) break;
 
-                        var targets = new List<(GameObject, string)>();
+                        var targets = new List<(GameObject, string, bool)>();
                         var tf = FindTarget(index, p, name);
                         if (tf != null)
                         {
-                            targets.Add((tf.gameObject, AnimationUtility.CalculateTransformPath(tf, root.transform)));
+                            targets.Add((tf.gameObject, AnimationUtility.CalculateTransformPath(tf, root.transform), true));
                             matched++;
                         }
                         else unmatched.Add($"{name}   →   {p}");

@@ -261,7 +261,7 @@ namespace CVRFury.Builder.Convert
 
             var sync = ReadParamInfo(avatar);
             var dropdownClips = new Dictionary<string, IList<AnimationClip>>();
-            int toggles = 0, sliders = 0, dropdowns = 0, bare = 0;
+            int toggles = 0, natives = 0, sliders = 0, dropdowns = 0, bare = 0;
             var log = new List<string>();
 
             foreach (var row in rows.Where(r => r.include))
@@ -301,11 +301,22 @@ namespace CVRFury.Builder.Convert
                     var on = row.on;
                     var off = row.off;
                     if (on == null && off != null) { on = off; off = null; } // odd graphs: found clip = ON
-                    // BOTH states must always exist explicitly: with WriteDefaults off, an empty Off state
-                    // writes nothing and the toggle is one-way or dead. Missing OFF is synthesized —
-                    // object actives get the INVERSE of the ON value, everything else the current scene value.
-                    if (on != null && off == null) off = SynthesizeOff(avatar, on);
 
+                    // BULLETPROOF PATH: if the toggle's clip only switches GameObjects on/off (all clothing),
+                    // make a CVR-NATIVE GameObject toggle — the engine drives the objects directly, with NO
+                    // animation clip, NO animator layer, NO synthesized off. Nothing to break. Targets come
+                    // from the ON clip's m_IsActive curves (proven to resolve in the verifier).
+                    if (on != null && TryObjectTargets(avatar, on, off, out var targets) && targets.Count > 0)
+                    {
+                        cvr.AddGameObjectToggle(leaf, machine, info.def > 0.5f, targets);
+                        natives++;
+                        log.Add($"✓ native toggle '{row.display}' — {targets.Count} object(s), no clips " +
+                                $"[{row.provenance}]");
+                        continue;
+                    }
+
+                    // Material/blendshape/transform toggles keep the clip path (both states explicit).
+                    if (on != null && off == null) off = SynthesizeOff(avatar, on);
                     if (on != null)
                     {
                         cvr.AddToggle(leaf, machine, info.def > 0.5f, local, on, off);
@@ -330,9 +341,42 @@ namespace CVRFury.Builder.Convert
             // multi-state Int layers from the per-option clips.
             var buildReport = ToggleClipLinker.BuildAndAttach(cvr, avatar, cvr.SettingsList, null, dropdownClips);
 
-            return $"Applied from the FX graph: {toggles} toggle(s), {dropdowns} dropdown(s), {sliders} " +
-                   $"slider(s), {bare} without clips.\n" + string.Join("\n", log) +
-                   "\n\nController: " + buildReport;
+            return $"Applied from the FX graph: {natives} native object toggle(s) [no clips — bulletproof], " +
+                   $"{toggles} material/shape toggle(s), {dropdowns} dropdown(s), {sliders} slider(s), " +
+                   $"{bare} without clips.\n" + string.Join("\n", log) + "\n\nController: " + buildReport;
+        }
+
+        /// <summary>True when the toggle's clips ONLY switch GameObjects active (m_IsActive) — clothing and
+        /// accessories. Returns the native target list: every object the ON clip activates (onState=true) or
+        /// deactivates (onState=false), paths RESOLVED against this avatar. If any binding is something else
+        /// (material/blendshape/transform) or a path doesn't resolve, returns false so the clip path is used.
+        /// Native toggles need no animator layer, so they can never be broken by clip/param/regeneration bugs.</summary>
+        private static bool TryObjectTargets(GameObject avatar, AnimationClip on, AnimationClip off,
+                                             out List<(GameObject go, string path, bool onState)> targets)
+        {
+            targets = new List<(GameObject, string, bool)>();
+            var seen = new HashSet<string>();
+            foreach (var clip in new[] { on, off })
+            {
+                if (clip == null) continue;
+                if (AnimationUtility.GetObjectReferenceCurveBindings(clip).Length > 0) return false; // material swap etc.
+                foreach (var b in AnimationUtility.GetCurveBindings(clip))
+                {
+                    if (b.propertyName != "m_IsActive") return false; // not a pure object toggle
+                    var t = string.IsNullOrEmpty(b.path) ? avatar.transform : avatar.transform.Find(b.path);
+                    if (t == null) return false;                      // unresolved path — clip path will flag it
+                    if (!seen.Add(b.path)) continue;
+                    var curve = AnimationUtility.GetEditorCurve(clip, b);
+                    if (curve == null || curve.length == 0) continue;
+                    // onState = the object's active value in the ON clip. (Reading the ON clip only: an object
+                    // the ON hides has onState=false; CVR auto-restores it to the opposite when toggled off.)
+                    bool onState = clip == on
+                        ? curve.keys[curve.length - 1].value > 0.5f
+                        : curve.keys[curve.length - 1].value <= 0.5f; // from OFF clip, invert
+                    targets.Add((t.gameObject, b.path, onState));
+                }
+            }
+            return targets.Count > 0;
         }
 
         // ------------------------------------------------- clip synthesis ---------------------------
