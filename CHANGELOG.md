@@ -4,6 +4,18 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.2] - 2026-07-13 — Poiyomi unlock: material toggles that actually drive
+
+### Added
+- **🔓 Unlock Poiyomi** (Menu Wizard section). On avatars whose clothing is combined into shared meshes and
+  hidden by Poiyomi DISSOLVE / hue / emission or blendshapes (instead of separate GameObjects), the toggles
+  animate material properties — and a LOCKED Poiyomi shader ignores animation on any property not tagged
+  "Animated," so the converted toggle silently does nothing in CVR even though the property works when set by
+  hand. VRChat hides this because VRCFury/Poiyomi mark animated properties before locking; a converted CVR
+  avatar has no such pass. One click unlocks every locked Poiyomi material on the avatar (via Thry's optimizer
+  by reflection) so all their properties become animatable and material-driven toggles work. Reports what it
+  unlocked and flags any it couldn't (unlock those manually via the material's "Unlock Shader" button).
+
 ## [0.20.1] - 2026-07-13 — The real root cause: every toggle ships its own built layer
 
 A source-read of the real CCK (via the verification workflow) corrected the 0.20.0 approach BEFORE it

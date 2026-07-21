@@ -934,13 +934,24 @@ namespace CVRFury.Builder.Convert
                         }
                 }
 
+                using (new EditorGUILayout.HorizontalScope())
                 using (new EditorGUI.DisabledScope(_avatar == null))
+                {
                     if (GUILayout.Button("🔬 Verify menu (no upload needed)"))
                     {
                         try { _wizardStatus = MenuVerifier.Verify(_avatar); _log = _wizardStatus; }
                         catch (System.Exception ex) { _wizardStatus = "Error: " + ex.Message; Debug.LogException(ex); }
                         Repaint();
                     }
+                    if (GUILayout.Button(new GUIContent("🔓 Unlock Poiyomi",
+                        "Locked Poiyomi shaders ignore animation on non-'Animated' properties, so dissolve/" +
+                        "hue/emission toggles silently do nothing in CVR. This unlocks them so they animate.")))
+                    {
+                        try { _wizardStatus = PoiyomiTools.UnlockAll(_avatar); _log = _wizardStatus; }
+                        catch (System.Exception ex) { _wizardStatus = "Error: " + ex.Message; Debug.LogException(ex); }
+                        Repaint();
+                    }
+                }
 
                 if (!string.IsNullOrEmpty(_wizardStatus))
                     ThemedBox(_wizardStatus, _wizardStatus.StartsWith("Error") ? MessageType.Error : MessageType.Info);
