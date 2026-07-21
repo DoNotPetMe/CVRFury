@@ -4,6 +4,24 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.1] - 2026-07-13 — The real root cause: every toggle ships its own built layer
+
+A source-read of the real CCK (via the verification workflow) corrected the 0.20.0 approach BEFORE it
+reached anyone. `gameObjectTargets` is `#if UNITY_EDITOR`-only — there is NO runtime native toggle; the CCK
+BAKES targets into an `m_IsActive` clip inside a generated animator layer at build time. And the saga's true
+root cause: the CCK skips regenerating any entry whose parameter already exists in the controller, so an
+entry that has the parameter but no built LAYER (gameObjectTargets-only, or the 0.20.0 native path) never
+gets a layer and the object is dead — while material/blendshape toggles worked precisely because CVRFury
+built real layers for them.
+
+### Fixed
+- **Every menu toggle now ships as a real clip layer that CVRFury builds and attaches itself** — object
+  toggles included. Object toggles get an ON clip from the FX graph plus a guaranteed-correct OFF clip
+  (`m_IsActive` inverted), so `BuildAndAttach` builds a proper masked layer for each; because CVRFury's
+  controller (base + animator) already declares every parameter, the CCK preserves those layers instead of
+  regenerating over them. This is the exact path that always made skin/piercings work — now every clothing
+  toggle takes it too. Reverted the 0.20.0 native-GameObject-toggle routing.
+
 ## [0.20.0] - 2026-07-13 — Clothing toggles go native (no clips, no animator, no breakage)
 
 The verifier report on a real avatar proved the ON clips resolved and only the synthesized OFF clips were
