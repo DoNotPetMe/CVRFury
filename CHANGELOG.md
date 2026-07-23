@@ -4,6 +4,19 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.21.0] - 2026-07-13 — Nipple bump generator
+
+### Added
+- **🍒 Nipple bump (poke through clothing)** (Avatar features). Adds a bump to a clothing mesh so the nipple
+  reads through it — procedurally, since Unity can't sculpt: place a marker (pink gizmo sphere) on the shirt
+  where each nipple is, and every vertex within the radius is pushed OUTWARD along its normal with a smooth
+  cosine falloff (full at the marker, zero at the edge), baked as a "CVRFuryNipplePoke" blendshape on a NEW
+  mesh asset (the original is untouched). Markers map to vertices via the current skinned pose (BakeMesh), so
+  where you place them on the shirt is where the bump appears; size and poke-amount are sliders; it previews
+  at full strength instantly and regenerates non-destructively from the original each time (existing
+  blendshapes preserved). Drive the baked blendshape with a toggle or slider for an in-game on/off. Pairs
+  with Tools ▸ CVRFury ▸ Placement to hide the body while lining up the markers.
+
 ## [0.20.3] - 2026-07-13
 
 ### Added

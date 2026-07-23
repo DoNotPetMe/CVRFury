@@ -92,6 +92,14 @@ namespace CVRFury.Builder.Convert
         private bool _touchParticles;
         private string _touchStatus = "";
 
+        // Nipple bump (poke through clothing)
+        private bool _sBump;
+        private SkinnedMeshRenderer _bumpMesh;
+        private Mesh _bumpOriginal;
+        private readonly List<CVRFuryNippleMarker> _bumpMarkers = new List<CVRFuryNippleMarker>();
+        private float _bumpRadius = 0.03f, _bumpStrength = 0.015f;
+        private string _bumpStatus = "";
+
         // Breathing
         private bool _sBreathing;
         private SkinnedMeshRenderer _breathMesh;
@@ -289,6 +297,7 @@ namespace CVRFury.Builder.Convert
                     StepResize();
                     StepPresets();
                     StepTouch();
+                    StepNippleBump();
                     StepBreathing();
                     StepReveal();
                     StepSps();
@@ -1198,6 +1207,77 @@ namespace CVRFury.Builder.Convert
                     }
                 if (!string.IsNullOrEmpty(_touchStatus))
                     ThemedBox(_touchStatus, _touchStatus.StartsWith("Error") ? MessageType.Error : MessageType.Info);
+            }
+        }
+
+        private void StepNippleBump()
+        {
+            _sBump = Foldout(_sBump, "🍒 Nipple bump (poke through clothing)");
+            if (!_sBump) return;
+            using (new EditorGUI.IndentLevelScope())
+            {
+                ThemedBox("Adds a bump to a CLOTHING mesh so the nipple pokes through — done by math, not " +
+                    "sculpting: place a marker (pink sphere) on the shirt where each nipple is, and every " +
+                    "vertex inside it is pushed outward with a smooth falloff, baked as a blendshape. Tip: use " +
+                    "Tools ▸ CVRFury ▸ Placement to hide the body while you line the markers up on the shirt.",
+                    MessageType.None);
+
+                _bumpMesh = (SkinnedMeshRenderer)EditorGUILayout.ObjectField(new GUIContent("Clothing mesh",
+                    "The shirt/top Skinned Mesh Renderer to bump."), _bumpMesh, typeof(SkinnedMeshRenderer), true);
+                if (_bumpMesh != null && _bumpOriginal == null) _bumpOriginal = _bumpMesh.sharedMesh;
+
+                _bumpRadius = EditorGUILayout.Slider(new GUIContent("Bump size (m)", "Radius of each poke."), _bumpRadius, 0.005f, 0.1f);
+                _bumpStrength = EditorGUILayout.Slider(new GUIContent("Poke amount (m)", "How far it pokes out."), _bumpStrength, 0.002f, 0.06f);
+                foreach (var m in _bumpMarkers) if (m != null) m.radius = _bumpRadius;
+
+                using (new EditorGUILayout.HorizontalScope())
+                using (new EditorGUI.DisabledScope(_avatar == null))
+                {
+                    if (GUILayout.Button("+ Place a marker"))
+                    {
+                        var go = new GameObject($"Nipple Marker {_bumpMarkers.Count + 1}");
+                        Undo.RegisterCreatedObjectUndo(go, "Nipple marker");
+                        var anim = _avatar.GetComponentInChildren<Animator>();
+                        var chest = anim != null && anim.isHuman ? anim.GetBoneTransform(HumanBodyBones.Chest) : null;
+                        go.transform.SetParent(_avatar.transform, false);
+                        go.transform.position = (chest != null ? chest.position : _avatar.transform.position)
+                                                + _avatar.transform.forward * 0.12f + Vector3.up * 0.05f
+                                                + _avatar.transform.right * (_bumpMarkers.Count == 0 ? -0.07f : 0.07f);
+                        var mk = go.AddComponent<CVRFuryNippleMarker>();
+                        mk.radius = _bumpRadius;
+                        _bumpMarkers.Add(mk);
+                        Selection.activeGameObject = go;
+                        if (SceneView.lastActiveSceneView != null) SceneView.lastActiveSceneView.FrameSelected();
+                    }
+                    if (GUILayout.Button("Clear markers"))
+                    {
+                        foreach (var m in _bumpMarkers) if (m != null) Undo.DestroyObjectImmediate(m.gameObject);
+                        _bumpMarkers.Clear();
+                    }
+                }
+                _bumpMarkers.RemoveAll(m => m == null);
+                if (_bumpMarkers.Count > 0)
+                    EditorGUILayout.LabelField($"{_bumpMarkers.Count} marker(s) placed — drag each onto a nipple on the shirt.",
+                        EditorStyles.miniLabel);
+
+                using (new EditorGUI.DisabledScope(_bumpMesh == null || _bumpMarkers.Count == 0))
+                    if (GUILayout.Button("Generate / update bump", GUILayout.Height(24)))
+                    {
+                        try
+                        {
+                            _bumpStatus = NippleBumpGenerator.Generate(_bumpMesh, _bumpOriginal,
+                                _bumpMarkers.Select(m => m.transform.position).ToList(),
+                                _bumpMarkers.Select(m => m.radius).ToList(), _bumpStrength, out _);
+                        }
+                        catch (System.Exception ex) { _bumpStatus = "Error: " + ex.Message; Debug.LogException(ex); }
+                        Repaint();
+                    }
+                if (_bumpMarkers.Count > 0)
+                    EditorGUILayout.LabelField("When it looks right, delete the markers (Clear) — they're only a guide.",
+                        EditorStyles.miniLabel);
+
+                if (!string.IsNullOrEmpty(_bumpStatus))
+                    ThemedBox(_bumpStatus, _bumpStatus.StartsWith("Error") ? MessageType.Error : MessageType.Info);
             }
         }
 
