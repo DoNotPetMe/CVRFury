@@ -4,6 +4,15 @@ All notable changes to CVRFury are documented in this file. The format is based
 on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.3] - 2026-07-13
+
+### Added
+- **Placement view** (Tools ▸ CVRFury ▸ Placement) — for positioning things that sit on the body but are
+  hidden by opaque clothing (nipple bumps, piercings, SPS sockets, touch zones): "Hide Selected" makes the
+  selected clothing renderers invisible in the editor so you can see the body underneath and place precisely,
+  and "Show All Again" restores exactly what it hid. Toggles renderer visibility only (not activeSelf), so
+  nothing about the avatar's toggles or the shipped result is affected — it's purely an authoring aid.
+
 ## [0.20.2] - 2026-07-13 — Poiyomi unlock: material toggles that actually drive
 
 ### Added
